@@ -689,6 +689,27 @@
     worker.postMessage({ type: 'reset' });
   });
 
+  const tabButtons = Array.from(document.querySelectorAll('.tab-button'));
+  const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
+
+  function activateTab(name) {
+    if (!name) return;
+    tabButtons.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === name);
+    });
+    tabPanels.forEach(panel => {
+      panel.classList.toggle('active', panel.dataset.tab === name);
+    });
+  }
+
+  if (tabButtons.length) {
+    const initial = tabButtons.find(btn => btn.classList.contains('active'))?.dataset.tab || tabButtons[0].dataset.tab;
+    activateTab(initial);
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+    });
+  }
+
   function handleSlider(el, valEl, formatter, key) {
     el.addEventListener('input', () => {
       valEl.textContent = formatter(el.value);

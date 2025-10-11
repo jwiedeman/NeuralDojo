@@ -15,18 +15,29 @@ body {
   font-family: var(--mono);
   background: var(--bg);
   color: var(--fg);
+  overflow: hidden;
 }
 
-#app { max-width: 1380px; margin: 0 auto; padding: 12px; }
-header { margin-bottom: 12px; }
+#app {
+  width: 100%;
+  max-width: none;
+  margin: 0 auto;
+  padding: 12px 20px 16px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+header { margin-bottom: 10px; }
 .title { font-weight: 800; letter-spacing: 1px; font-size: 18px; }
 .subtitle { color: var(--muted); font-size: 12px; margin-top: 4px; }
 
 .split {
+  flex: 1;
   display: grid;
-  grid-template-columns: 1fr 1.2fr;
+  grid-template-columns: minmax(520px, 560px) 1fr;
   gap: 18px;
-  align-items: start;
+  align-items: stretch;
+  min-height: 0;
 }
 
 .pane {
@@ -34,7 +45,12 @@ header { margin-bottom: 12px; }
   border: 2px solid var(--border);
   padding: 14px;
   box-shadow: 4px 4px 0 #0002;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
+.pane.left { gap: 12px; }
+.pane.right { overflow: hidden; }
 
 .panel-header {
   border-bottom: 2px dotted var(--border);
@@ -67,11 +83,35 @@ header { margin-bottom: 12px; }
 
 .training-pane { padding: 16px; }
 
-.training-grid {
+.training-layout {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-  align-items: start;
+  flex: 1;
+  min-height: 0;
+}
+
+.training-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.training-column .panel-card {
+  flex: 1;
+}
+
+.column-setup .intro-card {
+  flex: 0 0 auto;
+}
+
+.column-setup .controls-card {
+  flex: 1;
+}
+
+.column-visuals .tab-card {
+  flex: 1;
 }
 
 .panel-card {
@@ -139,6 +179,20 @@ blockquote {
 .stats.compact { font-size: 12px; gap: 6px; }
 .stats-tight { gap: 6px; font-size: 12px; }
 
+.model-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.model-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
 #board {
   width: 100%;
   background: #fff;
@@ -160,8 +214,8 @@ blockquote {
 
 .weights-columns {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
 }
 
 .weights-section {
@@ -178,8 +232,8 @@ blockquote {
 
 .weights-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
 }
 
 .weight-unit {
@@ -193,6 +247,7 @@ blockquote {
   background: #fff;
   border: 1px solid #111;
   image-rendering: pixelated;
+  max-height: 110px;
 }
 
 .weight-caption {
@@ -210,7 +265,7 @@ blockquote {
 .output-weights-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
 }
 
 .output-card {
@@ -251,11 +306,75 @@ blockquote {
   margin: 8px 0 0;
 }
 
+.tab-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.tab-button {
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 11px;
+  padding: 6px 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.tab-button.active {
+  background: #111;
+  color: #f7f7f7;
+}
+
+.tab-panels {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tab-panel {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.tab-panel.active {
+  display: flex;
+}
+
+.tab-panel canvas {
+  width: 100%;
+  height: auto;
+  border: 1px solid #111;
+}
+
+@media (max-width: 1440px) {
+  .training-layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tab-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 1024px) {
+  body {
+    overflow: auto;
+  }
+  #app {
+    padding: 12px;
+    min-height: auto;
+  }
   .split {
     grid-template-columns: 1fr;
+    min-height: auto;
   }
   .pane { min-height: auto; }
-  .training-grid { grid-template-columns: 1fr; }
+  .training-layout { grid-template-columns: 1fr; }
   .weights-columns, .output-weights-grid { grid-template-columns: 1fr; }
 }
