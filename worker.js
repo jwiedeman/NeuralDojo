@@ -100,12 +100,19 @@ const config = {
   delayMs: 160
 };
 
-let net = new TinyValueNet(config.size, config.hiddenUnits, config.learningRate);
+function createNet() {
+  return new TinyValueNet(config.size, config.hiddenUnits, config.learningRate);
+}
+
+let nets = {
+  black: createNet(),
+  white: createNet()
+};
 let running = false;
 let moveTimer = null;
 let board = new Board(config.size, config.komi);
-let states = [];
-let predictions = [];
+let statesByColor = { black: [], white: [] };
+let predictionsByColor = { black: [], white: [] };
 let stats = createStats();
 let gameHistory = [];
 const maxHistory = 360;
@@ -117,9 +124,22 @@ function createStats() {
     whiteWins: 0,
     totalPredictions: 0,
     correctPredictions: 0,
-    avgConfidenceSum: 0,
+    confidenceSum: 0,
     lastWinner: '—',
     lastScore: 0,
+    trainingSteps: 0,
+    perModel: {
+      black: createModelStats(),
+      white: createModelStats()
+    }
+  };
+}
+
+function createModelStats() {
+  return {
+    predictions: 0,
+    correctPredictions: 0,
+    confidenceSum: 0,
     trainingSteps: 0
   };
 }
@@ -151,6 +171,18 @@ function snapshotBoard() {
 
 let lastMove = -1;
 let currentGame = 1;
+
+function colorKey(player) {
+  return player === BLACK ? 'black' : 'white';
+}
+
+function evaluateBoardConfidence(b) {
+  const encoded = encodeBoard(b);
+  return {
+    black: nets.black.forward(encoded).output,
+    white: nets.white.forward(encoded).output
+  };
+}
 
 function clearTimer() {
   if (moveTimer != null) {
@@ -189,19 +221,23 @@ function stepSelfPlay() {
   }
 
   const encoded = encodeBoard(board);
+  const playerKey = colorKey(board.toPlay);
+  const mover = board.toPlay;
+  const net = nets[playerKey];
   const { output } = net.forward(encoded);
-  states.push(encoded);
-  predictions.push(output);
+  statesByColor[playerKey].push(encoded);
+  predictionsByColor[playerKey].push(output);
 
   const move = chooseMove();
-  const mover = board.toPlay;
   lastMove = move;
   board.play(move);
+
+  const confidence = evaluateBoardConfidence(board);
 
   self.postMessage({
     type: 'move',
     board: snapshotBoard(),
-    confidence: output,
+    confidence,
     gameNumber: currentGame,
     moveIndex: board.moveCount,
     lastMove: move,
@@ -217,23 +253,18 @@ function chooseMove() {
   if (Math.random() < config.epsilon) {
     return moves[(Math.random() * moves.length) | 0];
   }
+  const playerKey = colorKey(board.toPlay);
+  const net = nets[playerKey];
   let bestMove = moves[0];
-  let bestValue = board.toPlay === BLACK ? -Infinity : Infinity;
+  let bestValue = -Infinity;
   for (const mv of moves) {
     const clone = board.clone();
     const res = clone.play(mv);
     if (!res.ok) continue;
     const { output } = net.forward(encodeBoard(clone));
-    if (board.toPlay === BLACK) {
-      if (output > bestValue) {
-        bestValue = output;
-        bestMove = mv;
-      }
-    } else {
-      if (output < bestValue) {
-        bestValue = output;
-        bestMove = mv;
-      }
+    if (output > bestValue) {
+      bestValue = output;
+      bestMove = mv;
     }
   }
   return bestMove;
@@ -242,25 +273,51 @@ function chooseMove() {
 function finishGame() {
   const score = board.areaScore();
   const blackWin = score > 0 ? 1 : 0;
-  if (states.length) {
-    net.trainBatch(states, blackWin);
-    stats.trainingSteps += states.length;
+  const whiteWin = blackWin ? 0 : 1;
+
+  const blackStates = statesByColor.black;
+  const whiteStates = statesByColor.white;
+  if (blackStates.length) {
+    nets.black.trainBatch(blackStates, blackWin);
+    stats.trainingSteps += blackStates.length;
+    stats.perModel.black.trainingSteps += blackStates.length;
   }
-  const correct = predictions.reduce((acc, p) => acc + (((p >= 0.5) ? 1 : 0) === blackWin ? 1 : 0), 0);
+  if (whiteStates.length) {
+    nets.white.trainBatch(whiteStates, whiteWin);
+    stats.trainingSteps += whiteStates.length;
+    stats.perModel.white.trainingSteps += whiteStates.length;
+  }
+
+  const blackPreds = predictionsByColor.black;
+  const whitePreds = predictionsByColor.white;
+  const correctBlack = blackPreds.reduce((acc, p) => acc + (((p >= 0.5) ? 1 : 0) === blackWin ? 1 : 0), 0);
+  const correctWhite = whitePreds.reduce((acc, p) => acc + (((p >= 0.5) ? 1 : 0) === whiteWin ? 1 : 0), 0);
+  const sumBlack = blackPreds.reduce((acc, p) => acc + p, 0);
+  const sumWhite = whitePreds.reduce((acc, p) => acc + p, 0);
+
   stats.games += 1;
   if (blackWin) stats.blackWins += 1; else stats.whiteWins += 1;
-  stats.totalPredictions += predictions.length;
-  stats.correctPredictions += correct;
-  const avgConf = predictions.length ? predictions.reduce((a,b) => a + b, 0) / predictions.length : 0.5;
-  stats.avgConfidenceSum += avgConf;
+  stats.totalPredictions += blackPreds.length + whitePreds.length;
+  stats.correctPredictions += correctBlack + correctWhite;
+  stats.confidenceSum += sumBlack + sumWhite;
   stats.lastWinner = blackWin ? 'Black' : 'White';
   stats.lastScore = score;
+
+  stats.perModel.black.predictions += blackPreds.length;
+  stats.perModel.black.correctPredictions += correctBlack;
+  stats.perModel.black.confidenceSum += sumBlack;
+  stats.perModel.white.predictions += whitePreds.length;
+  stats.perModel.white.correctPredictions += correctWhite;
+  stats.perModel.white.confidenceSum += sumWhite;
+
+  const totalPredictionsGame = blackPreds.length + whitePreds.length;
+  const avgConfGame = totalPredictionsGame ? (sumBlack + sumWhite) / totalPredictionsGame : 0.5;
 
   const historyEntry = {
     game: stats.games,
     winRate: stats.games ? stats.blackWins / stats.games : 0,
     accuracy: stats.totalPredictions ? stats.correctPredictions / stats.totalPredictions : 0,
-    avgConfidence: stats.games ? stats.avgConfidenceSum / stats.games : 0,
+    avgConfidence: avgConfGame,
     score,
     blackWin: !!blackWin
   };
@@ -285,21 +342,22 @@ function finishGame() {
 function startNewGame() {
   clearTimer();
   board = new Board(config.size, config.komi);
-  states = [];
-  predictions = [];
+  statesByColor = { black: [], white: [] };
+  predictionsByColor = { black: [], white: [] };
   lastMove = -1;
-  const { output } = net.forward(encodeBoard(board));
+  const confidence = evaluateBoardConfidence(board);
   self.postMessage({
     type: 'gameStart',
     board: snapshotBoard(),
-    confidence: output,
+    confidence,
     gameNumber: currentGame,
     running
   });
   if (running) scheduleNext();
 }
 
-function exportWeights() {
+function serializeNet(net) {
+  if (!net) return null;
   return {
     hiddenUnits: net.hiddenUnits,
     inputSize: net.inputSize,
@@ -311,11 +369,31 @@ function exportWeights() {
   };
 }
 
+function exportWeights() {
+  return {
+    black: serializeNet(nets.black),
+    white: serializeNet(nets.white)
+  };
+}
+
 function exportHistory() {
   return gameHistory.map(entry => ({ ...entry }));
 }
 
 function formatStats() {
+  const modelSummary = (model) => {
+    const predictions = model && typeof model.predictions === 'number' ? model.predictions : 0;
+    const correct = model && typeof model.correctPredictions === 'number' ? model.correctPredictions : 0;
+    const confidenceSum = model && typeof model.confidenceSum === 'number' ? model.confidenceSum : 0;
+    const trainingSteps = model && typeof model.trainingSteps === 'number' ? model.trainingSteps : 0;
+    return {
+      predictions,
+      accuracy: predictions ? correct / predictions : 0,
+      avgConfidence: predictions ? confidenceSum / predictions : 0,
+      trainingSteps
+    };
+  };
+
   const res = {
     games: stats.games,
     blackWins: stats.blackWins,
@@ -323,31 +401,38 @@ function formatStats() {
     blackWinRate: stats.games ? stats.blackWins / stats.games : 0,
     predictionAccuracy: stats.totalPredictions ? stats.correctPredictions / stats.totalPredictions : 0,
     totalPredictions: stats.totalPredictions,
-    avgConfidence: stats.games ? stats.avgConfidenceSum / stats.games : 0,
+    avgConfidence: stats.totalPredictions ? stats.confidenceSum / stats.totalPredictions : 0,
     trainingSteps: stats.trainingSteps,
     lastWinner: stats.lastWinner,
-    lastScore: stats.lastScore
+    lastScore: stats.lastScore,
+    perModel: {
+      black: modelSummary(stats.perModel.black),
+      white: modelSummary(stats.perModel.white)
+    }
   };
   return res;
 }
 
 function fullReset(messageType = 'resetDone') {
   clearTimer();
-  net = new TinyValueNet(config.size, config.hiddenUnits, config.learningRate);
+  nets = {
+    black: createNet(),
+    white: createNet()
+  };
   stats = createStats();
   board = new Board(config.size, config.komi);
-  states = [];
-  predictions = [];
+  statesByColor = { black: [], white: [] };
+  predictionsByColor = { black: [], white: [] };
   lastMove = -1;
   currentGame = 1;
   gameHistory = [];
-  const { output } = net.forward(encodeBoard(board));
+  const confidence = evaluateBoardConfidence(board);
   self.postMessage({
     type: messageType,
     board: snapshotBoard(),
     stats: formatStats(),
     weights: exportWeights(),
-    confidence: output,
+    confidence,
     config: { ...config },
     running,
     history: exportHistory()
@@ -368,7 +453,8 @@ self.onmessage = (ev) => {
     let needsReset = false;
     if (cfg.learningRate != null) {
       config.learningRate = +cfg.learningRate;
-      net.setLearningRate(config.learningRate);
+      nets.black.setLearningRate(config.learningRate);
+      nets.white.setLearningRate(config.learningRate);
     }
     if (cfg.hiddenUnits != null) {
       const units = Math.max(2, Math.floor(+cfg.hiddenUnits));
