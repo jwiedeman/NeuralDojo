@@ -1,0 +1,15 @@
+/* NeuralGo-specific styling layered on top of the shared Neural UI. */
+:root {
+  --board-surface: #f1d6a0;
+}
+
+#board {
+  background: var(--board-surface);
+  border-radius: 4px;
+}
+
+.board-legend {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
