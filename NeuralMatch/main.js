@@ -205,13 +205,10 @@
         ? `${msg.pattern.name} — ${msg.pattern.variant}`
         : msg.pattern?.name || '—';
       patternNameEl.textContent = patternLabel;
-      const layerTags = Array.isArray(msg.pattern?.layers) ? msg.pattern.layers : [];
-      const transformTags = Array.isArray(msg.pattern?.transforms) ? msg.pattern.transforms : [];
-      const descriptors = [];
-      if (msg.pattern?.layerDepth != null) descriptors.push(`layers=${msg.pattern.layerDepth}`);
-      descriptors.push(...layerTags, ...transformTags);
-      patternTransformsEl.textContent = descriptors.length ? descriptors.join(' · ') : 'none';
-      patternNoiseEl.textContent = `${((msg.pattern?.noise ?? 0) * 100).toFixed(1)}%`;
+      patternTransformsEl.textContent = (msg.pattern?.transforms && msg.pattern.transforms.length)
+        ? msg.pattern.transforms.join(' · ')
+        : 'none';
+      patternNoiseEl.textContent = `${Math.round((msg.pattern?.noise ?? 0) * 100)}%`;
 
       bestSwapEl.textContent = describeSwap(msg.bestMove, boardState.size);
       targetScoreEl.textContent = (msg.targetScore ?? 0).toFixed(2);

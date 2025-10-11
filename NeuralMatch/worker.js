@@ -14,45 +14,27 @@ const config = {
 class MatchNet {
   constructor(inputSize, hiddenUnits, learningRate) {
     this.inputSize = inputSize;
-    this.baseHiddenUnits = hiddenUnits;
+    this.hiddenUnits = hiddenUnits;
     this.learningRate = learningRate;
-    this.rebuildHiddenStack();
     this.initWeights();
   }
 
-  rebuildHiddenStack() {
-    const first = Math.max(8, Math.round(this.baseHiddenUnits));
-    const second = Math.max(6, Math.round(first * 0.75));
-    const third = Math.max(4, Math.round(first * 0.55));
-    this.hiddenStack = [first, second, third];
-  }
-
   initWeights() {
-    const layers = this.hiddenStack.length;
-    this.weights = new Array(layers);
-    this.biases = new Array(layers);
-
-    let prevSize = this.inputSize;
-    for (let layer = 0; layer < layers; layer++) {
-      const units = this.hiddenStack[layer];
-      const scale = Math.sqrt(6 / (prevSize + units));
-      const weight = new Float32Array(units * prevSize);
-      const bias = new Float32Array(units);
-      for (let i = 0; i < weight.length; i++) {
-        weight[i] = (Math.random() * 2 - 1) * scale;
-      }
-      this.weights[layer] = weight;
-      this.biases[layer] = bias;
-      prevSize = units;
+    const h = this.hiddenUnits;
+    const d = this.inputSize;
+    const scale1 = Math.sqrt(6 / (d + h));
+    this.w1 = new Float32Array(h * d);
+    this.b1 = new Float32Array(h);
+    for (let i = 0; i < this.w1.length; i++) {
+      this.w1[i] = (Math.random() * 2 - 1) * scale1;
     }
-
-    const lastUnits = this.hiddenStack[this.hiddenStack.length - 1];
-    const outScale = Math.sqrt(6 / (lastUnits + 1));
-    this.outWeights = new Float32Array(lastUnits);
-    for (let i = 0; i < lastUnits; i++) {
-      this.outWeights[i] = (Math.random() * 2 - 1) * outScale;
+    this.b1.fill(0);
+    this.w2 = new Float32Array(h);
+    const scale2 = Math.sqrt(6 / (h + 1));
+    for (let i = 0; i < h; i++) {
+      this.w2[i] = (Math.random() * 2 - 1) * scale2;
     }
-    this.outBias = 0;
+    this.b2 = 0;
   }
 
   setLearningRate(lr) {
@@ -60,83 +42,53 @@ class MatchNet {
   }
 
   setHiddenUnits(units) {
-    this.baseHiddenUnits = units;
-    this.rebuildHiddenStack();
+    this.hiddenUnits = units;
     this.initWeights();
   }
 
   forward(features) {
-    const caches = [];
-    let input = features;
-    for (let layer = 0; layer < this.hiddenStack.length; layer++) {
-      const units = this.hiddenStack[layer];
-      const prevSize = input.length;
-      const weight = this.weights[layer];
-      const bias = this.biases[layer];
-      const activation = new Float32Array(units);
-      for (let h = 0; h < units; h++) {
-        let sum = bias[h];
-        const offset = h * prevSize;
-        for (let i = 0; i < prevSize; i++) {
-          sum += weight[offset + i] * input[i];
-        }
-        activation[h] = Math.tanh(sum);
+    const hidden = new Float32Array(this.hiddenUnits);
+    for (let h = 0; h < this.hiddenUnits; h++) {
+      let sum = this.b1[h];
+      const offset = h * this.inputSize;
+      for (let i = 0; i < this.inputSize; i++) {
+        sum += this.w1[offset + i] * features[i];
       }
-      caches.push({ activation, input });
-      input = activation;
+      hidden[h] = Math.tanh(sum);
     }
-
-    let z = this.outBias;
-    for (let i = 0; i < this.outWeights.length; i++) {
-      z += this.outWeights[i] * input[i];
+    let z2 = this.b2;
+    for (let h = 0; h < this.hiddenUnits; h++) {
+      z2 += this.w2[h] * hidden[h];
     }
-    const clipped = Math.max(-10, Math.min(10, z));
+    const clipped = Math.max(-8, Math.min(8, z2));
     const output = 1 / (1 + Math.exp(-clipped));
-    return { output, caches, finalActivation: input };
+    return { hidden, output };
   }
 
   trainSample(features, target) {
-    const { output, caches, finalActivation } = this.forward(features);
+    const { hidden, output } = this.forward(features);
     const lr = this.learningRate;
     const error = output - target;
     const dOut = error * output * (1 - output);
 
-    const downstream = new Float32Array(this.outWeights.length);
-    for (let i = 0; i < this.outWeights.length; i++) {
-      downstream[i] = dOut * this.outWeights[i];
+    const gradHidden = new Float32Array(this.hiddenUnits);
+    for (let h = 0; h < this.hiddenUnits; h++) {
+      gradHidden[h] = dOut * this.w2[h] * (1 - hidden[h] * hidden[h]);
     }
 
-    for (let i = 0; i < this.outWeights.length; i++) {
-      this.outWeights[i] -= lr * dOut * finalActivation[i];
+    for (let h = 0; h < this.hiddenUnits; h++) {
+      this.w2[h] -= lr * dOut * hidden[h];
     }
-    this.outBias -= lr * dOut;
+    this.b2 -= lr * dOut;
 
-    let nextError = downstream;
-    for (let layer = this.hiddenStack.length - 1; layer >= 0; layer--) {
-      const { activation, input } = caches[layer];
-      const prevInput = layer === 0 ? features : caches[layer - 1].activation;
-      const prevSize = prevInput.length;
-      const units = this.hiddenStack[layer];
-      const weight = this.weights[layer];
-      const bias = this.biases[layer];
-      const propagated = new Float32Array(prevSize);
-
-      for (let h = 0; h < units; h++) {
-        const gradAct = 1 - activation[h] * activation[h];
-        const delta = nextError[h] * gradAct;
-        const offset = h * prevSize;
-        for (let i = 0; i < prevSize; i++) {
-          const weightVal = weight[offset + i];
-          propagated[i] += delta * weightVal;
-          weight[offset + i] -= lr * delta * prevInput[i];
-        }
-        bias[h] -= lr * delta;
+    for (let h = 0; h < this.hiddenUnits; h++) {
+      const offset = h * this.inputSize;
+      const grad = gradHidden[h];
+      for (let i = 0; i < this.inputSize; i++) {
+        this.w1[offset + i] -= lr * grad * features[i];
       }
-
-      nextError = propagated;
+      this.b1[h] -= lr * grad;
     }
-
-    return error;
   }
 }
 
@@ -150,81 +102,10 @@ const patternGenerators = [
   { key: 'checker', name: 'Checker storm', generate: patternChecker },
   { key: 'spiral', name: 'Spiral garden', generate: patternSpiral },
   { key: 'bands', name: 'Broken bands', generate: patternBands },
-  { key: 'glyphs', name: 'Glyph mosaics', generate: patternGlyphs },
-  { key: 'quadrants', name: 'Quadrant shards', generate: patternQuadrants },
-  { key: 'cross', name: 'Axial cruciform', generate: patternCross },
-  { key: 'constellation', name: 'Star constellations', generate: patternConstellation },
-  { key: 'maze', name: 'Lattice mazes', generate: patternMaze },
-  { key: 'petals', name: 'Radial petals', generate: patternPetals },
-  { key: 'fracture', name: 'Fracture gradients', generate: patternFracture }
+  { key: 'glyphs', name: 'Glyph mosaics', generate: patternGlyphs }
 ];
 
 const patternOrder = patternGenerators.map(g => g.name);
-
-const overlayModes = [
-  {
-    name: 'xor-fuse',
-    apply(base, overlay, size, colors) {
-      const out = base.slice();
-      for (let i = 0; i < out.length; i++) {
-        out[i] = (base[i] + overlay[i]) % colors;
-      }
-      return out;
-    }
-  },
-  {
-    name: 'mask-imprint',
-    apply(base, overlay, size, colors) {
-      const out = base.slice();
-      const counts = new Array(colors).fill(0);
-      for (let i = 0; i < overlay.length; i++) counts[overlay[i]]++;
-      let pivot = 0;
-      for (let c = 1; c < counts.length; c++) {
-        if (counts[c] > counts[pivot]) pivot = c;
-      }
-      for (let i = 0; i < out.length; i++) {
-        if (overlay[i] === pivot || Math.random() < 0.15) out[i] = overlay[i];
-      }
-      return out;
-    }
-  },
-  {
-    name: 'interleave-weave',
-    apply(base, overlay, size) {
-      const out = base.slice();
-      for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-          if (((x + y) & 1) === 0) {
-            const idx = y * size + x;
-            out[idx] = overlay[idx];
-          }
-        }
-      }
-      return out;
-    }
-  },
-  {
-    name: 'trail-carve',
-    apply(base, overlay, size) {
-      const out = base.slice();
-      let idx = Math.floor(Math.random() * out.length);
-      let color = overlay[idx];
-      const steps = size * 3 + Math.floor(Math.random() * size);
-      for (let step = 0; step < steps; step++) {
-        out[idx] = color;
-        const options = [];
-        if (idx % size !== size - 1) options.push(idx + 1);
-        if (idx % size !== 0) options.push(idx - 1);
-        if (idx + size < out.length) options.push(idx + size);
-        if (idx - size >= 0) options.push(idx - size);
-        if (!options.length) break;
-        idx = options[Math.floor(Math.random() * options.length)];
-        color = overlay[idx];
-      }
-      return out;
-    }
-  }
-];
 
 let net = createNet();
 let running = false;
@@ -248,7 +129,7 @@ function createStats() {
 }
 
 function createNet() {
-  const inputSize = boardSize * boardSize * numColors + patternOrder.length + 8;
+  const inputSize = boardSize * boardSize * numColors + patternOrder.length + 4;
   return new MatchNet(inputSize, config.hiddenUnits, config.learningRate);
 }
 
@@ -265,38 +146,21 @@ function resetAll() {
 
 function encodeBoard(cells, pattern) {
   const size = boardSize;
-  const features = new Float32Array(size * size * numColors + patternOrder.length + 8);
+  const features = new Float32Array(size * size * numColors + patternOrder.length + 4);
   let ptr = 0;
-  const colorCounts = new Array(numColors).fill(0);
   for (let i = 0; i < cells.length; i++) {
     const color = cells[i];
-    colorCounts[color]++;
     for (let c = 0; c < numColors; c++) {
       features[ptr++] = color === c ? 1 : 0;
     }
   }
   patternOrder.forEach((name, idx) => {
-    features[ptr + idx] = pattern.family === name ? 1 : 0;
+    features[ptr + idx] = pattern.name === name ? 1 : 0;
   });
   ptr += patternOrder.length;
-
-  const total = cells.length;
-  let entropy = 0;
-  for (let c = 0; c < numColors; c++) {
-    if (colorCounts[c] === 0) continue;
-    const p = colorCounts[c] / total;
-    entropy -= p * Math.log(p);
-  }
-  const maxEntropy = Math.log(numColors);
-  const matches = findMatches(cells, boardSize).size / total;
-
   features[ptr++] = pattern.noise;
-  features[ptr++] = Math.min(1, pattern.transforms.length / 12);
-  features[ptr++] = Math.min(1, (pattern.variantId ?? 0) / 16);
-  features[ptr++] = pattern.overlay ? 1 : 0;
-  features[ptr++] = Math.min(1, (pattern.layerDepth ?? 1) / 6);
-  features[ptr++] = maxEntropy ? entropy / maxEntropy : 0;
-  features[ptr++] = Math.min(1, matches * 4);
+  features[ptr++] = pattern.transforms.length / 8;
+  features[ptr++] = Math.min(1, (pattern.variantId ?? 0) / 6);
   features[ptr++] = Math.random();
   return features;
 }
@@ -306,14 +170,13 @@ function patternChaos(size, colors) {
   for (let i = 0; i < cells.length; i++) {
     cells[i] = Math.floor(Math.random() * colors);
   }
-  return { cells, variant: 'noise field', variantId: 0, layers: ['foundation: chaotic noise'] };
+  return { cells, variant: 'noise field', variantId: 0 };
 }
 
 function patternStripes(size, colors) {
   const cells = new Array(size * size);
   const orientation = Math.floor(Math.random() * 4);
   const width = 1 + Math.floor(Math.random() * 3);
-  const labels = ['horizontal', 'vertical', 'diagonal', 'anti-diagonal'];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       let band;
@@ -324,12 +187,7 @@ function patternStripes(size, colors) {
       cells[y * size + x] = Math.abs(band) % colors;
     }
   }
-  return {
-    cells,
-    variant: `${labels[orientation]} stripes`,
-    variantId: orientation + 1,
-    layers: [`foundation: ${labels[orientation]} bands`]
-  };
+  return { cells, variant: 'striped', variantId: orientation + 1 };
 }
 
 function patternClusters(size, colors) {
@@ -365,7 +223,7 @@ function patternClusters(size, colors) {
   for (let i = 0; i < cells.length; i++) {
     if (cells[i] === -1) cells[i] = Math.floor(Math.random() * colors);
   }
-  return { cells, variant: 'organic clusters', variantId: 2, layers: ['foundation: seeded clusters'] };
+  return { cells, variant: 'organic clusters', variantId: 2 };
 }
 
 function patternDiagonals(size, colors) {
@@ -377,7 +235,7 @@ function patternDiagonals(size, colors) {
       cells[y * size + x] = diag % colors;
     }
   }
-  return { cells, variant: 'diagonal ramp', variantId: 3, layers: ['foundation: diagonal ramp'] };
+  return { cells, variant: 'diagonal ramp', variantId: 3 };
 }
 
 function patternWaves(size, colors) {
@@ -391,7 +249,7 @@ function patternWaves(size, colors) {
       cells[y * size + x] = Math.floor(norm * colors) % colors;
     }
   }
-  return { cells, variant: 'wave field', variantId: 4, layers: ['foundation: interference waves'] };
+  return { cells, variant: 'wave field', variantId: 4 };
 }
 
 function patternRings(size, colors) {
@@ -404,7 +262,7 @@ function patternRings(size, colors) {
       cells[y * size + x] = Math.floor(dist) % colors;
     }
   }
-  return { cells, variant: 'rings', variantId: 5, layers: ['foundation: concentric rings'] };
+  return { cells, variant: 'rings', variantId: 5 };
 }
 
 function patternChecker(size, colors) {
@@ -416,7 +274,7 @@ function patternChecker(size, colors) {
       cells[y * size + x] = v;
     }
   }
-  return { cells, variant: 'checker', variantId: 6, layers: ['foundation: checker matrix'] };
+  return { cells, variant: 'checker', variantId: 6 };
 }
 
 function patternSpiral(size, colors) {
@@ -439,7 +297,7 @@ function patternSpiral(size, colors) {
     }
     color++;
   }
-  return { cells, variant: 'spiral', variantId: 7, layers: ['foundation: spiral sweep'] };
+  return { cells, variant: 'spiral', variantId: 7 };
 }
 
 function patternBands(size, colors) {
@@ -451,7 +309,7 @@ function patternBands(size, colors) {
       cells[y * size + x] = ((band % colors) + colors) % colors;
     }
   }
-  return { cells, variant: 'bands', variantId: 8, layers: ['foundation: broken bands'] };
+  return { cells, variant: 'bands', variantId: 8 };
 }
 
 function patternGlyphs(size, colors) {
@@ -473,163 +331,7 @@ function patternGlyphs(size, colors) {
       }
     }
   }
-  return { cells, variant: 'glyphs', variantId: 9, layers: ['foundation: glyph mosaics'] };
-}
-
-function patternQuadrants(size, colors) {
-  const cells = new Array(size * size);
-  const palette = Array.from({ length: colors }, (_, i) => i);
-  for (let i = palette.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [palette[i], palette[j]] = [palette[j], palette[i]];
-  }
-  const quadColors = [palette[0], palette[1 % palette.length], palette[2 % palette.length], palette[3 % palette.length]];
-  const jitter = 0.12 + Math.random() * 0.25;
-  const diagonalBias = Math.random() < 0.35;
-  const offset = Math.floor(Math.random() * size * 0.5);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      let quadrant = (x < size / 2 ? 0 : 1) + (y < size / 2 ? 0 : 2);
-      if (diagonalBias && ((x + y + offset) % 2 === 0)) quadrant = (quadrant + 1) % quadColors.length;
-      let color = quadColors[quadrant % quadColors.length];
-      if (Math.random() < jitter) {
-        color = palette[Math.floor(Math.random() * palette.length)];
-      }
-      cells[y * size + x] = color;
-    }
-  }
-  const variant = diagonalBias ? 'diagonal quadrants' : 'sharp quadrants';
-  return { cells, variant, variantId: 10, layers: ['foundation: quadrant shards'] };
-}
-
-function patternCross(size, colors) {
-  const background = Math.floor(Math.random() * colors);
-  let crossColor = Math.floor(Math.random() * colors);
-  if (crossColor === background) crossColor = (crossColor + 1) % colors;
-  const cells = new Array(size * size).fill(background);
-  const center = Math.floor(size / 2);
-  const thickness = 1 + Math.floor(Math.random() * 2);
-  const addDiagonals = Math.random() < 0.5;
-  for (let y = 0; y < size; y++) {
-    for (let dx = -thickness; dx <= thickness; dx++) {
-      const x = Math.min(size - 1, Math.max(0, center + dx));
-      cells[y * size + x] = crossColor;
-    }
-  }
-  for (let x = 0; x < size; x++) {
-    for (let dy = -thickness; dy <= thickness; dy++) {
-      const y = Math.min(size - 1, Math.max(0, center + dy));
-      cells[y * size + x] = crossColor;
-    }
-  }
-  if (addDiagonals) {
-    for (let i = 0; i < size; i++) {
-      cells[i * size + i] = crossColor;
-      cells[i * size + (size - i - 1)] = crossColor;
-    }
-  }
-  const variant = addDiagonals ? 'cross with diagonals' : 'orthogonal cross';
-  return { cells, variant, variantId: 11, layers: ['foundation: axial cross'] };
-}
-
-function patternConstellation(size, colors) {
-  const background = Math.floor(Math.random() * colors);
-  const cells = new Array(size * size).fill(background);
-  const starCount = size * 2 + Math.floor(Math.random() * size * 3);
-  const trails = Math.random() < 0.45;
-  for (let s = 0; s < starCount; s++) {
-    let idx = Math.floor(Math.random() * cells.length);
-    const color = Math.floor(Math.random() * colors);
-    cells[idx] = color;
-    if (Math.random() < 0.35) {
-      const neighbors = [idx + 1, idx - 1, idx + size, idx - size];
-      neighbors.forEach(n => {
-        if (n >= 0 && n < cells.length && Math.random() < 0.6) cells[n] = color;
-      });
-    }
-    if (trails && Math.random() < 0.2) {
-      const length = 2 + Math.floor(Math.random() * 4);
-      let current = idx;
-      for (let step = 0; step < length; step++) {
-        const dir = [1, -1, size, -size][Math.floor(Math.random() * 4)];
-        const next = current + dir;
-        if (next < 0 || next >= cells.length) break;
-        cells[next] = color;
-        current = next;
-      }
-    }
-  }
-  const variant = trails ? 'clustered constellations' : 'sparse constellations';
-  return { cells, variant, variantId: 12, layers: ['foundation: constellation dust'] };
-}
-
-function patternMaze(size, colors) {
-  const cells = new Array(size * size);
-  const baseA = Math.floor(Math.random() * colors);
-  let baseB = Math.floor(Math.random() * colors);
-  if (baseB === baseA) baseB = (baseA + 2) % colors;
-  const accent = (baseA + 1) % colors;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const vertical = x % 2 === 0;
-      const horizontal = y % 2 === 0;
-      let color = (vertical ^ horizontal) ? baseA : baseB;
-      if (Math.random() < 0.15) color = accent;
-      cells[y * size + x] = color;
-    }
-  }
-  let idx = Math.floor(Math.random() * cells.length);
-  const steps = size * size * 0.6;
-  for (let step = 0; step < steps; step++) {
-    cells[idx] = accent;
-    const dir = [1, -1, size, -size][Math.floor(Math.random() * 4)];
-    const next = idx + dir;
-    if (next < 0 || next >= cells.length) {
-      idx = Math.floor(Math.random() * cells.length);
-    } else {
-      idx = next;
-    }
-  }
-  return { cells, variant: 'woven maze', variantId: 13, layers: ['foundation: lattice maze'] };
-}
-
-function patternPetals(size, colors) {
-  const cells = new Array(size * size);
-  const cx = (size - 1) / 2;
-  const cy = (size - 1) / 2;
-  const petals = 4 + Math.floor(Math.random() * 4);
-  const twist = 0.4 + Math.random() * 1.1;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const dx = x - cx;
-      const dy = y - cy;
-      const angle = Math.atan2(dy, dx);
-      const radius = Math.sqrt(dx * dx + dy * dy);
-      const value = Math.sin(angle * petals) + Math.cos(radius * twist);
-      const norm = (value + 2) / 4;
-      cells[y * size + x] = Math.floor(norm * colors) % colors;
-    }
-  }
-  return { cells, variant: `${petals}-petal bloom`, variantId: 14, layers: ['foundation: radial petals'] };
-}
-
-function patternFracture(size, colors) {
-  const cells = new Array(size * size);
-  const slope = (Math.random() * 2 - 1) * 1.2;
-  const bias = (Math.random() - 0.5) * size;
-  const base = Math.floor(Math.random() * colors);
-  const contrast = (base + 1 + Math.floor(Math.random() * (colors - 1))) % colors;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const plane = x - slope * y + bias;
-      let color = plane > 0 ? base : contrast;
-      if (Math.random() < 0.2) {
-        color = (color + Math.floor(Math.abs(plane)) + colors) % colors;
-      }
-      cells[y * size + x] = color;
-    }
-  }
-  return { cells, variant: 'fracture gradient', variantId: 15, layers: ['foundation: fracture gradients'] };
+  return { cells, variant: 'glyphs', variantId: 9 };
 }
 
 function rotateBoard(cells, size, times) {
@@ -673,85 +375,6 @@ function shiftRows(cells, size) {
   return out;
 }
 
-function shiftColumns(cells, size) {
-  const out = cells.slice();
-  for (let x = 0; x < size; x++) {
-    const offset = Math.floor(Math.random() * size);
-    for (let y = 0; y < size; y++) {
-      const srcY = (y + offset) % size;
-      out[y * size + x] = cells[srcY * size + x];
-    }
-  }
-  return out;
-}
-
-function shearBoard(cells, size) {
-  const out = new Array(size * size);
-  const shear = (Math.random() * 0.9 + 0.2) * (Math.random() < 0.5 ? 1 : -1);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const shifted = Math.round(x + (y - size / 2) * shear);
-      const nx = ((shifted % size) + size) % size;
-      out[y * size + x] = cells[y * size + nx];
-    }
-  }
-  return out;
-}
-
-function fractureCarve(cells, size, colors) {
-  const out = cells.slice();
-  const fractures = 2 + Math.floor(Math.random() * 3);
-  for (let f = 0; f < fractures; f++) {
-    let idx = Math.floor(Math.random() * out.length);
-    let color = Math.floor(Math.random() * colors);
-    const steps = size + Math.floor(Math.random() * size * 2);
-    for (let step = 0; step < steps; step++) {
-      out[idx] = color;
-      const options = [];
-      if (idx % size !== size - 1) options.push(idx + 1);
-      if (idx % size !== 0) options.push(idx - 1);
-      if (idx + size < out.length) options.push(idx + size);
-      if (idx - size >= 0) options.push(idx - size);
-      if (!options.length) break;
-      idx = options[Math.floor(Math.random() * options.length)];
-      if (Math.random() < 0.3) color = Math.floor(Math.random() * colors);
-    }
-  }
-  return out;
-}
-
-function smearBoard(cells, size) {
-  const out = cells.slice();
-  const radius = 1 + Math.floor(Math.random() * 2);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const nx = (x + Math.floor(Math.random() * (radius * 2 + 1)) - radius + size) % size;
-      const ny = (y + Math.floor(Math.random() * (radius * 2 + 1)) - radius + size) % size;
-      out[y * size + x] = cells[ny * size + nx];
-    }
-  }
-  return out;
-}
-
-function jitterBoard(cells, size) {
-  const out = cells.slice();
-  const swaps = Math.floor(out.length * 0.3);
-  for (let i = 0; i < swaps; i++) {
-    const a = Math.floor(Math.random() * out.length);
-    const neighbors = [];
-    if (a % size !== size - 1) neighbors.push(a + 1);
-    if (a % size !== 0) neighbors.push(a - 1);
-    if (a + size < out.length) neighbors.push(a + size);
-    if (a - size >= 0) neighbors.push(a - size);
-    if (!neighbors.length) continue;
-    const b = neighbors[Math.floor(Math.random() * neighbors.length)];
-    const tmp = out[a];
-    out[a] = out[b];
-    out[b] = tmp;
-  }
-  return out;
-}
-
 function permuteColors(cells, colors) {
   const perm = Array.from({ length: colors }, (_, i) => i).sort(() => Math.random() - 0.5);
   return cells.map(v => perm[v]);
@@ -770,108 +393,44 @@ function applyNoise(cells, size, colors, intensity) {
 }
 
 function generateBoard() {
-  const generatorIndex = Math.floor(Math.random() * patternGenerators.length);
-  const generator = patternGenerators[generatorIndex];
-  const base = generator.generate(boardSize, numColors);
-  let cells = base.cells.slice();
-  const layers = Array.isArray(base.layers) && base.layers.length ? base.layers.slice() : [`foundation: ${generator.name}`];
+  const generator = patternGenerators[Math.floor(Math.random() * patternGenerators.length)];
+  let { cells, variant, variantId } = generator.generate(boardSize, numColors);
   const transforms = [];
-  let variantScore = base.variantId ?? 0;
-  let variantLabel = base.variant || generator.name;
-  let overlayName = null;
-
-  if (Math.random() < 0.7) {
-    let overlayGenIndex = Math.floor(Math.random() * patternGenerators.length);
-    if (overlayGenIndex === generatorIndex && patternGenerators.length > 1) {
-      overlayGenIndex = (generatorIndex + 1) % patternGenerators.length;
-    }
-    const overlayGen = patternGenerators[overlayGenIndex];
-    const overlay = overlayGen.generate(boardSize, numColors);
-    const modeIndex = Math.floor(Math.random() * overlayModes.length);
-    const mode = overlayModes[modeIndex];
-    cells = mode.apply(cells, overlay.cells, boardSize, numColors);
-    overlayName = overlayGen.name;
-    const overlayVariant = overlay.variant || overlayGen.name;
-    layers.push(`overlay: ${overlayGen.name} via ${mode.name}`);
-    variantScore += (overlay.variantId ?? 0) + modeIndex + 1;
-    variantLabel = `${variantLabel} + ${overlayVariant}`;
-  }
-
-  if (Math.random() < 0.55) {
-    cells = shiftRows(cells, boardSize);
-    transforms.push('row-shift');
-    variantScore += 0.5;
-  }
-  if (Math.random() < 0.5) {
-    cells = shiftColumns(cells, boardSize);
-    transforms.push('column-shift');
-    variantScore += 0.5;
-  }
-  if (Math.random() < 0.4) {
-    cells = shearBoard(cells, boardSize);
-    transforms.push('shear');
-    variantScore += 1;
-  }
-  if (Math.random() < 0.45) {
-    cells = jitterBoard(cells, boardSize);
-    transforms.push('jitter-swap');
-    variantScore += 0.5;
-  }
-
-  if (Math.random() < 0.4) {
-    cells = fractureCarve(cells, boardSize, numColors);
-    layers.push('curriculum: fracture walk');
-    variantScore += 1.5;
-  }
-  if (Math.random() < 0.3) {
-    cells = smearBoard(cells, boardSize);
-    layers.push('curriculum: smear drift');
-    variantScore += 1;
-  }
 
   const rotations = Math.floor(Math.random() * 4);
   if (rotations) {
     cells = rotateBoard(cells, boardSize, rotations);
     transforms.push(`rotate×${rotations}`);
-    variantScore += rotations * 0.3;
   }
-  if (Math.random() < 0.6) {
+  if (Math.random() < 0.5) {
     const axis = Math.random() < 0.5 ? 'horizontal' : 'vertical';
     cells = mirrorBoard(cells, boardSize, axis);
     transforms.push(`${axis} flip`);
-    variantScore += 0.5;
   }
-  if (Math.random() < 0.35) {
+  if (Math.random() < 0.25) {
     cells = mirrorBoard(cells, boardSize, 'diag');
     transforms.push('transpose');
-    variantScore += 0.4;
   }
-  if (Math.random() < 0.65) {
+  if (Math.random() < 0.55) {
+    cells = shiftRows(cells, boardSize);
+    transforms.push('row-shift');
+  }
+  if (Math.random() < 0.7) {
     cells = permuteColors(cells, numColors);
     transforms.push('recolour');
-    variantScore += 0.4;
   }
-
-  const noiseIntensity = Math.min(0.95, config.noise + Math.random() * 0.12);
+  const noiseIntensity = Math.min(0.95, config.noise + Math.random() * 0.08);
   const noiseResult = applyNoise(cells, boardSize, numColors, noiseIntensity);
   cells = noiseResult.cells;
   const noiseApplied = noiseResult.noiseApplied;
-  if (noiseApplied > 0.02) {
-    layers.push(`noise: ${(noiseApplied * 100).toFixed(1)}%`);
-  }
-  variantScore += noiseApplied * 8;
 
   return {
     cells,
-    name: overlayName ? `${generator.name} × ${overlayName}` : generator.name,
-    family: generator.name,
+    name: generator.name,
     key: generator.key,
     transforms,
-    layers,
-    layerDepth: layers.length,
-    overlay: overlayName,
-    variantId: variantScore,
-    variant: variantLabel,
+    variantId,
+    variant,
     noise: noiseApplied
   };
 }
@@ -988,16 +547,14 @@ function step() {
     batchError += sample.absError;
     teacherSum += sample.targetScore;
     modelSum += sample.modelScore;
-    const family = sample.pattern.family;
-    patternCounts[family] = (patternCounts[family] || 0) + 1;
-    localPatternCounts[family] = (localPatternCounts[family] || 0) + 1;
+    patternCounts[sample.pattern.name] = (patternCounts[sample.pattern.name] || 0) + 1;
+    localPatternCounts[sample.pattern.name] = (localPatternCounts[sample.pattern.name] || 0) + 1;
     stats.boards++;
     stats.teacherSum += sample.targetScore;
     stats.modelSum += sample.modelScore;
     stats.maeSum += sample.absError;
     stats.weightUpdates++;
     sample.pattern.transforms.forEach(t => stats.transformSet.add(t));
-    (sample.pattern.layers || []).forEach(l => stats.transformSet.add(l));
     if (
       !bestSample ||
       sample.targetScore > bestSample.targetScore ||
@@ -1033,12 +590,8 @@ function step() {
     highlight: bestSample.best.from != null ? [bestSample.best.from, bestSample.best.to] : null,
     pattern: {
       name: bestSample.pattern.name,
-      family: bestSample.pattern.family,
       variant: bestSample.pattern.variant,
       transforms: bestSample.pattern.transforms,
-      layers: bestSample.pattern.layers,
-      overlay: bestSample.pattern.overlay,
-      layerDepth: bestSample.pattern.layerDepth,
       noise: bestSample.pattern.noise
     },
     bestMove: bestSample.best,
