@@ -17,15 +17,16 @@ body {
   color: var(--fg);
 }
 
-#app { max-width: 1200px; margin: 0 auto; padding: 16px; }
+#app { max-width: 1380px; margin: 0 auto; padding: 12px; }
 header { margin-bottom: 12px; }
 .title { font-weight: 800; letter-spacing: 1px; font-size: 18px; }
 .subtitle { color: var(--muted); font-size: 12px; margin-top: 4px; }
 
 .split {
   display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
-  gap: 16px;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 18px;
+  align-items: start;
 }
 
 .pane {
@@ -33,7 +34,6 @@ header { margin-bottom: 12px; }
   border: 2px solid var(--border);
   padding: 14px;
   box-shadow: 4px 4px 0 #0002;
-  min-height: 680px;
 }
 
 .panel-header {
@@ -42,6 +42,9 @@ header { margin-bottom: 12px; }
   margin-bottom: 10px;
   font-weight: 700;
 }
+
+.confidence-row { gap: 12px; }
+.confidence-row div { white-space: nowrap; }
 
 .panel-sep {
   border-top: 2px dotted var(--border);
@@ -61,6 +64,32 @@ header { margin-bottom: 12px; }
 
 .controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 6px; }
 .controls.row { align-items: center; }
+
+.training-pane { padding: 16px; }
+
+.training-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.panel-card {
+  border: 1px dashed var(--border);
+  padding: 12px;
+  background: #fdfdfd;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.panel-card .controls { margin-top: 0; }
+
+.card-wide { grid-column: 1 / -1; }
+
+.intro-card blockquote { margin-bottom: 0; }
+
+.compact-grid { margin: 0; }
 
 button {
   border: 2px solid var(--border);
@@ -93,7 +122,7 @@ input[type="range"] { width: 100%; }
 }
 
 blockquote {
-  margin: 10px 0 12px;
+  margin: 10px 0 0;
   padding: 8px 12px;
   border-left: 3px solid var(--border);
   background: #f1f1f1;
@@ -108,6 +137,7 @@ blockquote {
   font-size: 12.5px;
 }
 .stats.compact { font-size: 12px; gap: 6px; }
+.stats-tight { gap: 6px; font-size: 12px; }
 
 #board {
   width: 100%;
@@ -116,7 +146,7 @@ blockquote {
   image-rendering: pixelated;
 }
 
-#trend, #outputWeights {
+#trend, #outputWeightsBlack, #outputWeightsWhite {
   width: 100%;
   background: #fff;
   border: 1px solid #111;
@@ -126,6 +156,24 @@ blockquote {
   width: 100%;
   background: #fff;
   border: 1px solid #111;
+}
+
+.weights-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.weights-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.weights-section-title {
+  font-weight: 700;
+  font-size: 12px;
+  margin-bottom: 6px;
 }
 
 .weights-grid {
@@ -159,6 +207,28 @@ blockquote {
   margin-bottom: 8px;
 }
 
+.output-weights-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.output-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.weights-bias {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.chart-hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+
 .weights-raw {
   margin-top: 8px;
   font-size: 11px;
@@ -186,4 +256,6 @@ blockquote {
     grid-template-columns: 1fr;
   }
   .pane { min-height: auto; }
+  .training-grid { grid-template-columns: 1fr; }
+  .weights-columns, .output-weights-grid { grid-template-columns: 1fr; }
 }

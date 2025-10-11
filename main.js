@@ -15,7 +15,8 @@
   const capBEl = document.getElementById('capB');
   const capWEl = document.getElementById('capW');
   const statusText = document.getElementById('statusText');
-  const confNowEl = document.getElementById('confNow');
+  const confBlackEl = document.getElementById('confBlack');
+  const confWhiteEl = document.getElementById('confWhite');
 
   const gameCountEl = document.getElementById('gameCount');
   const lastWinnerEl = document.getElementById('lastWinner');
@@ -28,15 +29,26 @@
   const predAccuracyEl = document.getElementById('predAccuracy');
   const avgConfidenceEl = document.getElementById('avgConfidence');
   const trainingStepsEl = document.getElementById('trainingSteps');
-  const outputBiasEl = document.getElementById('outputBias');
+  const blackModelPredsEl = document.getElementById('blackModelPreds');
+  const blackModelAccuracyEl = document.getElementById('blackModelAccuracy');
+  const blackModelAvgConfEl = document.getElementById('blackModelAvgConf');
+  const blackModelStepsEl = document.getElementById('blackModelSteps');
+  const whiteModelPredsEl = document.getElementById('whiteModelPreds');
+  const whiteModelAccuracyEl = document.getElementById('whiteModelAccuracy');
+  const whiteModelAvgConfEl = document.getElementById('whiteModelAvgConf');
+  const whiteModelStepsEl = document.getElementById('whiteModelSteps');
 
   const trendCanvas = document.getElementById('trend');
   const tctx = trendCanvas.getContext('2d');
   const historyCanvas = document.getElementById('history');
   const hctx = historyCanvas.getContext('2d');
   const weightsGrid = document.getElementById('weightsGrid');
-  const outputWeightsCanvas = document.getElementById('outputWeights');
-  const owctx = outputWeightsCanvas.getContext('2d');
+  const outputWeightsCanvasBlack = document.getElementById('outputWeightsBlack');
+  const outputWeightsCanvasWhite = document.getElementById('outputWeightsWhite');
+  const owBlackCtx = outputWeightsCanvasBlack.getContext('2d');
+  const owWhiteCtx = outputWeightsCanvasWhite.getContext('2d');
+  const outputBiasBlackEl = document.getElementById('outputBiasBlack');
+  const outputBiasWhiteEl = document.getElementById('outputBiasWhite');
   const weightsRawEl = document.getElementById('weightsRaw');
 
   const startBtn = document.getElementById('startBtn');
@@ -151,17 +163,37 @@
   }
 
   function setConfidence(val) {
-    if (val == null) {
-      confNowEl.textContent = '—';
+    const fmt = (v) => `${(v * 100).toFixed(1)}%`;
+    if (!val) {
+      confBlackEl.textContent = '—';
+      confWhiteEl.textContent = '—';
       return;
     }
-    const pct = (val * 100).toFixed(1);
-    confNowEl.textContent = pct + '%';
+    if (val.black != null && !Number.isNaN(val.black)) {
+      confBlackEl.textContent = fmt(val.black);
+    } else {
+      confBlackEl.textContent = '—';
+    }
+    if (val.white != null && !Number.isNaN(val.white)) {
+      confWhiteEl.textContent = fmt(val.white);
+    } else {
+      confWhiteEl.textContent = '—';
+    }
+  }
+
+  function clampConfidence(val) {
+    if (val == null || Number.isNaN(val)) return null;
+    return Math.max(0, Math.min(1, val));
   }
 
   function pushConfidence(val) {
-    if (val == null || Number.isNaN(val)) return;
-    confidenceHistory.push(val);
+    if (!val) return;
+    const entry = {
+      black: clampConfidence(val.black),
+      white: clampConfidence(val.white)
+    };
+    if (entry.black == null && entry.white == null) return;
+    confidenceHistory.push(entry);
     if (confidenceHistory.length > maxTrendPoints) {
       confidenceHistory = confidenceHistory.slice(confidenceHistory.length - maxTrendPoints);
     }
@@ -189,15 +221,32 @@
     tctx.stroke();
 
     if (!confidenceHistory.length) return;
-    tctx.strokeStyle = '#f27405';
-    tctx.beginPath();
+
     const stepX = confidenceHistory.length > 1 ? W / (confidenceHistory.length - 1) : W;
-    confidenceHistory.forEach((v, idx) => {
-      const x = idx * stepX;
-      const y = H - v * H;
-      if (idx === 0) tctx.moveTo(x, y); else tctx.lineTo(x, y);
+    const series = [
+      { key: 'black', color: '#f27405' },
+      { key: 'white', color: '#1e4cd7' }
+    ];
+
+    series.forEach(({ key, color }) => {
+      tctx.strokeStyle = color;
+      tctx.lineWidth = 1.5;
+      let started = false;
+      tctx.beginPath();
+      confidenceHistory.forEach((entry, idx) => {
+        const value = entry[key];
+        if (value == null) return;
+        const x = idx * stepX;
+        const y = H - value * H;
+        if (!started) {
+          tctx.moveTo(x, y);
+          started = true;
+        } else {
+          tctx.lineTo(x, y);
+        }
+      });
+      if (started) tctx.stroke();
     });
-    tctx.stroke();
   }
 
   function pushGameHistory(entries) {
@@ -358,20 +407,20 @@
     }
   }
 
-  function drawOutputWeights(weights) {
-    const W = outputWeightsCanvas.width;
-    const H = outputWeightsCanvas.height;
-    owctx.clearRect(0,0,W,H);
-    owctx.fillStyle = '#fff';
-    owctx.fillRect(0,0,W,H);
-    owctx.strokeStyle = '#000';
-    owctx.strokeRect(0,0,W,H);
+  function drawOutputWeights(ctx, canvas, weights) {
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle = '#000';
+    ctx.strokeRect(0,0,W,H);
 
-    owctx.strokeStyle = '#aaa';
-    owctx.beginPath();
-    owctx.moveTo(0, H * 0.5);
-    owctx.lineTo(W, H * 0.5);
-    owctx.stroke();
+    ctx.strokeStyle = '#aaa';
+    ctx.beginPath();
+    ctx.moveTo(0, H * 0.5);
+    ctx.lineTo(W, H * 0.5);
+    ctx.stroke();
 
     if (!weights || !weights.length) return;
     let maxAbs = 0;
@@ -385,46 +434,89 @@
       const barH = Math.abs(ratio) * usableHeight * 0.5;
       const x = i * barWidth + barWidth * 0.15;
       const y = v >= 0 ? (H * 0.5 - barH) : H * 0.5;
-      owctx.fillStyle = colorForValue(v, maxAbs);
-      owctx.fillRect(x, y, barWidth * 0.7, Math.max(2, barH));
+      ctx.fillStyle = colorForValue(v, maxAbs);
+      ctx.fillRect(x, y, barWidth * 0.7, Math.max(2, barH));
     }
   }
 
   function renderWeights(data) {
     weightsGrid.innerHTML = '';
+    const rawLines = [];
+
     if (!data) {
-      drawOutputWeights([]);
-      outputBiasEl.textContent = '0.000';
+      drawOutputWeights(owBlackCtx, outputWeightsCanvasBlack, []);
+      drawOutputWeights(owWhiteCtx, outputWeightsCanvasWhite, []);
+      outputBiasBlackEl.textContent = '0.000';
+      outputBiasWhiteEl.textContent = '0.000';
       if (weightsRawEl) weightsRawEl.textContent = '—';
       return;
     }
-    const boardCells = data.boardSize * data.boardSize;
-    const rawLines = [];
-    for (let i = 0; i < data.hiddenUnits; i++) {
-      const start = i * data.inputSize;
-      const slice = data.w1.slice(start, start + boardCells);
-      const toPlayWeight = data.w1[start + boardCells] || 0;
-      const unit = document.createElement('div');
-      unit.className = 'weight-unit';
-      const canvas = document.createElement('canvas');
-      canvas.width = 140;
-      canvas.height = 140;
-      unit.appendChild(canvas);
-      drawWeightCanvas(canvas, slice, data.boardSize);
-      const caption = document.createElement('div');
-      caption.className = 'weight-caption';
-      const bias = data.b1[i] ?? 0;
-      const outW = data.w2[i] ?? 0;
-      caption.textContent = `h${i+1}: bias=${bias.toFixed(3)} · out=${outW.toFixed(3)} · toPlay=${toPlayWeight.toFixed(3)}`;
-      unit.appendChild(caption);
-      weightsGrid.appendChild(unit);
 
-      rawLines.push(`h${i+1} board: ${Array.from(slice).map(v => v.toFixed(3)).join(' ')}`);
-      rawLines.push(`    toPlay=${toPlayWeight.toFixed(3)} · bias=${bias.toFixed(3)} · out=${outW.toFixed(3)}`);
-    }
-    drawOutputWeights(data.w2 || []);
-    if (typeof data.b2 === 'number') outputBiasEl.textContent = data.b2.toFixed(3);
-    rawLines.push(`output bias: ${(data.b2 ?? 0).toFixed(3)}`);
+    const colors = [
+      { key: 'black', label: 'Black model' },
+      { key: 'white', label: 'White model' }
+    ];
+
+    colors.forEach(({ key, label }) => {
+      const info = data[key];
+      const section = document.createElement('div');
+      section.className = 'weights-section';
+      const heading = document.createElement('div');
+      heading.className = 'weights-section-title';
+      heading.textContent = label;
+      section.appendChild(heading);
+      const grid = document.createElement('div');
+      grid.className = 'weights-grid';
+      section.appendChild(grid);
+
+      rawLines.push(`${label}:`);
+
+      if (info) {
+        const boardCells = info.boardSize * info.boardSize;
+        for (let i = 0; i < info.hiddenUnits; i++) {
+          const start = i * info.inputSize;
+          const slice = info.w1.slice(start, start + boardCells);
+          const toPlayWeight = info.w1[start + boardCells] || 0;
+          const unit = document.createElement('div');
+          unit.className = 'weight-unit';
+          const canvas = document.createElement('canvas');
+          canvas.width = 140;
+          canvas.height = 140;
+          unit.appendChild(canvas);
+          drawWeightCanvas(canvas, slice, info.boardSize);
+          const caption = document.createElement('div');
+          caption.className = 'weight-caption';
+          const bias = info.b1[i] ?? 0;
+          const outW = info.w2[i] ?? 0;
+          caption.textContent = `h${i + 1}: bias=${bias.toFixed(3)} · out=${outW.toFixed(3)} · toPlay=${toPlayWeight.toFixed(3)}`;
+          unit.appendChild(caption);
+          grid.appendChild(unit);
+
+          rawLines.push(`${label} h${i + 1} board: ${Array.from(slice).map(v => v.toFixed(3)).join(' ')}`);
+          rawLines.push(`    toPlay=${toPlayWeight.toFixed(3)} · bias=${bias.toFixed(3)} · out=${outW.toFixed(3)}`);
+        }
+      } else {
+        rawLines.push('  (weights not available)');
+        const placeholder = document.createElement('div');
+        placeholder.className = 'weight-caption';
+        placeholder.textContent = 'Weights not available yet.';
+        section.appendChild(placeholder);
+      }
+
+      rawLines.push('');
+
+      weightsGrid.appendChild(section);
+    });
+
+    const blackInfo = data.black || {};
+    const whiteInfo = data.white || {};
+    drawOutputWeights(owBlackCtx, outputWeightsCanvasBlack, blackInfo.w2 || []);
+    drawOutputWeights(owWhiteCtx, outputWeightsCanvasWhite, whiteInfo.w2 || []);
+    outputBiasBlackEl.textContent = typeof blackInfo.b2 === 'number' ? blackInfo.b2.toFixed(3) : '0.000';
+    outputBiasWhiteEl.textContent = typeof whiteInfo.b2 === 'number' ? whiteInfo.b2.toFixed(3) : '0.000';
+
+    rawLines.push(`black output bias: ${(blackInfo.b2 ?? 0).toFixed(3)}`);
+    rawLines.push(`white output bias: ${(whiteInfo.b2 ?? 0).toFixed(3)}`);
     if (weightsRawEl) weightsRawEl.textContent = rawLines.join('\n');
   }
 
@@ -443,12 +535,44 @@
     } else {
       predAccuracyEl.textContent = '—';
     }
-    if (stats.avgConfidence != null && stats.games > 0) {
+    if (stats.avgConfidence != null && stats.totalPredictions > 0) {
       avgConfidenceEl.textContent = (stats.avgConfidence * 100).toFixed(1) + '%';
     } else {
       avgConfidenceEl.textContent = '—';
     }
     trainingStepsEl.textContent = stats.trainingSteps ?? 0;
+
+    if (stats.perModel) {
+      const updateModel = (key, data, els) => {
+        const defaults = { predictions: 0, accuracy: null, avgConfidence: null, trainingSteps: 0 };
+        const payload = { ...defaults, ...(data || {}) };
+        els.preds.textContent = payload.predictions ?? 0;
+        if (payload.accuracy != null && !Number.isNaN(payload.accuracy) && payload.predictions > 0) {
+          els.accuracy.textContent = (payload.accuracy * 100).toFixed(1) + '%';
+        } else {
+          els.accuracy.textContent = '—';
+        }
+        if (payload.avgConfidence != null && !Number.isNaN(payload.avgConfidence) && payload.predictions > 0) {
+          els.avgConf.textContent = (payload.avgConfidence * 100).toFixed(1) + '%';
+        } else {
+          els.avgConf.textContent = '—';
+        }
+        els.steps.textContent = payload.trainingSteps ?? 0;
+      };
+
+      updateModel('black', stats.perModel.black, {
+        preds: blackModelPredsEl,
+        accuracy: blackModelAccuracyEl,
+        avgConf: blackModelAvgConfEl,
+        steps: blackModelStepsEl
+      });
+      updateModel('white', stats.perModel.white, {
+        preds: whiteModelPredsEl,
+        accuracy: whiteModelAccuracyEl,
+        avgConf: whiteModelAvgConfEl,
+        steps: whiteModelStepsEl
+      });
+    }
   }
 
   function updateLastGame(info) {
