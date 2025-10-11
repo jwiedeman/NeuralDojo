@@ -1,0 +1,2372 @@
+
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>d/dx f(g(x)) = f'(g(x))·g'(x)</title>
+
+        <!-- Favicon -->
+        <link rel="icon" type="image/png" href="images/sgd.png" />
+
+        <!-- Open Graph / Social Media Preview -->
+        <meta property="og:title" content="Built, or grown?" />
+        <meta property="og:description" content="No, it wasn't… we designed the learning algorithm… But we don't really understand exactly how they do those things." />
+        <meta property="og:image" content="images/sgd.png" />
+        <meta property="og:image:type" content="image/png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Built, or grown?" />
+        <meta name="twitter:description" content="No, it wasn't… we designed the learning algorithm… But we don't really understand exactly how they do those things." />
+        <meta name="twitter:image" content="images/sgd.png" />
+        <style>
+            @font-face {
+                font-family: 'Berkeley Mono';
+                src: url('fonts/BerkeleyMono-Regular.woff2') format('woff2');
+                font-weight: 400;
+                font-style: normal;
+            }
+
+            @font-face {
+                font-family: 'Berkeley Mono';
+                src: url('fonts/BerkeleyMono-Bold.woff2') format('woff2');
+                font-weight: 700;
+                font-style: normal;
+            }
+
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family: 'Berkeley Mono', monospace;
+                background: #f5f5f5;
+                color: #000;
+                padding: 20px;
+                line-height: 1.5;
+                font-size: 14px;
+                overflow-x: hidden;
+            }
+
+            .container {
+                max-width: 1400px;
+                margin: 0 auto;
+                border: 3px solid #000;
+                overflow-x: hidden;
+            }
+
+            .main-content {
+                display: grid;
+                grid-template-columns: 5fr 2fr;
+                gap: 0;
+            }
+
+            .visualization {
+                background: #fff;
+                padding: 30px;
+                border-right: 3px solid #000;
+            }
+
+            canvas {
+                width: 100%;
+                border: 3px solid #000;
+                background: #fff;
+            }
+
+            #patternCanvas {
+                height: auto;
+            }
+
+            .controls {
+                background: #fff;
+                padding: 30px;
+            }
+
+            .control-group {
+                margin-bottom: 20px;
+                padding-bottom: 20px;
+                border-bottom: 2px dotted #000;
+            }
+
+            .control-group label {
+                display: block;
+                color: #000;
+                margin-bottom: 8px;
+                font-size: 13px;
+                font-weight: bold;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+
+            .control-group input[type="range"] {
+                width: 100%;
+                margin-bottom: 8px;
+            }
+
+            .control-group .value {
+                color: #000;
+                font-size: 13px;
+            }
+
+            button {
+                width: 100%;
+                padding: 12px;
+                margin-bottom: 8px;
+                background: #fff;
+                color: #000;
+                border: 3px solid #000;
+                font-family: 'Berkeley Mono', monospace;
+                font-size: 14px;
+                font-weight: bold;
+                cursor: pointer;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+
+            button:hover {
+                background: #000;
+                color: #fff;
+            }
+
+            button.secondary {
+                background: #fff;
+                color: #000;
+                border: 1px solid #000;
+            }
+
+            button.secondary:hover {
+                background: #000;
+                color: #fff;
+            }
+
+            .algorithm-box {
+                background: #fff;
+                padding: 20px;
+                border: 3px solid #000;
+                margin-bottom: 20px;
+            }
+
+            .algorithm-box h3 {
+                color: #000;
+                margin-bottom: 12px;
+                font-size: 14px;
+                font-weight: bold;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+
+            .algorithm-box code {
+                display: block;
+                color: #000;
+                font-size: 13px;
+                line-height: 1.6;
+                white-space: pre;
+            }
+
+            .stats {
+                background: #fff;
+                padding: 20px;
+                border: 3px solid #000;
+                margin-top: 20px;
+            }
+
+            .stats div {
+                margin-bottom: 8px;
+                font-size: 13px;
+            }
+
+            .stats .label {
+                color: #000;
+                display: inline-block;
+                width: 100px;
+                font-weight: bold;
+            }
+
+            .draw-interface {
+                background: #fff;
+                padding: 20px;
+                border: 3px solid #000;
+                margin-top: 20px;
+            }
+
+            .draw-interface h4 {
+                color: #000;
+                margin-bottom: 12px;
+                font-size: 14px;
+                font-weight: bold;
+                text-transform: uppercase;
+            }
+
+            .draw-canvas {
+                display: grid;
+                grid-template-columns: repeat(8, 1fr);
+                gap: 1px;
+                width: 320px;
+                margin-bottom: 12px;
+                cursor: crosshair;
+                user-select: none;
+                border: 3px solid #000;
+            }
+
+            .draw-pixel {
+                aspect-ratio: 1;
+                background: #fff;
+                border: 1px solid #000;
+            }
+
+            .draw-pixel.active {
+                background: #000;
+            }
+
+            .draw-controls {
+                display: flex;
+                gap: 8px;
+                margin-bottom: 12px;
+            }
+
+            .draw-controls button {
+                flex: 1;
+                padding: 10px;
+                font-size: 13px;
+            }
+
+            .prediction {
+                font-size: 14px;
+                color: #000;
+                margin-top: 12px;
+                font-weight: bold;
+            }
+
+            .explanation {
+                background: #fff;
+                padding: 30px;
+                border-bottom: 3px solid #000;
+                font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto;
+            }
+
+            .explanation h2 {
+                color: #000;
+                margin-bottom: 15px;
+                font-size: 18px;
+                font-weight: bold;
+                text-transform: uppercase;
+                border-bottom: 2px dotted #000;
+                padding-bottom: 8px;
+            }
+
+            .explanation p {
+                margin-bottom: 15px;
+                color: #000;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+
+            .explanation strong {
+                color: #000;
+                font-weight: bold;
+            }
+
+            .weights-display {
+                margin-top: 20px;
+                padding-top: 20px;
+                border-top: 2px dotted #000;
+            }
+
+
+            .network-diagram {
+                margin-top: 20px;
+                padding: 20px;
+                background: #fff;
+                border: 3px solid #000;
+            }
+
+            .network-diagram h3 {
+                color: #000;
+                margin-bottom: 12px;
+                font-size: 14px;
+                font-weight: bold;
+                text-transform: uppercase;
+                text-align: left;
+            }
+
+            .network-viz {
+                display: flex;
+                justify-content: space-around;
+                align-items: center;
+                gap: 20px;
+                margin-top: 20px;
+            }
+
+            .layer {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 5px;
+            }
+
+            .layer-label {
+                font-size: 11px;
+                color: #000;
+                margin-bottom: 5px;
+                text-align: center;
+                font-weight: bold;
+            }
+
+            .layer-nodes {
+                display: flex;
+                flex-direction: column;
+                gap: 3px;
+            }
+
+            .node {
+                width: 10px;
+                height: 10px;
+                background: #fff;
+                border: 2px solid #000;
+            }
+
+            .node.hidden {
+                background: #000;
+            }
+
+            .node.output {
+                background: #fff;
+                border: 2px solid #000;
+            }
+
+            .arrow {
+                color: #000;
+                font-size: 18px;
+            }
+
+            h3 {
+                font-size: 14px;
+                font-weight: bold;
+                text-transform: uppercase;
+                color: #000;
+            }
+
+            @media (max-width: 768px) {
+                body {
+                    padding: 10px;
+                }
+
+                .container {
+                    border-width: 2px;
+                }
+
+                .explanation {
+                    padding: 15px;
+                }
+
+                .visualization {
+                    padding: 15px;
+                    border-right: none;
+                    border-bottom: 2px solid #000;
+                }
+
+                .controls {
+                    padding: 15px;
+                }
+
+                .main-content {
+                    grid-template-columns: 1fr;
+                    display: flex;
+                    flex-direction: column;
+                }
+
+                /* Flatten structure with display: contents */
+                .visualization {
+                    display: contents;
+                }
+
+                .controls {
+                    display: contents;
+                }
+
+                /* Order all children directly */
+                .visualization > div:first-child {
+                    order: 1; /* Classification task */
+                    padding: 15px;
+                    background: #fff;
+                    margin-bottom: 2px;
+                }
+
+                .visualization > canvas {
+                    order: 2; /* Pattern canvas */
+                    padding: 15px;
+                    background: #fff;
+                    margin-bottom: 2px;
+                }
+
+                .visualization .weights-display {
+                    order: 3; /* Weights */
+                    padding: 15px;
+                    background: #fff;
+                    margin-bottom: 2px;
+                    border-top: none;
+                }
+
+                .controls .stats {
+                    order: 4;
+                    padding: 15px;
+                    background: #fff;
+                    border: none;
+                    margin: 0 0 2px 0;
+                }
+
+                .controls .algorithm-box {
+                    order: 5;
+                    background: #fff;
+                    padding: 15px;
+                    margin-bottom: 2px;
+                    border: none;
+                }
+
+                .controls .control-group {
+                    order: 6;
+                    background: #fff;
+                    padding: 15px;
+                    margin: 0 0 2px 0;
+                    border-bottom: none;
+                }
+
+                .controls button {
+                    order: 7;
+                    background: #fff !important;
+                    color: #000 !important;
+                    padding: 12px;
+                    margin-bottom: 2px;
+                }
+
+                button:hover {
+                    background: #fff !important;
+                    color: #000 !important;
+                }
+
+                button:active {
+                    background: #f0f0f0 !important;
+                    color: #000 !important;
+                }
+
+                .visualization .draw-interface {
+                    order: 8; /* Last */
+                    padding: 15px;
+                    background: #fff;
+                    margin: 0;
+                    border: none;
+                }
+
+                .network-diagram {
+                    display: none;
+                }
+
+                .network-viz {
+                    flex-direction: column;
+                    gap: 10px;
+                }
+
+                .arrow {
+                    transform: rotate(90deg);
+                }
+
+                .draw-canvas {
+                    width: 100%;
+                    max-width: none;
+                }
+
+                .draw-interface > div[style*="display: flex"] {
+                    flex-direction: column !important;
+                }
+
+                .draw-interface > div[style*="display: flex"] > div {
+                    flex-shrink: 1 !important;
+                    width: 100% !important;
+                }
+
+                .algorithm-box {
+                    padding: 15px;
+                    overflow-x: auto;
+                }
+
+                .algorithm-box code {
+                    font-size: 11px;
+                }
+
+                .stats {
+                    padding: 15px;
+                }
+
+                .draw-interface {
+                    padding: 15px;
+                }
+
+                canvas {
+                    max-width: 100%;
+                }
+
+                #patternCanvas {
+                    width: 100% !important;
+                }
+
+                .weights-display {
+                    overflow-x: hidden;
+                }
+
+                /* Classification task grid - 2x2 on mobile */
+                .visualization > div > div[style*="grid-template-columns: repeat(4, 1fr)"] {
+                    grid-template-columns: repeat(2, 1fr) !important;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="explanation">
+                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 15px; border-bottom: 2px dotted #000; padding-bottom: 8px;">
+                    <h2 style="margin: 0; border: none; padding: 0;">Growing a Neural Network</h2>
+                    <div style="font-size: 14px; color: #666; font-family: 'Berkeley Mono', monospace;">d/dx f(g(x)) = f'(g(x))·g'(x)</div>
+                </div>
+
+                <p>
+                    <strong>What we know:</strong> The exact update rule. At
+                    every single step, we know precisely what will happen:
+                    compute the gradient, multiply by learning rate, subtract
+                    from parameters.
+                </p>
+                <p>
+                    <strong>What we don't know:</strong> How the program that results from repeatedly applying the update rule works internally.
+                </p>
+                <p>
+                    A tiny neural network learns to classify pixel patterns.
+                    Watch the weights visualization evolve. These
+                    weight patterns emerge from nothing but gradient descent. You
+                    didn't design them. They're emergent.
+                </p>
+                <p>
+                    The floating-point numbers in those weights
+                    <em>are executable code</em>—a program that successfully
+                    classifies patterns. But the program is inscrutable. It
+                    works, we just don't automatically understand how. Hit "RESET NETWORK" and
+                    watch completely different weights emerge. Same algorithm,
+                    different solution every time.
+                </p>
+                <p>
+                    <strong>Why this matters:</strong> This is the essence of
+                    modern AI. We design the optimization process, not the
+                    system itself. We understand the principle (minimize loss via
+                    gradient descent), but cannot predict what features,
+                    representations, or behaviors will emerge from billions of
+                    these simple steps. GPT-4 is just this, scaled up.
+                </p>
+
+                <p><strong>Modern AI systems are grown, not built.</strong></p>
+
+                <div style="background: #f5f5f5; border: 3px solid #000; padding: 25px; margin-top: 25px;">
+                    <p style="font-size: 16px; line-height: 1.7; margin: 0;">
+                        <strong>"We have a very good idea of sort of roughly what it's doing. But as soon as it gets really complicated, we don't actually know what's going on any more than we know what's going on in your brain."</strong>
+                    </p>
+                    <p style="font-size: 16px; line-height: 1.7; margin-top: 15px; margin-bottom: 15px;">
+                        <em>60 Minutes (Pelley: "What do you mean we don't know exactly how it works? It was designed by people.")</em><br>
+                        <strong>"No, it wasn't… we designed the learning algorithm… But we don't really understand exactly how they do those things."</strong>
+                    </p>
+                    <p style="font-size: 13px; margin: 0;">
+                        — Geoffrey Hinton, <a href="https://www.youtube.com/watch?v=qrvK_KuIeJk&t=4m46s" target="_blank" style="color: #000; text-decoration: underline;">60 Minutes Interview</a>
+                    </p>
+                </div>
+            </div>
+
+            <div class="main-content">
+                <div class="visualization">
+                    <div
+                        style="
+                            background: #fff;
+                            padding: 20px;
+                            border: 3px solid #000;
+                            margin-bottom: 20px;
+                        "
+                    >
+                        <h3
+                            style="
+                                color: #000;
+                                margin-bottom: 12px;
+                                font-size: 14px;
+                                font-weight: bold;
+                                text-transform: uppercase;
+                                border-bottom: 2px dotted #000;
+                                padding-bottom: 8px;
+                            "
+                        >
+                            CLASSIFICATION TASK
+                        </h3>
+                        <p
+                            style="
+                                font-size: 13px;
+                                color: #000;
+                                margin-bottom: 12px;
+                                line-height: 1.5;
+                            "
+                        >
+                            OBJECTIVE: Classify 8×8 pixel patterns into 4
+                            categories. 300 training samples total.
+                        </p>
+                        <div
+                            style="
+                                display: grid;
+                                grid-template-columns: repeat(4, 1fr);
+                                gap: 8px;
+                                font-size: 11px;
+                            "
+                        >
+                            <div style="text-align: center">
+                                <div
+                                    style="
+                                        color: #000;
+                                        margin-bottom: 5px;
+                                        font-weight: bold;
+                                        font-size: 11px;
+                                    "
+                                >
+                                    H-STRIPE
+                                </div>
+                                <div
+                                    style="
+                                        display: grid;
+                                        grid-template-columns: repeat(8, 1fr);
+                                        gap: 0;
+                                        width: 80px;
+                                        height: 80px;
+                                        margin: 0 auto;
+                                        background: #fff;
+                                        border: 3px solid #000;
+                                    "
+                                >
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                </div>
+                            </div>
+                            <div style="text-align: center">
+                                <div
+                                    style="
+                                        color: #000;
+                                        margin-bottom: 5px;
+                                        font-weight: bold;
+                                        font-size: 11px;
+                                    "
+                                >
+                                    V-STRIPE
+                                </div>
+                                <div
+                                    style="
+                                        display: grid;
+                                        grid-template-columns: repeat(8, 1fr);
+                                        gap: 0;
+                                        width: 80px;
+                                        height: 80px;
+                                        margin: 0 auto;
+                                        background: #fff;
+                                        border: 3px solid #000;
+                                    "
+                                >
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                </div>
+                            </div>
+                            <div style="text-align: center">
+                                <div
+                                    style="
+                                        color: #000;
+                                        margin-bottom: 5px;
+                                        font-weight: bold;
+                                        font-size: 11px;
+                                    "
+                                >
+                                    DIAGONAL
+                                </div>
+                                <div
+                                    style="
+                                        display: grid;
+                                        grid-template-columns: repeat(8, 1fr);
+                                        gap: 0;
+                                        width: 80px;
+                                        height: 80px;
+                                        margin: 0 auto;
+                                        background: #fff;
+                                        border: 3px solid #000;
+                                    "
+                                >
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                </div>
+                            </div>
+                            <div style="text-align: center">
+                                <div
+                                    style="
+                                        color: #000;
+                                        margin-bottom: 5px;
+                                        font-weight: bold;
+                                        font-size: 11px;
+                                    "
+                                >
+                                    CHECKER
+                                </div>
+                                <div
+                                    style="
+                                        display: grid;
+                                        grid-template-columns: repeat(8, 1fr);
+                                        gap: 0;
+                                        width: 80px;
+                                        height: 80px;
+                                        margin: 0 auto;
+                                        background: #fff;
+                                        border: 3px solid #000;
+                                    "
+                                >
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                    <div></div>
+                                    <div style="background: #000"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <canvas id="patternCanvas"></canvas>
+
+                    <div class="weights-display">
+                        <h3
+                            style="
+                                color: #000;
+                                margin-bottom: 12px;
+                                font-size: 14px;
+                                font-weight: bold;
+                                text-transform: uppercase;
+                            "
+                        >
+                            ALL NETWORK WEIGHTS
+                        </h3>
+                        <p
+                            style="
+                                font-size: 13px;
+                                color: #000;
+                                margin-bottom: 12px;
+                                line-height: 1.5;
+                            "
+                        >
+                            DARKER = HIGHER VALUE. ORANGE = ACTIVE GRADIENT.
+                        </p>
+                        <canvas id="weightsCanvas" style="width: 100%; height: 120px; border: 3px solid #000; background: #fff;"></canvas>
+                    </div>
+
+                    <div class="network-diagram">
+                        <h3>Neural Network Architecture</h3>
+                        <div class="network-viz" id="networkViz">
+                            <div class="layer">
+                                <div class="layer-label">
+                                    Input Layer<br />(64 pixels)
+                                </div>
+                                <div class="layer-nodes">
+                                    <div class="node"></div>
+                                    <div class="node"></div>
+                                    <div class="node"></div>
+                                    <div class="node"></div>
+                                    <div style="color: #555; font-size: 0.8em">
+                                        ...
+                                    </div>
+                                    <div class="node"></div>
+                                    <div class="node"></div>
+                                </div>
+                            </div>
+                            <div class="arrow">→</div>
+                            <div class="layer">
+                                <div class="layer-label">
+                                    Hidden Layer<br />(<span id="hiddenCount"
+                                        >6</span
+                                    >
+                                    features)
+                                </div>
+                                <div class="layer-nodes" id="hiddenLayerViz">
+                                    <div class="node hidden"></div>
+                                    <div class="node hidden"></div>
+                                    <div class="node hidden"></div>
+                                    <div class="node hidden"></div>
+                                    <div class="node hidden"></div>
+                                    <div class="node hidden"></div>
+                                </div>
+                            </div>
+                            <div class="arrow">→</div>
+                            <div class="layer">
+                                <div class="layer-label">
+                                    Output Layer<br />(4 classes)
+                                </div>
+                                <div class="layer-nodes">
+                                    <div class="node output"></div>
+                                    <div class="node output"></div>
+                                    <div class="node output"></div>
+                                    <div class="node output"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <p
+                            style="
+                                font-size: 11px;
+                                color: #000;
+                                margin-top: 12px;
+                                text-align: left;
+                                border-top: 2px dotted #000;
+                                padding-top: 8px;
+                            "
+                        >
+                            WEIGHTS (ABOVE) = PARAMETERS CONNECTING INPUT TO
+                            HIDDEN LAYER
+                        </p>
+                    </div>
+
+                    <div class="draw-interface">
+                        <h4>TRY THE NETWORK</h4>
+                        <p
+                            style="
+                                font-size: 13px;
+                                color: #000;
+                                margin-bottom: 12px;
+                                line-height: 1.5;
+                            "
+                        >
+                            Draw an 8×8 pattern and watch the network classify it in real-time.
+                        </p>
+                        <div style="display: flex; gap: 20px; align-items: start;">
+                            <div style="flex-shrink: 0;">
+                                <div class="draw-canvas" id="drawCanvas"></div>
+                                <div class="draw-controls">
+                                    <button id="clearDrawing" class="secondary">
+                                        Clear
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div class="prediction">
+                                    PREDICTION: <span id="drawPrediction">—</span>
+                                </div>
+                                <div
+                                    style="
+                                        font-size: 13px;
+                                        color: #000;
+                                        margin-top: 8px;
+                                    "
+                                >
+                                    CONFIDENCE: <span id="drawConfidence">—</span>
+                                </div>
+                                <div style="margin-top: 15px; padding-top: 15px; border-top: 2px dotted #000;">
+                                    <div style="font-size: 12px; color: #000; margin-bottom: 8px; font-weight: bold;">
+                                        HIDDEN LAYER (<span id="hiddenCountDraw">6</span> features)
+                                    </div>
+                                    <div id="activationsViz" style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 15px;"></div>
+
+                                    <div style="font-size: 12px; color: #000; margin-bottom: 8px; font-weight: bold; padding-top: 10px; border-top: 1px dotted #ccc;">
+                                        OUTPUT LAYER (4 classes)
+                                    </div>
+                                    <div id="outputActivationsViz" style="display: flex; gap: 4px; flex-wrap: wrap;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <div class="algorithm-box">
+                        <code>for each batch:
+  gradient = ∂Loss/∂θ
+  θ = θ - α · gradient
+
+where:
+  θ = network parameters (weights)
+  α = learning rate (step size)</code>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Learning Rate (α)</label>
+                        <input
+                            type="range"
+                            id="patternLearningRate"
+                            min="0.01"
+                            max="0.4"
+                            step="0.01"
+                            value="0.1"
+                        />
+                        <div class="value">
+                            α = <span id="patternLearningRateValue">0.100</span>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Hidden Units</label>
+                        <input
+                            type="range"
+                            id="hiddenUnits"
+                            min="2"
+                            max="12"
+                            step="1"
+                            value="6"
+                        />
+                        <div class="value">
+                            <span id="hiddenUnitsValue">6</span>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Speed</label>
+                        <input
+                            type="range"
+                            id="trainingSpeed"
+                            min="0"
+                            max="1"
+                            step="0.001"
+                            value="0.2"
+                        />
+                        <div class="value">
+                            <span id="trainingSpeedValue">0.2</span>x
+                        </div>
+                    </div>
+
+                    <button id="patternStartBtn">START LEARNING</button>
+                    <button id="patternResetBtn" class="secondary">
+                        RESET NETWORK
+                    </button>
+
+                    <div class="stats">
+                        <div
+                            style="
+                                display: grid;
+                                grid-template-columns: 1fr 150px;
+                                gap: 15px;
+                            "
+                        >
+                            <div>
+                                <div>
+                                    <span class="label">Iteration:</span>
+                                    <span id="patternIteration">0</span>
+                                </div>
+                                <div>
+                                    <span class="label">Loss:</span>
+                                    <span id="patternLoss">0.000</span>
+                                </div>
+                                <div>
+                                    <span class="label">Accuracy:</span>
+                                    <span id="patternAccuracy">0%</span>
+                                </div>
+                                <div>
+                                    <span class="label">Status:</span>
+                                    <span id="patternStatus">Ready</span>
+                                </div>
+                            </div>
+                            <div>
+                                <canvas
+                                    id="lossLandscape"
+                                    style="
+                                        width: 150px;
+                                        height: 120px;
+                                        border: 2px solid #000;
+                                        background: #fff;
+                                        cursor: pointer;
+                                    "
+                                ></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // ============================================
+            // PATTERN RECOGNITION
+            // ============================================
+            const patternCanvas = document.getElementById("patternCanvas");
+            const patternCtx = patternCanvas.getContext("2d");
+            const weightsCanvas = document.getElementById("weightsCanvas");
+            const weightsCtx = weightsCanvas.getContext("2d");
+
+            const GRID_SIZE = 8;
+            let trainingData = [];
+            let W1 = []; // Input to hidden weights
+            let b1 = []; // Hidden biases
+            let W2 = []; // Hidden to output weights
+            let b2 = []; // Output biases
+            let hiddenUnits = 6;
+            let patternLearningRate = 0.1;
+            let patternIteration = 0;
+            let patternRunning = false;
+            let trainingSpeed = 0.2; // 0 to 1, controls steps per second multiplier
+            let lastFrameTime = 0;
+            let stepAccumulator = 0; // Fractional steps to carry over
+
+            // Loss landscape tracking
+            let trajectoryPoints = []; // Store [w1, w2, loss] for visualization
+            const MAX_TRAJECTORY = 150; // Keep last N points
+
+            // Current batch tracking for visualization
+            let currentBatchIndices = [];
+
+            // Track gradients for visualization
+            let currentGradientsW1 = [];
+            let currentGradientsW2 = [];
+            let maxGradientNormW1 = 0;
+            let maxGradientNormW2 = 0;
+            const CALIBRATION_STEPS = 20; // Track max gradient for first N steps
+
+            function updateNetworkDiagram() {
+                // Update hidden layer count
+                document.getElementById("hiddenCount").textContent =
+                    hiddenUnits;
+                document.getElementById("hiddenCountDraw").textContent =
+                    hiddenUnits;
+
+                // Update hidden layer visualization
+                const hiddenLayerViz =
+                    document.getElementById("hiddenLayerViz");
+                hiddenLayerViz.innerHTML = "";
+
+                for (let i = 0; i < hiddenUnits; i++) {
+                    const node = document.createElement("div");
+                    node.className = "node hidden";
+                    hiddenLayerViz.appendChild(node);
+                }
+            }
+
+            function resizePatternCanvas() {
+                const rect = patternCanvas.getBoundingClientRect();
+                const dpr = window.devicePixelRatio || 1;
+
+                // Calculate required height based on samples
+                const topPadding = 30;
+                const cols = 25;
+                const rows = Math.ceil((trainingData.length || 300) / cols);
+                const cellSize = rect.width / cols;
+                const requiredHeight = topPadding + (rows * cellSize);
+
+                patternCanvas.width = rect.width * dpr;
+                patternCanvas.height = requiredHeight * dpr;
+
+                patternCtx.scale(dpr, dpr);
+
+                if (trainingData.length > 0) {
+                    updatePatternStats();
+                    drawPattern();
+                    visualizeWeights();
+                }
+            }
+            resizePatternCanvas();
+            resizeWeightsCanvas();
+            window.addEventListener("resize", () => {
+                resizePatternCanvas();
+                resizeWeightsCanvas();
+                resizeLossCanvas();
+                drawLossLandscape();
+                visualizeWeights();
+            });
+
+            function relu(x) {
+                return Math.max(0, x);
+            }
+
+            function reluDerivative(x) {
+                return x > 0 ? 1 : 0;
+            }
+
+            function sigmoid(x) {
+                return 1 / (1 + Math.exp(-x));
+            }
+
+            function sigmoidDerivative(x) {
+                const s = sigmoid(x);
+                return s * (1 - s);
+            }
+
+            function generatePatterns() {
+                trainingData = [];
+
+                // Class 0: Horizontal stripes
+                for (let i = 0; i < 75; i++) {
+                    const pattern = new Array(GRID_SIZE * GRID_SIZE).fill(0);
+                    const offset = Math.floor(Math.random() * 2); // Random 0 or 1
+                    for (let row = 0; row < GRID_SIZE; row++) {
+                        if ((row + offset) % 2 === 0) {
+                            for (let col = 0; col < GRID_SIZE; col++) {
+                                if (Math.random() > 0.15)
+                                    pattern[row * GRID_SIZE + col] = 1;
+                            }
+                        } else {
+                            for (let col = 0; col < GRID_SIZE; col++) {
+                                if (Math.random() > 0.85)
+                                    pattern[row * GRID_SIZE + col] = 1;
+                            }
+                        }
+                    }
+                    trainingData.push({ input: pattern, label: 0 });
+                }
+
+                // Class 1: Vertical stripes
+                for (let i = 0; i < 75; i++) {
+                    const pattern = new Array(GRID_SIZE * GRID_SIZE).fill(0);
+                    const offset = Math.floor(Math.random() * 2); // Random 0 or 1
+                    for (let row = 0; row < GRID_SIZE; row++) {
+                        for (let col = 0; col < GRID_SIZE; col++) {
+                            if ((col + offset) % 2 === 0) {
+                                if (Math.random() > 0.15)
+                                    pattern[row * GRID_SIZE + col] = 1;
+                            } else {
+                                if (Math.random() > 0.85)
+                                    pattern[row * GRID_SIZE + col] = 1;
+                            }
+                        }
+                    }
+                    trainingData.push({ input: pattern, label: 1 });
+                }
+
+                // Class 2: Diagonal (both orientations)
+                for (let i = 0; i < 75; i++) {
+                    const pattern = new Array(GRID_SIZE * GRID_SIZE).fill(0);
+                    const offset = Math.floor(Math.random() * 3) - 1; // Random -1, 0, or 1
+                    const flipped = Math.random() > 0.5; // Randomly choose orientation
+
+                    for (let row = 0; row < GRID_SIZE; row++) {
+                        for (let col = 0; col < GRID_SIZE; col++) {
+                            const dist = flipped
+                                ? Math.abs(row + col - (GRID_SIZE - 1) - offset)
+                                : Math.abs(row - col - offset);
+                            if (dist <= 2) {
+                                if (Math.random() > 0.2)
+                                    pattern[row * GRID_SIZE + col] = 1;
+                            } else {
+                                if (Math.random() > 0.9)
+                                    pattern[row * GRID_SIZE + col] = 1;
+                            }
+                        }
+                    }
+                    trainingData.push({ input: pattern, label: 2 });
+                }
+
+                // Class 3: Checkerboard
+                for (let i = 0; i < 75; i++) {
+                    const pattern = new Array(GRID_SIZE * GRID_SIZE).fill(0);
+                    const offset = Math.floor(Math.random() * 2); // Random 0 or 1
+                    for (let row = 0; row < GRID_SIZE; row++) {
+                        for (let col = 0; col < GRID_SIZE; col++) {
+                            if ((row + col + offset) % 2 === 0) {
+                                if (Math.random() > 0.15)
+                                    pattern[row * GRID_SIZE + col] = 1;
+                            } else {
+                                if (Math.random() > 0.85)
+                                    pattern[row * GRID_SIZE + col] = 1;
+                            }
+                        }
+                    }
+                    trainingData.push({ input: pattern, label: 3 });
+                }
+            }
+
+            function initPatternNetwork() {
+                const inputSize = GRID_SIZE * GRID_SIZE;
+                const outputSize = 4;
+
+                // He initialization for ReLU: std = sqrt(2 / fan_in)
+                const std_W1 = Math.sqrt(2 / inputSize);
+                const std_W2 = Math.sqrt(2 / hiddenUnits);
+
+                W1 = [];
+                for (let i = 0; i < hiddenUnits; i++) {
+                    W1[i] = [];
+                    for (let j = 0; j < inputSize; j++) {
+                        // Box-Muller transform for Gaussian sampling
+                        const u1 = Math.random();
+                        const u2 = Math.random();
+                        const z =
+                            Math.sqrt(-2 * Math.log(u1)) *
+                            Math.cos(2 * Math.PI * u2);
+                        W1[i][j] = z * std_W1;
+                    }
+                }
+
+                b1 = new Array(hiddenUnits).fill(0);
+
+                W2 = [];
+                for (let i = 0; i < outputSize; i++) {
+                    W2[i] = [];
+                    for (let j = 0; j < hiddenUnits; j++) {
+                        const u1 = Math.random();
+                        const u2 = Math.random();
+                        const z =
+                            Math.sqrt(-2 * Math.log(u1)) *
+                            Math.cos(2 * Math.PI * u2);
+                        W2[i][j] = z * std_W2;
+                    }
+                }
+
+                b2 = new Array(outputSize).fill(0);
+
+                patternIteration = 0;
+                trajectoryPoints = []; // Reset trajectory
+                currentGradientsW1 = []; // Reset gradients
+                currentGradientsW2 = [];
+                maxGradientNormW1 = 0; // Reset max gradient
+                maxGradientNormW2 = 0;
+
+                // Initialize with random batch for visualization
+                currentBatchIndices = [];
+                while (currentBatchIndices.length < 4) {
+                    const idx = Math.floor(Math.random() * trainingData.length);
+                    if (!currentBatchIndices.includes(idx)) {
+                        currentBatchIndices.push(idx);
+                    }
+                }
+            }
+
+            // Track 2D projection of weights for visualization
+            function getWeightProjection() {
+                // Use first two weights from W1 as our 2D projection
+                return [W1[0][0], W1[0][1]];
+            }
+
+            function forwardPass(input) {
+                // Hidden layer
+                const hidden = new Array(hiddenUnits);
+                const hiddenRaw = new Array(hiddenUnits);
+                for (let i = 0; i < hiddenUnits; i++) {
+                    let sum = b1[i];
+                    for (let j = 0; j < input.length; j++) {
+                        sum += W1[i][j] * input[j];
+                    }
+                    hiddenRaw[i] = sum;
+                    hidden[i] = relu(sum);
+                }
+
+                // Output layer
+                const output = new Array(4);
+                const outputRaw = new Array(4);
+                for (let i = 0; i < 4; i++) {
+                    let sum = b2[i];
+                    for (let j = 0; j < hiddenUnits; j++) {
+                        sum += W2[i][j] * hidden[j];
+                    }
+                    outputRaw[i] = sum;
+                }
+
+                // Softmax
+                const maxVal = Math.max(...outputRaw);
+                const expVals = outputRaw.map((x) => Math.exp(x - maxVal));
+                const sumExp = expVals.reduce((a, b) => a + b, 0);
+                for (let i = 0; i < 4; i++) {
+                    output[i] = expVals[i] / sumExp;
+                }
+
+                return { hidden, hiddenRaw, output, outputRaw };
+            }
+
+            function patternSGDStep() {
+                // Sample random batch
+                const batchIndices = [];
+                const batch = [];
+                const usedIndices = new Set();
+
+                // Sample 4 random examples for the batch
+                while (batch.length < 4) {
+                    const idx = Math.floor(Math.random() * trainingData.length);
+                    if (!usedIndices.has(idx)) {
+                        usedIndices.add(idx);
+                        batchIndices.push(idx);
+                        batch.push(trainingData[idx]);
+                    }
+                }
+
+                // Store for visualization
+                currentBatchIndices = batchIndices;
+
+                // Process each sample in batch
+                const allGradients = { W1: [], b1: [], W2: [], b2: [] };
+
+                for (const sample of batch) {
+                    const input = sample.input;
+                    const label = sample.label;
+
+                    // Forward pass
+                    const { hidden, hiddenRaw, output, outputRaw } =
+                        forwardPass(input);
+
+                    // Compute output gradient (cross-entropy + softmax)
+                    const outputGrad = [...output];
+                    outputGrad[label] -= 1;
+
+                    // Backprop to hidden layer
+                    const hiddenGrad = new Array(hiddenUnits).fill(0);
+                    for (let i = 0; i < hiddenUnits; i++) {
+                        for (let j = 0; j < 4; j++) {
+                            hiddenGrad[i] += outputGrad[j] * W2[j][i];
+                        }
+                        hiddenGrad[i] *= reluDerivative(hiddenRaw[i]);
+                    }
+
+                    // Accumulate gradients
+                    if (!allGradients.W1.length) {
+                        allGradients.W1 = W1.map((row) => row.map(() => 0));
+                        allGradients.b1 = new Array(hiddenUnits).fill(0);
+                        allGradients.W2 = W2.map((row) => row.map(() => 0));
+                        allGradients.b2 = new Array(4).fill(0);
+                    }
+
+                    for (let i = 0; i < 4; i++) {
+                        for (let j = 0; j < hiddenUnits; j++) {
+                            allGradients.W2[i][j] += outputGrad[i] * hidden[j];
+                        }
+                        allGradients.b2[i] += outputGrad[i];
+                    }
+
+                    for (let i = 0; i < hiddenUnits; i++) {
+                        for (let j = 0; j < input.length; j++) {
+                            allGradients.W1[i][j] += hiddenGrad[i] * input[j];
+                        }
+                        allGradients.b1[i] += hiddenGrad[i];
+                    }
+                }
+
+                // Average gradients and store for visualization
+                const batchSize = batch.length;
+
+                // Store W1 gradients
+                currentGradientsW1 = [];
+                let stepMaxGradW1 = 0;
+                for (let i = 0; i < hiddenUnits; i++) {
+                    currentGradientsW1[i] = [];
+                    for (let j = 0; j < GRID_SIZE * GRID_SIZE; j++) {
+                        const grad = Math.abs(
+                            allGradients.W1[i][j] / batchSize,
+                        );
+                        currentGradientsW1[i][j] = grad;
+                        stepMaxGradW1 = Math.max(stepMaxGradW1, grad);
+                    }
+                }
+
+                // Store W2 gradients
+                currentGradientsW2 = [];
+                let stepMaxGradW2 = 0;
+                for (let i = 0; i < 4; i++) {
+                    currentGradientsW2[i] = [];
+                    for (let j = 0; j < hiddenUnits; j++) {
+                        const grad = Math.abs(
+                            allGradients.W2[i][j] / batchSize,
+                        );
+                        currentGradientsW2[i][j] = grad;
+                        stepMaxGradW2 = Math.max(stepMaxGradW2, grad);
+                    }
+                }
+
+                // Track maximum gradient during calibration period
+                if (patternIteration < CALIBRATION_STEPS) {
+                    maxGradientNormW1 = Math.max(maxGradientNormW1, stepMaxGradW1);
+                    maxGradientNormW2 = Math.max(maxGradientNormW2, stepMaxGradW2);
+                }
+
+                // Apply gradients
+                for (let i = 0; i < 4; i++) {
+                    for (let j = 0; j < hiddenUnits; j++) {
+                        W2[i][j] -=
+                            (patternLearningRate * allGradients.W2[i][j]) /
+                            batchSize;
+                    }
+                    b2[i] -=
+                        (patternLearningRate * allGradients.b2[i]) / batchSize;
+                }
+
+                for (let i = 0; i < hiddenUnits; i++) {
+                    for (let j = 0; j < GRID_SIZE * GRID_SIZE; j++) {
+                        W1[i][j] -=
+                            (patternLearningRate * allGradients.W1[i][j]) /
+                            batchSize;
+                    }
+                    b1[i] -=
+                        (patternLearningRate * allGradients.b1[i]) / batchSize;
+                }
+
+                patternIteration++;
+
+                // Track trajectory for loss landscape (every 5 iterations)
+                if (patternIteration % 5 === 0) {
+                    const [w1, w2] = getWeightProjection();
+                    const loss = computePatternStats().loss;
+                    trajectoryPoints.push({ w1, w2, loss });
+                    if (trajectoryPoints.length > MAX_TRAJECTORY) {
+                        trajectoryPoints.shift();
+                    }
+                }
+            }
+
+            function computePatternStats() {
+                let totalLoss = 0;
+                let correct = 0;
+
+                for (const sample of trainingData) {
+                    const { output } = forwardPass(sample.input);
+                    const predicted = output.indexOf(Math.max(...output));
+                    if (predicted === sample.label) correct++;
+
+                    totalLoss += -Math.log(output[sample.label] + 1e-10);
+                }
+
+                return {
+                    loss: totalLoss / trainingData.length,
+                    accuracy: (correct / trainingData.length) * 100,
+                };
+            }
+
+            function drawPattern() {
+                const rect = patternCanvas.getBoundingClientRect();
+                const width = rect.width;
+                const height = rect.height;
+
+                patternCtx.fillStyle = "#fff";
+                patternCtx.fillRect(0, 0, width, height);
+
+                const classNames = [
+                    "H-Stripe",
+                    "V-Stripe",
+                    "Diagonal",
+                    "Checker",
+                ];
+
+                // Draw legend at top
+                patternCtx.font = "11px 'Berkeley Mono', monospace";
+                patternCtx.fillStyle = "#000";
+                patternCtx.fillText("■ CORRECT", 10, 15);
+                patternCtx.fillStyle = "#ff0000";
+                patternCtx.fillText("■ WRONG", 90, 15);
+
+                // Draw batch indicator - white square with black border
+                patternCtx.fillStyle = "#fff";
+                patternCtx.fillRect(170, 6, 10, 10);
+                patternCtx.strokeStyle = "#000";
+                patternCtx.lineWidth = 2;
+                patternCtx.strokeRect(170, 6, 10, 10);
+
+                patternCtx.fillStyle = "#000";
+                patternCtx.font = "11px 'Berkeley Mono', monospace";
+                patternCtx.fillText("BATCH", 185, 15);
+
+                const topPadding = 30;
+                const cols = 25;
+                const rows = Math.ceil(trainingData.length / cols);
+                const cellSize = width / cols;
+                const pixelSize = cellSize / GRID_SIZE;
+
+                for (let i = 0; i < trainingData.length; i++) {
+                    const sample = trainingData[i];
+                    const col = i % cols;
+                    const row = Math.floor(i / cols);
+                    const x = col * cellSize + 2;
+                    const y = row * cellSize + topPadding + 2;
+
+                    const isInBatch = currentBatchIndices.includes(i);
+
+                    // Predict and check correctness
+                    const { output } = forwardPass(sample.input);
+                    const predicted = output.indexOf(Math.max(...output));
+                    const isCorrect = predicted === sample.label;
+
+                    // Draw pattern (very small)
+                    for (let py = 0; py < GRID_SIZE; py++) {
+                        for (let px = 0; px < GRID_SIZE; px++) {
+                            const idx = py * GRID_SIZE + px;
+                            if (sample.input[idx] === 1) {
+                                // Color based on correctness and batch membership
+                                if (isInBatch) {
+                                    patternCtx.fillStyle = "#000";
+                                } else {
+                                    patternCtx.fillStyle = isCorrect
+                                        ? "#000"
+                                        : "#ff0000";
+                                }
+                                patternCtx.fillRect(
+                                    x + px * pixelSize,
+                                    y + py * pixelSize,
+                                    pixelSize - 0.3,
+                                    pixelSize - 0.3,
+                                );
+                            }
+                        }
+                    }
+
+                    // Draw border based on correctness
+                    if (isInBatch) {
+                        patternCtx.strokeStyle = "#000";
+                        patternCtx.lineWidth = 2;
+                    } else {
+                        patternCtx.strokeStyle = isCorrect
+                            ? "#00000033"
+                            : "#ff000033";
+                        patternCtx.lineWidth = 1;
+                    }
+                    patternCtx.strokeRect(
+                        x - 0.5,
+                        y - 0.5,
+                        cellSize - 3,
+                        cellSize - 3,
+                    );
+                }
+            }
+
+            function resizeWeightsCanvas() {
+                const rect = weightsCanvas.getBoundingClientRect();
+                const dpr = window.devicePixelRatio || 1;
+                weightsCanvas.width = rect.width * dpr;
+                weightsCanvas.height = rect.height * dpr;
+                weightsCtx.scale(dpr, dpr);
+            }
+
+            function visualizeWeights() {
+                const rect = weightsCanvas.getBoundingClientRect();
+                const width = rect.width;
+                const height = rect.height;
+                const padding = 8;
+
+                weightsCtx.fillStyle = "#fff";
+                weightsCtx.fillRect(0, 0, width, height);
+
+                // Collect all weights for global normalization
+                const allWeights = [];
+                for (let h = 0; h < hiddenUnits; h++) {
+                    allWeights.push(...W1[h]);
+                }
+                for (let i = 0; i < 4; i++) {
+                    allWeights.push(...W2[i]);
+                }
+                const min = Math.min(...allWeights);
+                const max = Math.max(...allWeights);
+                const range = max - min;
+
+                // Total weights: W1 (64 * hiddenUnits) + W2 (4 * hiddenUnits)
+                const totalW1 = 64 * hiddenUnits;
+                const totalW2 = 4 * hiddenUnits;
+                const totalWeights = totalW1 + totalW2;
+
+                // Layout as a grid with padding
+                const availableWidth = width - (padding * 2);
+                const availableHeight = height - (padding * 2);
+                const cols = Math.ceil(Math.sqrt(totalWeights * (availableWidth / availableHeight)));
+                const rows = Math.ceil(totalWeights / cols);
+                const cellWidth = availableWidth / cols;
+                const cellHeight = availableHeight / rows;
+
+                let weightIdx = 0;
+
+                // Draw W1 weights
+                for (let h = 0; h < hiddenUnits; h++) {
+                    for (let i = 0; i < 64; i++) {
+                        const weight = W1[h][i];
+                        const normalized = range > 0 ? (weight - min) / range : 0.5;
+                        const intensity = Math.floor(normalized * 255);
+
+                        let r = intensity, g = intensity, b = intensity;
+
+                        // Gradient overlay
+                        if (currentGradientsW1[h] && maxGradientNormW1 > 0) {
+                            const gradMag = currentGradientsW1[h][i];
+                            const normGrad = Math.min(1, gradMag / maxGradientNormW1);
+                            r = Math.floor(intensity + (255 - intensity) * normGrad * 0.7);
+                            g = Math.floor(intensity + (165 - intensity) * normGrad * 0.7);
+                            b = Math.floor(intensity + (0 - intensity) * normGrad * 0.7);
+                        }
+
+                        const col = weightIdx % cols;
+                        const row = Math.floor(weightIdx / cols);
+                        weightsCtx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                        weightsCtx.fillRect(padding + col * cellWidth, padding + row * cellHeight, cellWidth, cellHeight);
+
+                        weightIdx++;
+                    }
+                }
+
+                // Draw W2 weights
+                for (let outClass = 0; outClass < 4; outClass++) {
+                    for (let h = 0; h < hiddenUnits; h++) {
+                        const weight = W2[outClass][h];
+                        const normalized = range > 0 ? (weight - min) / range : 0.5;
+                        const intensity = Math.floor(normalized * 255);
+
+                        let r = intensity, g = intensity, b = intensity;
+
+                        // Gradient overlay
+                        if (currentGradientsW2[outClass] && maxGradientNormW2 > 0) {
+                            const gradMag = currentGradientsW2[outClass][h];
+                            const normGrad = Math.min(1, gradMag / maxGradientNormW2);
+                            r = Math.floor(intensity + (255 - intensity) * normGrad * 0.7);
+                            g = Math.floor(intensity + (165 - intensity) * normGrad * 0.7);
+                            b = Math.floor(intensity + (0 - intensity) * normGrad * 0.7);
+                        }
+
+                        const col = weightIdx % cols;
+                        const row = Math.floor(weightIdx / cols);
+                        weightsCtx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                        weightsCtx.fillRect(padding + col * cellWidth, padding + row * cellHeight, cellWidth, cellHeight);
+
+                        weightIdx++;
+                    }
+                }
+
+                // Draw weight count in bottom right
+                weightsCtx.font = "11px 'Berkeley Mono', monospace";
+                weightsCtx.fillStyle = "#000";
+                weightsCtx.textAlign = "right";
+                weightsCtx.textBaseline = "bottom";
+                weightsCtx.fillText(`${totalWeights} weights`, width - padding, height - padding);
+            }
+
+            // ============================================
+            // LOSS LANDSCAPE VISUALIZATION
+            // ============================================
+            const lossCanvas = document.getElementById("lossLandscape");
+            const lossCtx = lossCanvas.getContext("2d");
+
+            function resizeLossCanvas() {
+                const dpr = window.devicePixelRatio || 1;
+                lossCanvas.width = 150 * dpr;
+                lossCanvas.height = 120 * dpr;
+                lossCtx.scale(dpr, dpr);
+            }
+            resizeLossCanvas();
+
+            function drawLossLandscape() {
+                const width = 150;
+                const height = 120;
+
+                lossCtx.fillStyle = "#fff";
+                lossCtx.fillRect(0, 0, width, height);
+
+                if (trajectoryPoints.length < 2) return;
+
+                // Find bounds for trajectory
+                const w1Values = trajectoryPoints.map((p) => p.w1);
+                const w2Values = trajectoryPoints.map((p) => p.w2);
+                const lossValues = trajectoryPoints.map((p) => p.loss);
+
+                const minW1 = Math.min(...w1Values);
+                const maxW1 = Math.max(...w1Values);
+                const minW2 = Math.min(...w2Values);
+                const maxW2 = Math.max(...w2Values);
+                const minLoss = Math.min(...lossValues);
+                const maxLoss = Math.max(...lossValues);
+
+                const rangeW1 = maxW1 - minW1 || 1;
+                const rangeW2 = maxW2 - minW2 || 1;
+                const rangeLoss = maxLoss - minLoss || 1;
+
+                // 3D projection parameters
+                const centerX = width / 2;
+                const centerY = height * 0.7;
+                const scaleXY = Math.min(width, height) * 0.3;
+                const scaleZ = -height * 0.4; // Negative to invert Y-axis
+
+                // Project 3D point to 2D (isometric-ish projection)
+                function project3D(w1, w2, loss) {
+                    const nx = (w1 - minW1) / rangeW1 - 0.5; // -0.5 to 0.5
+                    const ny = (w2 - minW2) / rangeW2 - 0.5;
+                    const nz = (loss - minLoss) / rangeLoss;
+
+                    // Isometric projection
+                    const x = centerX + (nx - ny) * scaleXY;
+                    const y = centerY + (nx + ny) * scaleXY * 0.5 + nz * scaleZ;
+
+                    return { x, y };
+                }
+
+                // Draw grid for the base plane
+                lossCtx.strokeStyle = "#ccc";
+                lossCtx.lineWidth = 1;
+
+                for (let i = 0; i <= 10; i++) {
+                    const t = i / 10;
+                    const w1 = minW1 + rangeW1 * t;
+                    const w2_start = minW2;
+                    const w2_end = minW2 + rangeW2;
+
+                    const p1 = project3D(w1, w2_start, minLoss);
+                    const p2 = project3D(w1, w2_end, minLoss);
+
+                    lossCtx.beginPath();
+                    lossCtx.moveTo(p1.x, p1.y);
+                    lossCtx.lineTo(p2.x, p2.y);
+                    lossCtx.stroke();
+                }
+
+                for (let i = 0; i <= 10; i++) {
+                    const t = i / 10;
+                    const w2 = minW2 + rangeW2 * t;
+                    const w1_start = minW1;
+                    const w1_end = minW1 + rangeW1;
+
+                    const p1 = project3D(w1_start, w2, minLoss);
+                    const p2 = project3D(w1_end, w2, minLoss);
+
+                    lossCtx.beginPath();
+                    lossCtx.moveTo(p1.x, p1.y);
+                    lossCtx.lineTo(p2.x, p2.y);
+                    lossCtx.stroke();
+                }
+
+                // Draw trajectory path
+                lossCtx.strokeStyle = "#000";
+                lossCtx.lineWidth = 2;
+                lossCtx.beginPath();
+
+                for (let i = 0; i < trajectoryPoints.length; i++) {
+                    const point = trajectoryPoints[i];
+                    const { x, y } = project3D(point.w1, point.w2, point.loss);
+
+                    if (i === 0) {
+                        lossCtx.moveTo(x, y);
+                    } else {
+                        lossCtx.lineTo(x, y);
+                    }
+                }
+
+                lossCtx.stroke();
+
+                // Draw points along trajectory (with fade)
+                for (let i = 0; i < trajectoryPoints.length; i++) {
+                    const point = trajectoryPoints[i];
+                    const { x, y } = project3D(point.w1, point.w2, point.loss);
+
+                    const alpha = (i / trajectoryPoints.length) * 0.6 + 0.4;
+                    lossCtx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
+                    lossCtx.beginPath();
+                    lossCtx.arc(x, y, 2, 0, Math.PI * 2);
+                    lossCtx.fill();
+                }
+
+                // Draw current position (larger)
+                if (trajectoryPoints.length > 0) {
+                    const current =
+                        trajectoryPoints[trajectoryPoints.length - 1];
+                    const { x, y } = project3D(
+                        current.w1,
+                        current.w2,
+                        current.loss,
+                    );
+
+                    lossCtx.fillStyle = "#000";
+                    lossCtx.beginPath();
+                    lossCtx.arc(x, y, 4, 0, Math.PI * 2);
+                    lossCtx.fill();
+
+                    lossCtx.strokeStyle = "#fff";
+                    lossCtx.lineWidth = 2;
+                    lossCtx.stroke();
+                }
+
+                // No labels needed for compact view
+            }
+
+            function updatePatternStats() {
+                const stats = computePatternStats();
+                document.getElementById("patternIteration").textContent =
+                    patternIteration;
+                document.getElementById("patternLoss").textContent =
+                    stats.loss.toFixed(3);
+                document.getElementById("patternAccuracy").textContent =
+                    Math.round(stats.accuracy) + "%";
+
+                // Check for convergence
+                if (stats.loss < 0.08 && patternRunning) {
+                    patternRunning = false;
+                    document.getElementById("patternStartBtn").textContent =
+                        "START LEARNING";
+                    document.getElementById("patternStatus").textContent =
+                        "CONVERGED";
+                    document.getElementById("patternStatus").style.color =
+                        "#000";
+                    document.getElementById("patternStatus").style.fontWeight =
+                        "bold";
+                } else {
+                    document.getElementById("patternStatus").textContent =
+                        patternRunning ? "ACTIVE" : "PAUSED";
+                    document.getElementById("patternStatus").style.color =
+                        "#000";
+                    document.getElementById("patternStatus").style.fontWeight =
+                        "normal";
+                }
+            }
+
+            function animatePattern(timestamp) {
+                if (!patternRunning) return;
+
+                // Initialize lastFrameTime on first frame
+                if (lastFrameTime === 0) {
+                    lastFrameTime = timestamp;
+                    requestAnimationFrame(animatePattern);
+                    return;
+                }
+
+                // Calculate elapsed time in seconds
+                const deltaTime = (timestamp - lastFrameTime) / 1000;
+                lastFrameTime = timestamp;
+
+                // Calculate steps to run based on time elapsed
+                // Base speed: 100 steps/sec, scaled by trainingSpeed (0 to 1)
+                const stepsPerSecond = trainingSpeed * 100;
+                stepAccumulator += stepsPerSecond * deltaTime;
+
+                // Execute accumulated steps
+                const stepsToRun = Math.floor(stepAccumulator);
+                stepAccumulator -= stepsToRun;
+
+                for (let i = 0; i < stepsToRun; i++) {
+                    patternSGDStep();
+                }
+
+                // Update visualization every frame
+                updatePatternStats();
+                drawPattern();
+                visualizeWeights();
+                drawLossLandscape();
+
+                requestAnimationFrame(animatePattern);
+            }
+
+            document
+                .getElementById("patternStartBtn")
+                .addEventListener("click", () => {
+                    patternRunning = !patternRunning;
+                    const btn = document.getElementById("patternStartBtn");
+                    if (patternRunning) {
+                        btn.textContent = "PAUSE";
+                        lastFrameTime = 0; // Reset timing
+                        stepAccumulator = 0;
+                        requestAnimationFrame(animatePattern);
+                    } else {
+                        btn.textContent = "START LEARNING";
+                    }
+                });
+
+            document
+                .getElementById("patternResetBtn")
+                .addEventListener("click", () => {
+                    patternRunning = false;
+                    document.getElementById("patternStartBtn").textContent =
+                        "START LEARNING";
+                    lastFrameTime = 0;
+                    stepAccumulator = 0;
+                    initPatternNetwork();
+                    updatePatternStats();
+                    drawPattern();
+                    visualizeWeights();
+                    drawLossLandscape();
+                });
+
+            document
+                .getElementById("patternLearningRate")
+                .addEventListener("input", (e) => {
+                    patternLearningRate = parseFloat(e.target.value);
+                    document.getElementById(
+                        "patternLearningRateValue",
+                    ).textContent = patternLearningRate.toFixed(3);
+                });
+
+            document
+                .getElementById("trainingSpeed")
+                .addEventListener("input", (e) => {
+                    trainingSpeed = parseFloat(e.target.value);
+                    // Show up to 3 decimal places, removing trailing zeros
+                    const formatted = parseFloat(
+                        trainingSpeed.toFixed(3),
+                    ).toString();
+                    document.getElementById("trainingSpeedValue").textContent =
+                        formatted;
+                });
+
+            document
+                .getElementById("hiddenUnits")
+                .addEventListener("input", (e) => {
+                    const newHiddenUnits = parseInt(e.target.value);
+                    if (newHiddenUnits !== hiddenUnits) {
+                        hiddenUnits = newHiddenUnits;
+                        document.getElementById(
+                            "hiddenUnitsValue",
+                        ).textContent = hiddenUnits;
+                        patternRunning = false;
+                        document.getElementById("patternStartBtn").textContent =
+                            "START LEARNING";
+                        lastFrameTime = 0;
+                        stepAccumulator = 0;
+                        initPatternNetwork();
+                        updatePatternStats();
+                        drawPattern();
+                        visualizeWeights();
+                        updateNetworkDiagram();
+                        drawLossLandscape();
+                    }
+                });
+
+            // ============================================
+            // DRAWING INTERFACE
+            // ============================================
+            const drawCanvasContainer = document.getElementById("drawCanvas");
+            let drawState = new Array(GRID_SIZE * GRID_SIZE).fill(0);
+            let isDrawing = false;
+            let drawMode = 1; // 1 = drawing, 0 = erasing
+
+            // Initialize drawing canvas
+            function initDrawCanvas() {
+                drawCanvasContainer.innerHTML = "";
+                for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+                    const pixel = document.createElement("div");
+                    pixel.className = "draw-pixel";
+                    pixel.dataset.index = i;
+                    drawCanvasContainer.appendChild(pixel);
+                }
+            }
+
+            function updateDrawCanvas() {
+                const pixels =
+                    drawCanvasContainer.querySelectorAll(".draw-pixel");
+                pixels.forEach((pixel, i) => {
+                    if (drawState[i] === 1) {
+                        pixel.classList.add("active");
+                    } else {
+                        pixel.classList.remove("active");
+                    }
+                });
+            }
+
+            function classifyDrawing() {
+                const classNames = [
+                    "H-Stripe",
+                    "V-Stripe",
+                    "Diagonal",
+                    "Checker",
+                ];
+
+                // Check if anything is drawn
+                if (drawState.every((v) => v === 0)) {
+                    document.getElementById("drawPrediction").textContent = "—";
+                    document.getElementById("drawConfidence").textContent = "—";
+                    document.getElementById("activationsViz").innerHTML = "";
+                    document.getElementById("outputActivationsViz").innerHTML = "";
+                    return;
+                }
+
+                // Classify
+                const { output, hidden } = forwardPass(drawState);
+                const predicted = output.indexOf(Math.max(...output));
+                const confidence = (output[predicted] * 100).toFixed(1);
+
+                document.getElementById("drawPrediction").textContent =
+                    classNames[predicted];
+                document.getElementById("drawConfidence").textContent =
+                    `${confidence}%`;
+
+                // Visualize hidden layer activations
+                const activationsContainer = document.getElementById("activationsViz");
+                activationsContainer.innerHTML = "";
+
+                const maxActivation = Math.max(...hidden);
+
+                for (let i = 0; i < hidden.length; i++) {
+                    const activation = hidden[i];
+                    const normalized = maxActivation > 0 ? activation / maxActivation : 0;
+                    const intensity = Math.floor(normalized * 255);
+
+                    const cell = document.createElement("div");
+                    cell.style.width = "35px";
+                    cell.style.height = "35px";
+                    cell.style.background = `rgb(${intensity}, ${intensity}, ${intensity})`;
+                    cell.style.border = "2px solid #000";
+                    cell.style.display = "flex";
+                    cell.style.alignItems = "center";
+                    cell.style.justifyContent = "center";
+                    cell.style.fontSize = "10px";
+                    cell.style.fontWeight = "bold";
+                    cell.style.color = normalized > 0.5 ? "#000" : "#fff";
+                    cell.textContent = activation.toFixed(1);
+
+                    activationsContainer.appendChild(cell);
+                }
+
+                // Visualize output layer activations
+                const outputContainer = document.getElementById("outputActivationsViz");
+                outputContainer.innerHTML = "";
+
+                const maxOutput = Math.max(...output);
+
+                for (let i = 0; i < output.length; i++) {
+                    const activation = output[i];
+                    const normalized = maxOutput > 0 ? activation / maxOutput : 0;
+                    const intensity = Math.floor(normalized * 255);
+
+                    const cell = document.createElement("div");
+                    cell.style.width = "60px";
+                    cell.style.height = "35px";
+                    cell.style.background = `rgb(${intensity}, ${intensity}, ${intensity})`;
+                    cell.style.border = i === predicted ? "3px solid #000" : "2px solid #000";
+                    cell.style.display = "flex";
+                    cell.style.alignItems = "center";
+                    cell.style.justifyContent = "center";
+                    cell.style.fontSize = "9px";
+                    cell.style.fontWeight = "bold";
+                    cell.style.color = normalized > 0.5 ? "#000" : "#fff";
+                    cell.style.flexDirection = "column";
+                    cell.style.gap = "2px";
+
+                    const label = document.createElement("div");
+                    label.style.fontSize = "8px";
+                    label.textContent = classNames[i].toUpperCase();
+
+                    const value = document.createElement("div");
+                    value.textContent = (activation * 100).toFixed(0) + "%";
+
+                    cell.appendChild(label);
+                    cell.appendChild(value);
+
+                    outputContainer.appendChild(cell);
+                }
+            }
+
+            function togglePixel(index) {
+                drawState[index] = drawState[index] === 1 ? 0 : 1;
+                updateDrawCanvas();
+                classifyDrawing();
+            }
+
+            // Mouse events
+            drawCanvasContainer.addEventListener("mousedown", (e) => {
+                if (e.target.classList.contains("draw-pixel")) {
+                    const index = parseInt(e.target.dataset.index);
+                    isDrawing = true;
+                    // Set draw mode based on current pixel state (toggle)
+                    drawMode = drawState[index] === 1 ? 0 : 1;
+                    drawState[index] = drawMode;
+                    updateDrawCanvas();
+                    classifyDrawing();
+                }
+            });
+
+            drawCanvasContainer.addEventListener("mouseover", (e) => {
+                if (isDrawing && e.target.classList.contains("draw-pixel")) {
+                    const index = parseInt(e.target.dataset.index);
+                    if (drawState[index] !== drawMode) {
+                        drawState[index] = drawMode;
+                        updateDrawCanvas();
+                        classifyDrawing();
+                    }
+                }
+            });
+
+            document.addEventListener("mouseup", () => {
+                isDrawing = false;
+            });
+
+            // Touch events for mobile
+            drawCanvasContainer.addEventListener("touchstart", (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const element = document.elementFromPoint(
+                    touch.clientX,
+                    touch.clientY,
+                );
+                if (element && element.classList.contains("draw-pixel")) {
+                    const index = parseInt(element.dataset.index);
+                    isDrawing = true;
+                    // Set draw mode based on current pixel state (toggle)
+                    drawMode = drawState[index] === 1 ? 0 : 1;
+                    drawState[index] = drawMode;
+                    updateDrawCanvas();
+                    classifyDrawing();
+                }
+            });
+
+            drawCanvasContainer.addEventListener("touchmove", (e) => {
+                e.preventDefault();
+                if (isDrawing) {
+                    const touch = e.touches[0];
+                    const element = document.elementFromPoint(
+                        touch.clientX,
+                        touch.clientY,
+                    );
+                    if (element && element.classList.contains("draw-pixel")) {
+                        const index = parseInt(element.dataset.index);
+                        if (drawState[index] !== drawMode) {
+                            drawState[index] = drawMode;
+                            updateDrawCanvas();
+                            classifyDrawing();
+                        }
+                    }
+                }
+            });
+
+            document.addEventListener("touchend", () => {
+                isDrawing = false;
+            });
+
+            document
+                .getElementById("clearDrawing")
+                .addEventListener("click", () => {
+                    drawState = new Array(GRID_SIZE * GRID_SIZE).fill(0);
+                    updateDrawCanvas();
+                    classifyDrawing();
+                });
+
+            // Initialize everything
+            generatePatterns();
+            initPatternNetwork();
+            resizePatternCanvas(); // Resize now that we have data
+            updatePatternStats();
+            drawPattern();
+            visualizeWeights();
+            updateNetworkDiagram();
+            drawLossLandscape();
+            initDrawCanvas();
+        </script>
+    </body>
+</html>
