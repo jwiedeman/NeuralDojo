@@ -10,7 +10,7 @@
   <div id="app">
     <header>
       <div class="title">GO ARENA — NEURAL GARDEN</div>
-      <div class="subtitle">Self-play Go network. Same brain on both sides. Watch confidence & weights evolve.</div>
+      <div class="subtitle">We grow a Go evaluator through endless self-play. Same network, both colours. Watch the program emerge.</div>
     </header>
 
     <main class="split">
@@ -38,9 +38,12 @@
       <section class="pane right">
         <div class="panel-header">SELF-PLAY TRAINING LOOP</div>
         <div class="explain">
-          Growing a neural Go player by gradient descent. One tiny value network learns via endless self-play.<br />
-          Same network evaluates both colours; only learning rule is hand-coded. Everything else emerges from updates.
+          <strong>Growing a neural network.</strong> We know the update rule (gradient descent), not the solution. Every move feeds a replay
+          buffer, gradients nudge weights, and a new evaluator appears. Reset the network to watch a different program emerge.
         </div>
+        <blockquote>
+          "We designed the learning algorithm… But we don't really understand exactly how they do those things." — Geoffrey Hinton
+        </blockquote>
 
         <div class="controls row">
           <button id="startBtn">START</button>
@@ -90,14 +93,24 @@
 
         <div class="panel-sep"></div>
 
-        <div class="panel-sub">Projected Confidence Trend</div>
+        <div class="panel-sub">Win Probability Trace (per move)</div>
         <canvas id="trend" width="520" height="220"></canvas>
+
+        <div class="panel-sep"></div>
+
+        <div class="panel-sub">Learning Trajectory (per game)</div>
+        <canvas id="history" width="520" height="220"></canvas>
 
         <div class="panel-sep"></div>
 
         <div class="panel-sub">Network Weights (Input → Hidden)</div>
         <div class="weights-legend">Orange = drives toward black victory, Blue = toward white. Gray ≈ neutral. Last column weight = player-to-move feature.</div>
         <div id="weightsGrid" class="weights-grid"></div>
+
+        <details class="weights-raw">
+          <summary>Raw parameter dump</summary>
+          <pre id="weightsRaw">—</pre>
+        </details>
 
         <div class="panel-sub">Output weights (hidden → win probability)</div>
         <canvas id="outputWeights" width="520" height="90"></canvas>

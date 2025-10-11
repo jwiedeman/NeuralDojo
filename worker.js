@@ -107,6 +107,8 @@ let board = new Board(config.size, config.komi);
 let states = [];
 let predictions = [];
 let stats = createStats();
+let gameHistory = [];
+const maxHistory = 360;
 
 function createStats() {
   return {
@@ -254,12 +256,26 @@ function finishGame() {
   stats.lastWinner = blackWin ? 'Black' : 'White';
   stats.lastScore = score;
 
+  const historyEntry = {
+    game: stats.games,
+    winRate: stats.games ? stats.blackWins / stats.games : 0,
+    accuracy: stats.totalPredictions ? stats.correctPredictions / stats.totalPredictions : 0,
+    avgConfidence: stats.games ? stats.avgConfidenceSum / stats.games : 0,
+    score,
+    blackWin: !!blackWin
+  };
+  gameHistory.push(historyEntry);
+  if (gameHistory.length > maxHistory) {
+    gameHistory = gameHistory.slice(gameHistory.length - maxHistory);
+  }
+
   self.postMessage({
     type: 'gameComplete',
     stats: formatStats(),
     winner: stats.lastWinner,
     score,
-    weights: exportWeights()
+    weights: exportWeights(),
+    history: exportHistory()
   });
 
   currentGame = stats.games + 1;
@@ -295,6 +311,10 @@ function exportWeights() {
   };
 }
 
+function exportHistory() {
+  return gameHistory.map(entry => ({ ...entry }));
+}
+
 function formatStats() {
   const res = {
     games: stats.games,
@@ -320,6 +340,7 @@ function fullReset(messageType = 'resetDone') {
   predictions = [];
   lastMove = -1;
   currentGame = 1;
+  gameHistory = [];
   const { output } = net.forward(encodeBoard(board));
   self.postMessage({
     type: messageType,
@@ -328,7 +349,8 @@ function fullReset(messageType = 'resetDone') {
     weights: exportWeights(),
     confidence: output,
     config: { ...config },
-    running
+    running,
+    history: exportHistory()
   });
 }
 
@@ -365,7 +387,7 @@ self.onmessage = (ev) => {
       fullReset('resetDone');
     } else {
       self.postMessage({ type: 'config', config: { ...config } });
-      self.postMessage({ type: 'weights', weights: exportWeights() });
+      self.postMessage({ type: 'weights', weights: exportWeights(), history: exportHistory() });
     }
   }
 };

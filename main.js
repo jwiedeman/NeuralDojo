@@ -32,9 +32,12 @@
 
   const trendCanvas = document.getElementById('trend');
   const tctx = trendCanvas.getContext('2d');
+  const historyCanvas = document.getElementById('history');
+  const hctx = historyCanvas.getContext('2d');
   const weightsGrid = document.getElementById('weightsGrid');
   const outputWeightsCanvas = document.getElementById('outputWeights');
   const owctx = outputWeightsCanvas.getContext('2d');
+  const weightsRawEl = document.getElementById('weightsRaw');
 
   const startBtn = document.getElementById('startBtn');
   const pauseBtn = document.getElementById('pauseBtn');
@@ -54,6 +57,8 @@
   let confidenceHistory = [];
   const maxTrendPoints = 240;
   let running = false;
+  let gameHistory = [];
+  const maxHistoryGames = 240;
 
   function drawBoard() {
     const W = cvs.width, H = cvs.height;
@@ -195,6 +200,120 @@
     tctx.stroke();
   }
 
+  function pushGameHistory(entries) {
+    if (!entries) return;
+    gameHistory = entries.slice(-maxHistoryGames);
+    drawHistory();
+  }
+
+  function drawHistory() {
+    if (!historyCanvas || !hctx) return;
+    const W = historyCanvas.width;
+    const H = historyCanvas.height;
+    hctx.clearRect(0,0,W,H);
+    hctx.fillStyle = '#fff';
+    hctx.fillRect(0,0,W,H);
+    hctx.strokeStyle = '#000';
+    hctx.strokeRect(0,0,W,H);
+
+    if (!gameHistory.length) {
+      hctx.fillStyle = '#999';
+      hctx.font = '11px monospace';
+      hctx.fillText('No completed games yet — press START to begin self-play.', 14, H/2);
+      return;
+    }
+
+    const margin = { left: 36, right: 12, top: 16, bottom: 48 };
+    const plotW = W - margin.left - margin.right;
+    const plotH = H - margin.top - margin.bottom;
+    const baseY = margin.top + plotH;
+
+    // Grid lines for percentages
+    hctx.strokeStyle = '#ddd';
+    hctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const ratio = i / 4;
+      const y = margin.top + plotH - ratio * plotH;
+      hctx.beginPath();
+      hctx.moveTo(margin.left, y);
+      hctx.lineTo(margin.left + plotW, y);
+      hctx.stroke();
+      hctx.fillStyle = '#666';
+      hctx.font = '10px monospace';
+      hctx.fillText((ratio * 100).toFixed(0) + '%', 6, y + 3);
+    }
+
+    const lastGame = gameHistory[gameHistory.length - 1]?.game ?? 1;
+    const minGame = Math.max(1, lastGame - gameHistory.length + 1);
+    const series = [
+      { key: 'winRate', color: '#f25f1c', label: 'Black win rate' },
+      { key: 'accuracy', color: '#1e4cd7', label: 'Prediction accuracy' },
+      { key: 'avgConfidence', color: '#2c8f2c', label: 'Avg confidence' }
+    ];
+
+    const xForIndex = (idx) => {
+      const xRatio = gameHistory.length > 1 ? idx / (gameHistory.length - 1) : 0;
+      return margin.left + xRatio * plotW;
+    };
+
+    series.forEach(({ key, color }) => {
+      hctx.strokeStyle = color;
+      hctx.lineWidth = 1.5;
+      hctx.beginPath();
+      gameHistory.forEach((entry, idx) => {
+        const val = Math.max(0, Math.min(1, entry[key] ?? 0));
+        const x = xForIndex(idx);
+        const y = margin.top + (1 - val) * plotH;
+        if (idx === 0) hctx.moveTo(x, y); else hctx.lineTo(x, y);
+      });
+      hctx.stroke();
+    });
+
+    // Score bars
+    const scoreRange = 30;
+    hctx.fillStyle = 'rgba(17,17,17,0.08)';
+    hctx.fillRect(margin.left, baseY + 8, plotW, margin.bottom - 20);
+    hctx.strokeStyle = '#bbb';
+    hctx.beginPath();
+    const zeroY = baseY + 8 + (margin.bottom - 28) / 2;
+    hctx.moveTo(margin.left, zeroY);
+    hctx.lineTo(margin.left + plotW, zeroY);
+    hctx.stroke();
+
+    const barWidth = plotW / Math.max(gameHistory.length, 1) * 0.7;
+    gameHistory.forEach((entry, idx) => {
+      const score = Math.max(-scoreRange, Math.min(scoreRange, entry.score ?? 0));
+      const xCenter = xForIndex(idx);
+      const x = xCenter - barWidth / 2;
+      const halfHeight = (margin.bottom - 28) / 2;
+      const barHeight = (score / scoreRange) * halfHeight;
+      hctx.fillStyle = entry.blackWin ? '#f25f1c' : '#1e4cd7';
+      if (barHeight >= 0) {
+        hctx.fillRect(x, zeroY - barHeight, barWidth, barHeight);
+      } else {
+        hctx.fillRect(x, zeroY, barWidth, -barHeight);
+      }
+    });
+
+    // Legend
+    const legendItems = series.concat([{ key: 'score', color: '#555', label: 'Score differential (bars)' }]);
+    const legendY = H - 12;
+    let legendX = margin.left;
+    legendItems.forEach(({ color, label }, idx) => {
+      hctx.fillStyle = color === '#555' ? '#555' : color;
+      hctx.fillRect(legendX, legendY - 8, 10, 10);
+      hctx.fillStyle = '#222';
+      hctx.font = '10px monospace';
+      hctx.fillText(label, legendX + 14, legendY);
+      legendX += hctx.measureText(label).width + 40;
+    });
+
+    // X-axis annotations
+    hctx.fillStyle = '#666';
+    hctx.font = '10px monospace';
+    hctx.fillText(`Games ${minGame} – ${lastGame}`, margin.left, H - margin.bottom + 12);
+  }
+
   function colorForValue(v, maxAbs) {
     if (maxAbs <= 1e-6) return 'rgb(240,240,240)';
     const ratio = v / maxAbs;
@@ -276,9 +395,11 @@
     if (!data) {
       drawOutputWeights([]);
       outputBiasEl.textContent = '0.000';
+      if (weightsRawEl) weightsRawEl.textContent = '—';
       return;
     }
     const boardCells = data.boardSize * data.boardSize;
+    const rawLines = [];
     for (let i = 0; i < data.hiddenUnits; i++) {
       const start = i * data.inputSize;
       const slice = data.w1.slice(start, start + boardCells);
@@ -297,9 +418,14 @@
       caption.textContent = `h${i+1}: bias=${bias.toFixed(3)} · out=${outW.toFixed(3)} · toPlay=${toPlayWeight.toFixed(3)}`;
       unit.appendChild(caption);
       weightsGrid.appendChild(unit);
+
+      rawLines.push(`h${i+1} board: ${Array.from(slice).map(v => v.toFixed(3)).join(' ')}`);
+      rawLines.push(`    toPlay=${toPlayWeight.toFixed(3)} · bias=${bias.toFixed(3)} · out=${outW.toFixed(3)}`);
     }
     drawOutputWeights(data.w2 || []);
     if (typeof data.b2 === 'number') outputBiasEl.textContent = data.b2.toFixed(3);
+    rawLines.push(`output bias: ${(data.b2 ?? 0).toFixed(3)}`);
+    if (weightsRawEl) weightsRawEl.textContent = rawLines.join('\n');
   }
 
   function updateStats(stats) {
@@ -380,6 +506,7 @@
         updateLastGame(info);
       }
       renderWeights(msg.weights);
+      pushGameHistory(msg.history || []);
       applyConfig(msg.config);
       setRunningState(false);
     } else if (msg.type === 'status') {
@@ -405,8 +532,10 @@
       updateLastGame({ gameNumber: msg.stats?.games, winner: msg.winner, score: msg.score });
       renderWeights(msg.weights);
       setStatus(`Game ${msg.stats?.games} finished — ${msg.winner} by ${(msg.score ?? 0).toFixed(1)}`);
+      pushGameHistory(msg.history || []);
     } else if (msg.type === 'weights') {
       renderWeights(msg.weights);
+      if (msg.history) pushGameHistory(msg.history);
     } else if (msg.type === 'stats') {
       updateStats(msg.stats);
       if (msg.stats) {
@@ -418,6 +547,7 @@
         updateLastGame(info);
       }
       if (msg.weights) renderWeights(msg.weights);
+      if (msg.history) pushGameHistory(msg.history);
     } else if (msg.type === 'config') {
       applyConfig(msg.config);
     }
