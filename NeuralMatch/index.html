@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NeuralMatch — Synthetic Pattern Duel</title>
+  <link rel="stylesheet" href="../shared/ui.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="title">NEURALMATCH — SYNTHETIC PATTERN LAB</div>
+      <div class="subtitle">Two neural critics learn to evaluate match-3 boards fed by a vast garden of procedurally varied puzzles.</div>
+    </header>
+
+    <main class="split">
+      <section class="pane left">
+        <div class="panel-header">MATCH-3 SYNTHETIC BOARD</div>
+        <canvas id="matchBoard" width="520" height="520"></canvas>
+        <div class="board-legend">Highlighted squares show the best swap discovered by the teacher heuristic.</div>
+        <div class="hud">
+          <div>Pattern generator: <span id="patternName">—</span></div>
+          <div>Transformations: <span id="patternTransforms">—</span></div>
+          <div>Noise injected: <span id="patternNoise">0%</span></div>
+        </div>
+        <div class="hud secondary">
+          <div>Best swap (target): <span id="bestSwap">—</span></div>
+          <div>Target score: <span id="targetScore">0</span></div>
+          <div>Model score: <span id="modelScore">0</span></div>
+        </div>
+        <div class="hud secondary">
+          <div>Batch error: <span id="batchError">—</span></div>
+          <div>Running avg error: <span id="avgError">—</span></div>
+          <div>Confidence: <span id="confidence">—</span></div>
+        </div>
+      </section>
+
+      <section class="pane right training-pane">
+        <div class="panel-header">SYNTHETIC TRAINING WORKSHOP</div>
+        <div class="training-layout">
+          <div class="training-column column-setup">
+            <div class="panel-card intro-card">
+              <div class="explain">
+                <strong>Hyper-diverse self-supervision.</strong> We mutate structured match-3 layouts, rotate, mirror, recolour and sprinkle noise.
+                Two evaluators see thousands of worlds per minute and chase a teacher's combinational target.
+              </div>
+              <blockquote>
+                "The more perspectives the model sees, the better it hallucinates the space between." — Synthetic Curriculum Notes
+              </blockquote>
+            </div>
+
+            <div class="panel-card controls-card">
+              <div class="controls row">
+                <button id="startBtn">START</button>
+                <button id="pauseBtn">PAUSE</button>
+                <button id="resetBtn">RESET</button>
+              </div>
+
+              <div class="grid-2 compact-grid">
+                <div>
+                  <div class="label">Learning rate</div>
+                  <input type="range" id="learningRate" min="0.01" max="0.4" step="0.01" value="0.12" />
+                  <div class="val" id="learningRateVal">0.12</div>
+                </div>
+                <div>
+                  <div class="label">Hidden units</div>
+                  <input type="range" id="hiddenUnits" min="8" max="64" step="1" value="28" />
+                  <div class="val" id="hiddenUnitsVal">28</div>
+                </div>
+              </div>
+
+              <div class="grid-2 compact-grid">
+                <div>
+                  <div class="label">Batch size</div>
+                  <input type="range" id="batchSize" min="4" max="48" step="1" value="20" />
+                  <div class="val" id="batchSizeVal">20</div>
+                </div>
+                <div>
+                  <div class="label">Noise (%)</div>
+                  <input type="range" id="noise" min="0" max="35" step="1" value="12" />
+                  <div class="val" id="noiseVal">12</div>
+                </div>
+              </div>
+
+              <div class="grid-2 compact-grid">
+                <div>
+                  <div class="label">Update delay (ms)</div>
+                  <input type="range" id="delayMs" min="0" max="320" step="20" value="80" />
+                  <div class="val" id="delayMsVal">80</div>
+                </div>
+                <div>
+                  <div class="label">Augmentation bursts</div>
+                  <input type="range" id="burstFactor" min="1" max="6" step="1" value="3" />
+                  <div class="val" id="burstFactorVal">3</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="training-column column-metrics">
+            <div class="panel-card results-card">
+              <div class="panel-sub">Training summary</div>
+              <div class="stats">
+                <div>Total boards: <span id="totalBoards">0</span></div>
+                <div>Teacher score avg: <span id="teacherAvg">0.0</span></div>
+                <div>Model score avg: <span id="modelAvg">0.0</span></div>
+                <div>Mean abs error: <span id="mae">—</span></div>
+                <div>Explored transforms: <span id="transformCount">0</span></div>
+                <div>Weights updates: <span id="weightUpdates">0</span></div>
+              </div>
+            </div>
+
+            <div class="panel-card model-card">
+              <div class="panel-sub">Pattern family coverage</div>
+              <ul class="pattern-list" id="patternList"></ul>
+            </div>
+          </div>
+
+          <div class="training-column column-visuals">
+            <div class="panel-card tab-card">
+              <div class="panel-sub">Telemetry</div>
+              <div class="tab-buttons">
+                <button class="tab-button active" data-tab="errorTrace">Error trace</button>
+                <button class="tab-button" data-tab="scoreTrace">Score drift</button>
+                <button class="tab-button" data-tab="diversity">Augmentation mosaic</button>
+              </div>
+              <div class="tab-panels">
+                <div class="tab-panel active" data-tab="errorTrace">
+                  <canvas id="errorCanvas" width="520" height="170"></canvas>
+                  <div class="chart-hint">Orange: batch error · Blue: running mean</div>
+                </div>
+                <div class="tab-panel" data-tab="scoreTrace">
+                  <canvas id="scoreCanvas" width="520" height="170"></canvas>
+                </div>
+                <div class="tab-panel" data-tab="diversity">
+                  <canvas id="diversityCanvas" width="520" height="170"></canvas>
+                  <div class="chart-hint">Heatmap of pattern family utilisation across recent batches.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="../shared/ui.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

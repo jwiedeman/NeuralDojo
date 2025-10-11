@@ -696,44 +696,41 @@
     worker.postMessage({ type: 'reset' });
   });
 
-  const tabButtons = Array.from(document.querySelectorAll('.tab-button'));
-  const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
+  const UI = window.NeuralUI;
+  if (UI) {
+    UI.initTabs();
 
-  function activateTab(name) {
-    if (!name) return;
-    tabButtons.forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.tab === name);
-    });
-    tabPanels.forEach(panel => {
-      panel.classList.toggle('active', panel.dataset.tab === name);
-    });
-  }
+    const makeConfigHandler = key => value => {
+      worker.postMessage({ type: 'configure', config: { [key]: value } });
+    };
 
-  if (tabButtons.length) {
-    const initial = tabButtons.find(btn => btn.classList.contains('active'))?.dataset.tab || tabButtons[0].dataset.tab;
-    activateTab(initial);
-    tabButtons.forEach(btn => {
-      btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+    UI.bindRangeControl(lrEl, {
+      valueEl: lrVal,
+      format: v => (+v).toFixed(2),
+      onCommit: makeConfigHandler('learningRate')
     });
-  }
-
-  function handleSlider(el, valEl, formatter, key) {
-    el.addEventListener('input', () => {
-      valEl.textContent = formatter(el.value);
+    UI.bindRangeControl(hiddenEl, {
+      valueEl: hiddenVal,
+      format: v => Math.round(+v),
+      onCommit: makeConfigHandler('hiddenUnits')
     });
-    el.addEventListener('change', () => {
-      valEl.textContent = formatter(el.value);
-      const payload = { type: 'configure', config: { [key]: parseFloat(el.value) } };
-      worker.postMessage(payload);
+    UI.bindRangeControl(epsEl, {
+      valueEl: epsVal,
+      format: v => (+v).toFixed(2),
+      onCommit: makeConfigHandler('epsilon')
     });
-  }
-
-  handleSlider(lrEl, lrVal, v => (+v).toFixed(2), 'learningRate');
-  handleSlider(hiddenEl, hiddenVal, v => Math.round(+v), 'hiddenUnits');
-  handleSlider(epsEl, epsVal, v => (+v).toFixed(2), 'epsilon');
-  handleSlider(delayEl, delayVal, v => Math.round(+v), 'delayMs');
-  if (captureBiasEl && captureBiasVal) {
-    handleSlider(captureBiasEl, captureBiasVal, v => (+v).toFixed(2), 'captureBias');
+    UI.bindRangeControl(delayEl, {
+      valueEl: delayVal,
+      format: v => Math.round(+v),
+      onCommit: makeConfigHandler('delayMs')
+    });
+    if (captureBiasEl && captureBiasVal) {
+      UI.bindRangeControl(captureBiasEl, {
+        valueEl: captureBiasVal,
+        format: v => (+v).toFixed(2),
+        onCommit: makeConfigHandler('captureBias')
+      });
+    }
   }
 
   // Kick initial render with blank board

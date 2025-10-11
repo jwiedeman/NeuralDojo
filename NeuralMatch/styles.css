@@ -1,0 +1,51 @@
+/* NeuralMatch specific styling built atop the shared Neural UI system. */
+:root {
+  --match-bg: #101820;
+  --match-accent: #ffb400;
+}
+
+#matchBoard {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--match-bg);
+  border-radius: 6px;
+}
+
+.pattern-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pattern-list li {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 2px;
+  font-size: 12px;
+}
+
+.pattern-list li span {
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--fg);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
