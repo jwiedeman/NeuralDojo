@@ -146,6 +146,12 @@ button:disabled {
 }
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 8px 0; }
+.full-span { grid-column: 1 / -1; }
+.capture-hint {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
 
 .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 4px; }
 .val { font-size: 12px; margin-top: 4px; }

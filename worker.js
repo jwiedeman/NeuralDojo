@@ -97,7 +97,8 @@ const config = {
   hiddenUnits: 6,
   learningRate: 0.1,
   epsilon: 0.1,
-  delayMs: 160
+  delayMs: 160,
+  captureBias: 0.15
 };
 
 function createNet() {
@@ -262,8 +263,12 @@ function chooseMove() {
     const res = clone.play(mv);
     if (!res.ok) continue;
     const { output } = net.forward(encodeBoard(clone));
-    if (output > bestValue) {
-      bestValue = output;
+    let value = output;
+    if (config.captureBias > 0 && res.captured) {
+      value += config.captureBias * res.captured;
+    }
+    if (value > bestValue) {
+      bestValue = value;
       bestMove = mv;
     }
   }
@@ -468,6 +473,10 @@ self.onmessage = (ev) => {
     }
     if (cfg.delayMs != null) {
       config.delayMs = Math.max(0, Math.floor(+cfg.delayMs));
+    }
+    if (cfg.captureBias != null) {
+      const bias = Math.max(0, Math.min(1, +cfg.captureBias));
+      config.captureBias = bias;
     }
     if (needsReset) {
       fullReset('resetDone');
