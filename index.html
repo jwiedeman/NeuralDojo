@@ -3,95 +3,104 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Neural Garden: Go Arena (9×9)</title>
+  <title>Neural Garden: Go Self-Play Lab</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div id="app">
     <header>
       <div class="title">GO ARENA — NEURAL GARDEN</div>
-      <div class="subtitle">Left: 9×9 Go. Right: live MCTS stats & controls (SGD.fyi style).</div>
+      <div class="subtitle">Self-play Go network. Same brain on both sides. Watch confidence & weights evolve.</div>
     </header>
 
     <main class="split">
-      <!-- LEFT: Board -->
       <section class="pane left">
-        <div class="panel-header">GO BOARD (9×9)</div>
+        <div class="panel-header">GO SELF-PLAY ARENA (9×9)</div>
         <canvas id="board" width="540" height="540"></canvas>
         <div class="hud">
           <div>Turn: <span id="turnLabel">Black</span></div>
-          <div>Captures — Black: <span id="capB">0</span> · White: <span id="capW">0</span></div>
-          <div>Status: <span id="statusText">Ready</span></div>
+          <div>Move #: <span id="moveCount">0</span></div>
+          <div>Captures — B: <span id="capB">0</span> · W: <span id="capW">0</span></div>
         </div>
-        <div class="controls row">
-          <button id="newGame">NEW GAME</button>
-          <button id="passBtn">PASS</button>
-          <button id="undoBtn">UNDO</button>
-          <label class="toggle">
-            <input type="checkbox" id="aiPlaysBlack" />
-            AI plays Black
-          </label>
-          <label class="toggle">
-            <input type="checkbox" id="aiPlaysWhite" checked />
-            AI plays White
-          </label>
+        <div class="hud secondary">
+          <div>Confidence (black win): <span id="confNow">—</span></div>
+          <div>Status: <span id="statusText">Idle</span></div>
+        </div>
+
+        <div class="panel-sub">Last completed game</div>
+        <div class="stats compact">
+          <div>Game #: <span id="gameCount">0</span></div>
+          <div>Winner: <span id="lastWinner">—</span></div>
+          <div>Score (B−W): <span id="lastScore">—</span></div>
         </div>
       </section>
 
-      <!-- RIGHT: Stats -->
       <section class="pane right">
-        <div class="panel-header">SEARCH TASK</div>
+        <div class="panel-header">SELF-PLAY TRAINING LOOP</div>
         <div class="explain">
-          <b>OBJECTIVE:</b> Choose a move that maximizes win probability by simulation.<br/>
-          <b>Loop:</b> select → expand → simulate → backpropagate.<br/>
-          <b>UCT:</b> Q + c·√(ln(N)/n).<br/>
-          <b>Terminal:</b> two passes or board full. Scoring: Chinese. Komi: <span id="komiLabel">6.5</span>.
+          Growing a neural Go player by gradient descent. One tiny value network learns via endless self-play.<br />
+          Same network evaluates both colours; only learning rule is hand-coded. Everything else emerges from updates.
+        </div>
+
+        <div class="controls row">
+          <button id="startBtn">START</button>
+          <button id="pauseBtn">PAUSE</button>
+          <button id="resetBtn">RESET NETWORK</button>
         </div>
 
         <div class="grid-2">
           <div>
-            <div class="label">THINK TIME (ms)</div>
-            <input type="range" id="timeMs" min="100" max="3000" step="50" value="1200" />
-            <div class="val" id="timeMsVal">1200</div>
+            <div class="label">Learning Rate (α)</div>
+            <input type="range" id="learningRate" min="0.01" max="0.30" step="0.01" value="0.10" />
+            <div class="val" id="learningRateVal">0.10</div>
           </div>
           <div>
-            <div class="label">EXPLORATION (c)</div>
-            <input type="range" id="cExp" min="0.5" max="2.5" step="0.05" value="1.41" />
-            <div class="val" id="cExpVal">1.41</div>
+            <div class="label">Hidden Units</div>
+            <input type="range" id="hiddenUnits" min="2" max="24" step="1" value="6" />
+            <div class="val" id="hiddenUnitsVal">6</div>
           </div>
         </div>
 
         <div class="grid-2">
           <div>
-            <button id="aiMove">AI: THINK NOW</button>
+            <div class="label">Exploration (ε)</div>
+            <input type="range" id="epsilon" min="0.00" max="0.40" step="0.01" value="0.10" />
+            <div class="val" id="epsilonVal">0.10</div>
           </div>
-          <div class="toggle">
-            <input type="checkbox" id="autoAI" checked />
-            <label for="autoAI">Auto-move for AI side</label>
+          <div>
+            <div class="label">Move Delay (ms)</div>
+            <input type="range" id="delayMs" min="0" max="400" step="20" value="160" />
+            <div class="val" id="delayMsVal">160</div>
           </div>
         </div>
 
         <div class="panel-sep"></div>
 
+        <div class="panel-sub">Cumulative stats</div>
         <div class="stats">
-          <div>Iterations: <span id="itCount">0</span></div>
-          <div>Playouts/sec: <span id="pps">0</span></div>
-          <div>Nodes: <span id="nodes">0</span></div>
-          <div>Avg depth: <span id="avgDepth">0</span></div>
-          <div>Root est. winrate (AI): <span id="winrate">—</span></div>
-          <div>Best move: <span id="bestMove">—</span></div>
+          <div>Total games: <span id="totalGames">0</span></div>
+          <div>Black wins: <span id="blackWins">0</span></div>
+          <div>White wins: <span id="whiteWins">0</span></div>
+          <div>Black win rate: <span id="blackWinRate">—</span></div>
+          <div>Prediction accuracy: <span id="predAccuracy">—</span></div>
+          <div>Avg confidence: <span id="avgConfidence">—</span></div>
+          <div>Training steps: <span id="trainingSteps">0</span></div>
+          <div>Output bias: <span id="outputBias">0.000</span></div>
         </div>
 
-        <div class="grid-2">
-          <div>
-            <div class="panel-sub">MOVE HEATMAP (root visit counts)</div>
-            <canvas id="heatmap" width="270" height="270"></canvas>
-          </div>
-          <div>
-            <div class="panel-sub">ROOT VALUE TREND</div>
-            <canvas id="trend" width="270" height="270"></canvas>
-          </div>
-        </div>
+        <div class="panel-sep"></div>
+
+        <div class="panel-sub">Projected Confidence Trend</div>
+        <canvas id="trend" width="520" height="220"></canvas>
+
+        <div class="panel-sep"></div>
+
+        <div class="panel-sub">Network Weights (Input → Hidden)</div>
+        <div class="weights-legend">Orange = drives toward black victory, Blue = toward white. Gray ≈ neutral. Last column weight = player-to-move feature.</div>
+        <div id="weightsGrid" class="weights-grid"></div>
+
+        <div class="panel-sub">Output weights (hidden → win probability)</div>
+        <canvas id="outputWeights" width="520" height="90"></canvas>
       </section>
     </main>
   </div>
