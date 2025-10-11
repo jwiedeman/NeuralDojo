@@ -1,57 +1,60 @@
-// UI orchestration for Go board + MCTS stats.
+// Neural Go self-play UI orchestration.
 (() => {
-  const { Board, BLACK, WHITE, other, idxOf, xyOf } = window.GoEngine;
+  const { Board, BLACK, WHITE, xyOf } = window.GoEngine;
 
-  // --- DOM refs
-  const cvs = document.getElementById('board');
-  const ctx = cvs.getContext('2d');
-
-  const capBEl = document.getElementById('capB');
-  const capWEl = document.getElementById('capW');
-  const turnLabel = document.getElementById('turnLabel');
-  const statusText = document.getElementById('statusText');
-
-  const newGameBtn = document.getElementById('newGame');
-  const passBtn = document.getElementById('passBtn');
-  const undoBtn = document.getElementById('undoBtn');
-  const aiMoveBtn = document.getElementById('aiMove');
-
-  const timeMsEl = document.getElementById('timeMs');
-  const timeMsVal = document.getElementById('timeMsVal');
-  const cExpEl = document.getElementById('cExp');
-  const cExpVal = document.getElementById('cExpVal');
-  const komiLabel = document.getElementById('komiLabel');
-
-  const aiPlaysBlack = document.getElementById('aiPlaysBlack');
-  const aiPlaysWhite = document.getElementById('aiPlaysWhite');
-  const autoAI = document.getElementById('autoAI');
-
-  const itCountEl = document.getElementById('itCount');
-  const ppsEl = document.getElementById('pps');
-  const nodesEl = document.getElementById('nodes');
-  const avgDepthEl = document.getElementById('avgDepth');
-  const winrateEl = document.getElementById('winrate');
-  const bestMoveEl = document.getElementById('bestMove');
-
-  const heatmap = document.getElementById('heatmap');
-  const hctx = heatmap.getContext('2d');
-  const trend = document.getElementById('trend');
-  const tctx = trend.getContext('2d');
-
-  // --- State
   const size = 9;
   const komi = 6.5;
   const board = new Board(size, komi);
-  komiLabel.textContent = komi.toString();
 
-  // Worker
+  const cvs = document.getElementById('board');
+  const ctx = cvs.getContext('2d');
+  let lastMove = -1;
+
+  const turnLabel = document.getElementById('turnLabel');
+  const moveCountEl = document.getElementById('moveCount');
+  const capBEl = document.getElementById('capB');
+  const capWEl = document.getElementById('capW');
+  const statusText = document.getElementById('statusText');
+  const confNowEl = document.getElementById('confNow');
+
+  const gameCountEl = document.getElementById('gameCount');
+  const lastWinnerEl = document.getElementById('lastWinner');
+  const lastScoreEl = document.getElementById('lastScore');
+
+  const totalGamesEl = document.getElementById('totalGames');
+  const blackWinsEl = document.getElementById('blackWins');
+  const whiteWinsEl = document.getElementById('whiteWins');
+  const blackWinRateEl = document.getElementById('blackWinRate');
+  const predAccuracyEl = document.getElementById('predAccuracy');
+  const avgConfidenceEl = document.getElementById('avgConfidence');
+  const trainingStepsEl = document.getElementById('trainingSteps');
+  const outputBiasEl = document.getElementById('outputBias');
+
+  const trendCanvas = document.getElementById('trend');
+  const tctx = trendCanvas.getContext('2d');
+  const weightsGrid = document.getElementById('weightsGrid');
+  const outputWeightsCanvas = document.getElementById('outputWeights');
+  const owctx = outputWeightsCanvas.getContext('2d');
+
+  const startBtn = document.getElementById('startBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const resetBtn = document.getElementById('resetBtn');
+
+  const lrEl = document.getElementById('learningRate');
+  const lrVal = document.getElementById('learningRateVal');
+  const hiddenEl = document.getElementById('hiddenUnits');
+  const hiddenVal = document.getElementById('hiddenUnitsVal');
+  const epsEl = document.getElementById('epsilon');
+  const epsVal = document.getElementById('epsilonVal');
+  const delayEl = document.getElementById('delayMs');
+  const delayVal = document.getElementById('delayMsVal');
+
   const worker = new Worker('worker.js');
 
-  let searching = false;
-  let lastHeat = new Array(size*size).fill(0);
-  let trendVals = [];
+  let confidenceHistory = [];
+  const maxTrendPoints = 240;
+  let running = false;
 
-  // --- Drawing
   function drawBoard() {
     const W = cvs.width, H = cvs.height;
     ctx.clearRect(0,0,W,H);
@@ -64,7 +67,6 @@
     ctx.strokeStyle = '#111';
     ctx.lineWidth = 1;
 
-    // Grid
     for (let i = 0; i < n; i++) {
       const x = margin + i * cell;
       ctx.beginPath();
@@ -78,7 +80,6 @@
       ctx.stroke();
     }
 
-    // Star points for 9x9: (2,2), (6,2), (4,4), (2,6), (6,6)
     const stars = [[2,2],[6,2],[4,4],[2,6],[6,6]];
     ctx.fillStyle = '#111';
     for (const [sx,sy] of stars) {
@@ -87,7 +88,6 @@
       ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI*2); ctx.fill();
     }
 
-    // Stones
     for (let i = 0; i < n*n; i++) {
       const v = board.cells[i];
       if (v === 0) continue;
@@ -101,227 +101,358 @@
       ctx.strokeStyle = '#111';
       ctx.stroke();
       if (v === WHITE) {
-        // little shadow line
         ctx.beginPath();
         ctx.arc(px - cell*0.12, py - cell*0.12, cell*0.4, 0, Math.PI*2);
-        ctx.strokeStyle = '#ccc'; ctx.stroke();
+        ctx.strokeStyle = '#ccc';
+        ctx.stroke();
       }
     }
 
-    // Ko mark
-    if (board.ko >= 0) {
-      const [kx,ky] = xyOf(board.ko, n);
-      const px = margin + kx * cell;
-      const py = margin + ky * cell;
-      ctx.fillStyle = 'rgba(255,0,0,0.6)';
-      ctx.fillRect(px-3, py-3, 6, 6);
+    if (lastMove != null && lastMove >= 0) {
+      const [lx, ly] = xyOf(lastMove, n);
+      const px = margin + lx * cell;
+      const py = margin + ly * cell;
+      ctx.strokeStyle = '#f25f1c';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(px, py, cell*0.2, 0, Math.PI*2);
+      ctx.stroke();
     }
   }
 
-  function drawHeatmap(values) {
-    const W = heatmap.width, H = heatmap.height;
-    const margin = 6;
-    const n = size;
-    const cell = (W - margin*2) / n;
-    const max = Math.max(1, ...values);
-    hctx.clearRect(0,0,W,H);
-    hctx.fillStyle = '#fff'; hctx.fillRect(0,0,W,H);
-    for (let y=0; y<n; y++) {
-      for (let x=0; x<n; x++) {
-        const i = y*n + x;
-        const v = values[i] / max; // 0..1
-        const shade = 255 - Math.floor(v * 255);
-        hctx.fillStyle = `rgb(${shade},${shade},${shade})`;
-        hctx.fillRect(margin + x*cell, margin + y*cell, cell-1, cell-1);
-      }
-    }
-    // Grid lines
-    hctx.strokeStyle = '#000';
-    for (let i=0;i<=n;i++) {
-      const x = margin + i*cell;
-      hctx.beginPath(); hctx.moveTo(x, margin); hctx.lineTo(x, margin + n*cell); hctx.stroke();
-      const y = margin + i*cell;
-      hctx.beginPath(); hctx.moveTo(margin, y); hctx.lineTo(margin + n*cell, y); hctx.stroke();
-    }
-  }
-
-  function drawTrend(vals) {
-    const W = trend.width, H = trend.height;
-    tctx.clearRect(0,0,W,H);
-    tctx.fillStyle = '#fff'; tctx.fillRect(0,0,W,H);
-    tctx.strokeStyle = '#000'; tctx.strokeRect(0,0,W,H);
-
-    if (!vals.length) return;
-    const maxN = Math.min(vals.length, 200);
-    const slice = vals.slice(vals.length - maxN);
-    const stepX = W / (slice.length - 1 || 1);
-    tctx.beginPath();
-    for (let i=0;i<slice.length;i++) {
-      const x = i * stepX;
-      const y = H - slice[i] * H;
-      if (i===0) tctx.moveTo(x,y); else tctx.lineTo(x,y);
-    }
-    tctx.stroke();
-    // baseline 0.5
-    tctx.strokeStyle = '#aaa';
-    tctx.beginPath(); tctx.moveTo(0, H*0.5); tctx.lineTo(W, H*0.5); tctx.stroke();
-  }
-
-  function updateHUD(status='') {
-    turnLabel.textContent = (board.toPlay === BLACK) ? 'Black' : 'White';
-    capBEl.textContent = board.capturesB;
-    capWEl.textContent = board.capturesW;
-    statusText.textContent = status || statusText.textContent;
-  }
-
-  // --- Interaction
-  function canvasToIdx(evt) {
-    const rect = cvs.getBoundingClientRect();
-    const mx = (evt.clientX - rect.left) * (cvs.width / rect.width);
-    const my = (evt.clientY - rect.top) * (cvs.height / rect.height);
-    const margin = 24;
-    const cell = (cvs.width - margin*2) / (size - 1);
-    const x = Math.round((mx - margin) / cell);
-    const y = Math.round((my - margin) / cell);
-    if (x < 0 || x >= size || y < 0 || y >= size) return -1;
-    return y*size + x;
-  }
-
-  cvs.addEventListener('click', (e) => {
-    if (searching) return;
-    const i = canvasToIdx(e);
-    if (i < 0) return;
-    if (isAIToMove()) return;
-    const res = board.play(i);
-    if (!res.ok) { updateHUD(`Illegal: ${res.msg}`); return; }
-    afterHumanMove();
-  });
-
-  function isAIToMove() {
-    return (board.toPlay === BLACK && aiPlaysBlack.checked) ||
-           (board.toPlay === WHITE && aiPlaysWhite.checked);
-  }
-
-  function afterHumanMove() {
+  function applyBoardSnapshot(snap) {
+    if (!snap) return;
+    board.cells = new Uint8Array(snap.cells || board.cells);
+    board.toPlay = snap.toPlay ?? board.toPlay;
+    board.capturesB = snap.capturesB ?? board.capturesB;
+    board.capturesW = snap.capturesW ?? board.capturesW;
+    board.moveCount = snap.moveCount ?? board.moveCount;
+    board.passes = snap.passes ?? board.passes;
+    lastMove = snap.lastMove ?? -1;
     drawBoard();
-    updateHUD('');
-    if (autoAI.checked && isAIToMove()) {
-      thinkAndMove();
+    updateHUD();
+  }
+
+  function updateHUD() {
+    turnLabel.textContent = board.toPlay === BLACK ? 'Black' : 'White';
+    moveCountEl.textContent = board.moveCount ?? 0;
+    capBEl.textContent = board.capturesB ?? 0;
+    capWEl.textContent = board.capturesW ?? 0;
+  }
+
+  function setStatus(text) {
+    if (text) statusText.textContent = text;
+    else statusText.textContent = running ? 'Running' : 'Idle';
+  }
+
+  function setConfidence(val) {
+    if (val == null) {
+      confNowEl.textContent = '—';
+      return;
+    }
+    const pct = (val * 100).toFixed(1);
+    confNowEl.textContent = pct + '%';
+  }
+
+  function pushConfidence(val) {
+    if (val == null || Number.isNaN(val)) return;
+    confidenceHistory.push(val);
+    if (confidenceHistory.length > maxTrendPoints) {
+      confidenceHistory = confidenceHistory.slice(confidenceHistory.length - maxTrendPoints);
+    }
+    drawTrend();
+  }
+
+  function resetTrend() {
+    confidenceHistory = [];
+    drawTrend();
+  }
+
+  function drawTrend() {
+    const W = trendCanvas.width;
+    const H = trendCanvas.height;
+    tctx.clearRect(0,0,W,H);
+    tctx.fillStyle = '#fff';
+    tctx.fillRect(0,0,W,H);
+    tctx.strokeStyle = '#000';
+    tctx.strokeRect(0,0,W,H);
+
+    tctx.strokeStyle = '#aaa';
+    tctx.beginPath();
+    tctx.moveTo(0, H * 0.5);
+    tctx.lineTo(W, H * 0.5);
+    tctx.stroke();
+
+    if (!confidenceHistory.length) return;
+    tctx.strokeStyle = '#f27405';
+    tctx.beginPath();
+    const stepX = confidenceHistory.length > 1 ? W / (confidenceHistory.length - 1) : W;
+    confidenceHistory.forEach((v, idx) => {
+      const x = idx * stepX;
+      const y = H - v * H;
+      if (idx === 0) tctx.moveTo(x, y); else tctx.lineTo(x, y);
+    });
+    tctx.stroke();
+  }
+
+  function colorForValue(v, maxAbs) {
+    if (maxAbs <= 1e-6) return 'rgb(240,240,240)';
+    const ratio = v / maxAbs;
+    const abs = Math.min(1, Math.abs(ratio));
+    const hue = ratio >= 0 ? 25 : 210; // orange vs blue
+    const sat = 80;
+    const light = 55 - abs * 25;
+    return `hsl(${hue}, ${sat}%, ${light}%)`;
+  }
+
+  function drawWeightCanvas(canvas, weights, boardSize) {
+    const ctxW = canvas.getContext('2d');
+    const W = canvas.width;
+    const H = canvas.height;
+    ctxW.clearRect(0,0,W,H);
+    ctxW.fillStyle = '#fff';
+    ctxW.fillRect(0,0,W,H);
+    const margin = 6;
+    const n = boardSize;
+    const cellW = (W - margin*2) / n;
+    const cellH = (H - margin*2) / n;
+    let maxAbs = 0;
+    for (const w of weights) maxAbs = Math.max(maxAbs, Math.abs(w));
+    if (maxAbs <= 1e-6) maxAbs = 1;
+
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        const idx = y * n + x;
+        const v = weights[idx] || 0;
+        ctxW.fillStyle = colorForValue(v, maxAbs);
+        ctxW.fillRect(margin + x * cellW, margin + y * cellH, cellW, cellH);
+      }
+    }
+
+    ctxW.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctxW.lineWidth = 1;
+    for (let i = 0; i <= n; i++) {
+      const x = margin + i * cellW;
+      ctxW.beginPath(); ctxW.moveTo(x, margin); ctxW.lineTo(x, margin + n * cellH); ctxW.stroke();
+      const y = margin + i * cellH;
+      ctxW.beginPath(); ctxW.moveTo(margin, y); ctxW.lineTo(margin + n * cellW, y); ctxW.stroke();
     }
   }
 
-  newGameBtn.addEventListener('click', () => {
-    const b = new Board(size, komi);
-    board.cells = b.cells;
-    board.toPlay = b.toPlay;
-    board.ko = -1;
-    board.passes = 0;
-    board.moveCount = 0;
-    board.capturesB = 0; board.capturesW = 0;
-    board.history = [];
-    lastHeat = new Array(size*size).fill(0);
-    trendVals = [];
-    updateStats({it:0,nodes:0,pps:0,avgDepth:0,winrate:null,bestMove:null,heat:lastHeat,trend:trendVals});
-    drawBoard(); drawHeatmap(lastHeat); drawTrend(trendVals);
-    updateHUD('New game.');
-  });
+  function drawOutputWeights(weights) {
+    const W = outputWeightsCanvas.width;
+    const H = outputWeightsCanvas.height;
+    owctx.clearRect(0,0,W,H);
+    owctx.fillStyle = '#fff';
+    owctx.fillRect(0,0,W,H);
+    owctx.strokeStyle = '#000';
+    owctx.strokeRect(0,0,W,H);
 
-  passBtn.addEventListener('click', () => {
-    if (searching) return;
-    const r = board.play(-1);
-    if (!r.ok) return;
-    if (board.isTerminal()) {
-      endGame();
-    } else {
-      afterHumanMove();
+    owctx.strokeStyle = '#aaa';
+    owctx.beginPath();
+    owctx.moveTo(0, H * 0.5);
+    owctx.lineTo(W, H * 0.5);
+    owctx.stroke();
+
+    if (!weights || !weights.length) return;
+    let maxAbs = 0;
+    for (const w of weights) maxAbs = Math.max(maxAbs, Math.abs(w));
+    if (maxAbs <= 1e-6) maxAbs = 1;
+    const barWidth = W / weights.length;
+    const usableHeight = H * 0.8;
+    for (let i = 0; i < weights.length; i++) {
+      const v = weights[i];
+      const ratio = v / maxAbs;
+      const barH = Math.abs(ratio) * usableHeight * 0.5;
+      const x = i * barWidth + barWidth * 0.15;
+      const y = v >= 0 ? (H * 0.5 - barH) : H * 0.5;
+      owctx.fillStyle = colorForValue(v, maxAbs);
+      owctx.fillRect(x, y, barWidth * 0.7, Math.max(2, barH));
     }
-  });
+  }
 
-  undoBtn.addEventListener('click', () => {
-    if (searching) return;
-    board.undo(); board.undo(); // undo both last moves if possible
-    drawBoard(); updateHUD('Undo');
-  });
+  function renderWeights(data) {
+    weightsGrid.innerHTML = '';
+    if (!data) {
+      drawOutputWeights([]);
+      outputBiasEl.textContent = '0.000';
+      return;
+    }
+    const boardCells = data.boardSize * data.boardSize;
+    for (let i = 0; i < data.hiddenUnits; i++) {
+      const start = i * data.inputSize;
+      const slice = data.w1.slice(start, start + boardCells);
+      const toPlayWeight = data.w1[start + boardCells] || 0;
+      const unit = document.createElement('div');
+      unit.className = 'weight-unit';
+      const canvas = document.createElement('canvas');
+      canvas.width = 140;
+      canvas.height = 140;
+      unit.appendChild(canvas);
+      drawWeightCanvas(canvas, slice, data.boardSize);
+      const caption = document.createElement('div');
+      caption.className = 'weight-caption';
+      const bias = data.b1[i] ?? 0;
+      const outW = data.w2[i] ?? 0;
+      caption.textContent = `h${i+1}: bias=${bias.toFixed(3)} · out=${outW.toFixed(3)} · toPlay=${toPlayWeight.toFixed(3)}`;
+      unit.appendChild(caption);
+      weightsGrid.appendChild(unit);
+    }
+    drawOutputWeights(data.w2 || []);
+    if (typeof data.b2 === 'number') outputBiasEl.textContent = data.b2.toFixed(3);
+  }
 
-  aiMoveBtn.addEventListener('click', () => {
-    if (!isAIToMove()) { updateHUD('It is not the AI side to move.'); return; }
-    if (searching) return;
-    thinkAndMove();
-  });
+  function updateStats(stats) {
+    if (!stats) return;
+    totalGamesEl.textContent = stats.games ?? 0;
+    blackWinsEl.textContent = stats.blackWins ?? 0;
+    whiteWinsEl.textContent = stats.whiteWins ?? 0;
+    if (stats.games > 0) {
+      blackWinRateEl.textContent = (stats.blackWinRate * 100).toFixed(1) + '%';
+    } else {
+      blackWinRateEl.textContent = '—';
+    }
+    if (stats.predictionAccuracy != null && stats.totalPredictions > 0) {
+      predAccuracyEl.textContent = (stats.predictionAccuracy * 100).toFixed(1) + '%';
+    } else {
+      predAccuracyEl.textContent = '—';
+    }
+    if (stats.avgConfidence != null && stats.games > 0) {
+      avgConfidenceEl.textContent = (stats.avgConfidence * 100).toFixed(1) + '%';
+    } else {
+      avgConfidenceEl.textContent = '—';
+    }
+    trainingStepsEl.textContent = stats.trainingSteps ?? 0;
+  }
 
-  timeMsEl.addEventListener('input', () => timeMsVal.textContent = timeMsEl.value);
-  cExpEl.addEventListener('input', () => cExpVal.textContent = (+cExpEl.value).toFixed(2));
+  function updateLastGame(info) {
+    if (!info) return;
+    gameCountEl.textContent = info.gameNumber ?? 0;
+    lastWinnerEl.textContent = info.winner ?? '—';
+    if (typeof info.score === 'number') {
+      lastScoreEl.textContent = info.score.toFixed(1);
+    } else {
+      lastScoreEl.textContent = '—';
+    }
+  }
 
-  // --- Search
+  function applyConfig(cfg) {
+    if (!cfg) return;
+    if (cfg.learningRate != null) {
+      lrEl.value = cfg.learningRate.toFixed(2);
+      lrVal.textContent = (+cfg.learningRate).toFixed(2);
+    }
+    if (cfg.hiddenUnits != null) {
+      hiddenEl.value = cfg.hiddenUnits;
+      hiddenVal.textContent = cfg.hiddenUnits;
+    }
+    if (cfg.epsilon != null) {
+      epsEl.value = cfg.epsilon.toFixed(2);
+      epsVal.textContent = (+cfg.epsilon).toFixed(2);
+    }
+    if (cfg.delayMs != null) {
+      delayEl.value = cfg.delayMs;
+      delayVal.textContent = cfg.delayMs;
+    }
+  }
+
+  function setRunningState(isRunning) {
+    running = isRunning;
+    startBtn.disabled = isRunning;
+    pauseBtn.disabled = !isRunning;
+    setStatus();
+  }
+
   worker.onmessage = (ev) => {
     const msg = ev.data || {};
-    if (msg.type === 'progress') {
-      updateStats(msg.snap);
-    } else if (msg.type === 'done') {
-      searching = false;
-      updateStats(msg.res);
-      const mv = msg.res.move ?? -1;
-      board.play(mv ?? -1);
-      if (board.isTerminal()) { endGame(); return; }
-      drawBoard();
-      updateHUD('AI played.');
-      if (autoAI.checked && isAIToMove()) {
-        // If both sides are AI, chain
-        thinkAndMove();
+    if (msg.type === 'init' || msg.type === 'resetDone') {
+      applyBoardSnapshot(msg.board);
+      setConfidence(msg.confidence);
+      resetTrend();
+      if (msg.confidence != null) pushConfidence(msg.confidence);
+      updateStats(msg.stats);
+      if (msg.stats) {
+        const info = {
+          gameNumber: msg.stats.games,
+          winner: msg.stats.lastWinner,
+          score: msg.stats.lastScore
+        };
+        updateLastGame(info);
       }
+      renderWeights(msg.weights);
+      applyConfig(msg.config);
+      setRunningState(false);
+    } else if (msg.type === 'status') {
+      setRunningState(!!msg.running);
+    } else if (msg.type === 'gameStart') {
+      applyBoardSnapshot(msg.board);
+      setConfidence(msg.confidence);
+      if (msg.resetTrend) resetTrend();
+      setStatus(`Game ${msg.gameNumber} — starting`);
+    } else if (msg.type === 'move') {
+      applyBoardSnapshot(msg.board);
+      setConfidence(msg.confidence);
+      pushConfidence(msg.confidence);
+      const mv = msg.lastMove;
+      if (mv != null && mv >= 0) {
+        const [x,y] = xyOf(mv, size);
+        setStatus(`Game ${msg.gameNumber} — Move ${msg.moveIndex} (${msg.lastPlayer === BLACK ? 'B' : 'W'} ${x+1},${y+1})`);
+      } else {
+        setStatus(`Game ${msg.gameNumber} — Move ${msg.moveIndex} (pass)`);
+      }
+    } else if (msg.type === 'gameComplete') {
+      updateStats(msg.stats);
+      updateLastGame({ gameNumber: msg.stats?.games, winner: msg.winner, score: msg.score });
+      renderWeights(msg.weights);
+      setStatus(`Game ${msg.stats?.games} finished — ${msg.winner} by ${(msg.score ?? 0).toFixed(1)}`);
+    } else if (msg.type === 'weights') {
+      renderWeights(msg.weights);
+    } else if (msg.type === 'stats') {
+      updateStats(msg.stats);
+      if (msg.stats) {
+        const info = {
+          gameNumber: msg.stats.games,
+          winner: msg.stats.lastWinner,
+          score: msg.stats.lastScore
+        };
+        updateLastGame(info);
+      }
+      if (msg.weights) renderWeights(msg.weights);
+    } else if (msg.type === 'config') {
+      applyConfig(msg.config);
     }
   };
 
-  function updateStats(s) {
-    itCountEl.textContent = s.it ?? 0;
-    ppsEl.textContent = s.pps ?? 0;
-    nodesEl.textContent = s.nodes ?? 0;
-    avgDepthEl.textContent = s.avgDepth ?? 0;
-    if (s.winrate != null) winrateEl.textContent = (s.winrate*100).toFixed(1) + '%';
-    if (s.bestMove != null && s.bestMove >= 0) {
-      const [x,y] = xyOf(s.bestMove, size);
-      bestMoveEl.textContent = `(${x+1}, ${y+1})`;
-    } else {
-      bestMoveEl.textContent = 'pass';
-    }
-    if (s.heat) { lastHeat = s.heat.slice(); drawHeatmap(lastHeat); }
-    if (s.trend) { trendVals = s.trend.slice(); drawTrend(trendVals); }
+  startBtn.addEventListener('click', () => {
+    worker.postMessage({ type: 'start' });
+  });
+
+  pauseBtn.addEventListener('click', () => {
+    worker.postMessage({ type: 'pause' });
+  });
+
+  resetBtn.addEventListener('click', () => {
+    worker.postMessage({ type: 'reset' });
+  });
+
+  function handleSlider(el, valEl, formatter, key) {
+    el.addEventListener('input', () => {
+      valEl.textContent = formatter(el.value);
+    });
+    el.addEventListener('change', () => {
+      valEl.textContent = formatter(el.value);
+      const payload = { type: 'configure', config: { [key]: parseFloat(el.value) } };
+      worker.postMessage(payload);
+    });
   }
 
-  function thinkAndMove() {
-    searching = true;
-    updateHUD('AI thinking...');
-    const payload = {
-      type: 'search',
-      state: {
-        size, komi,
-        cells: Array.from(board.cells),
-        toPlay: board.toPlay,
-        ko: board.ko,
-        passes: board.passes,
-        moveCount: board.moveCount
-      },
-      config: {
-        timeMs: +timeMsEl.value,
-        c: +cExpEl.value
-      }
-    };
-    worker.postMessage(payload);
-  }
+  handleSlider(lrEl, lrVal, v => (+v).toFixed(2), 'learningRate');
+  handleSlider(hiddenEl, hiddenVal, v => Math.round(+v), 'hiddenUnits');
+  handleSlider(epsEl, epsVal, v => (+v).toFixed(2), 'epsilon');
+  handleSlider(delayEl, delayVal, v => Math.round(+v), 'delayMs');
 
-  function endGame() {
-    const score = board.areaScore();
-    const winner = (score > 0) ? 'Black' : 'White';
-    drawBoard();
-    updateHUD(`Game over. Score (B-W): ${score.toFixed(1)}. Winner: ${winner}`);
-  }
-
-  // Initial render
-  timeMsVal.textContent = timeMsEl.value;
-  cExpVal.textContent = (+cExpEl.value).toFixed(2);
-  drawBoard(); drawHeatmap(lastHeat); drawTrend(trendVals);
-  updateHUD('Ready.');
-
-  // If AI starts as black, auto-move
-  if (isAIToMove() && autoAI.checked) thinkAndMove();
+  // Kick initial render with blank board
+  drawBoard();
+  updateHUD();
+  setStatus('Idle');
 })();

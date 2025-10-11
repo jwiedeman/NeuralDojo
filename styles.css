@@ -1,4 +1,4 @@
-/* Minimalist mono aesthetic reminiscent of sgd.fyi */
+/* Neural Garden Go UI — inspired by SGD.fyi */
 :root {
   --bg: #f7f7f7;
   --fg: #111;
@@ -18,63 +18,135 @@ body {
 }
 
 #app { max-width: 1200px; margin: 0 auto; padding: 16px; }
-header { margin-bottom: 8px; }
-.title { font-weight: 800; letter-spacing: 1px; }
-.subtitle { color: var(--muted); font-size: 12px; }
+header { margin-bottom: 12px; }
+.title { font-weight: 800; letter-spacing: 1px; font-size: 18px; }
+.subtitle { color: var(--muted); font-size: 12px; margin-top: 4px; }
 
 .split {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1.15fr 0.85fr;
   gap: 16px;
 }
 
 .pane {
   background: white;
   border: 2px solid var(--border);
-  padding: 12px;
+  padding: 14px;
   box-shadow: 4px 4px 0 #0002;
-  min-height: 640px;
+  min-height: 680px;
 }
 
 .panel-header {
   border-bottom: 2px dotted var(--border);
   padding-bottom: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   font-weight: 700;
 }
 
 .panel-sep {
   border-top: 2px dotted var(--border);
-  margin: 10px 0;
+  margin: 14px 0;
 }
 
-.panel-sub { font-weight: 700; margin: 6px 0; }
+.panel-sub { font-weight: 700; margin: 10px 0 6px; }
 
-.hud { display: flex; gap: 16px; margin: 8px 0; font-size: 13px; }
-.controls { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.hud {
+  display: flex;
+  gap: 16px;
+  margin: 10px 0 6px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.hud.secondary { color: var(--muted); }
+
+.controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 6px; }
 .controls.row { align-items: center; }
 
 button {
   border: 2px solid var(--border);
   background: white;
   font-family: var(--mono);
-  padding: 6px 10px;
+  padding: 6px 12px;
   cursor: pointer;
+  font-size: 12px;
 }
 button:active { transform: translate(1px, 1px); }
-
-.toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 8px 0; }
 
-.explain { font-size: 12px; color: var(--fg); background: #fafafa; border: 1px dashed var(--border); padding: 8px; }
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 4px; }
+.val { font-size: 12px; margin-top: 4px; }
 
-.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 13px; }
+input[type="range"] { width: 100%; }
 
-/* Board and heatmap canvases framed */
-#board, #heatmap, #trend {
+.explain {
+  font-size: 12px;
+  color: var(--fg);
+  background: #fafafa;
+  border: 1px dashed var(--border);
+  padding: 8px;
+  line-height: 1.4;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+  font-size: 12.5px;
+}
+.stats.compact { font-size: 12px; gap: 6px; }
+
+#board {
   width: 100%;
   background: #fff;
   border: 1px solid #111;
   image-rendering: pixelated;
+}
+
+#trend, #outputWeights {
+  width: 100%;
+  background: #fff;
+  border: 1px solid #111;
+}
+
+.weights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.weight-unit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.weight-unit canvas {
+  width: 100%;
+  background: #fff;
+  border: 1px solid #111;
+  image-rendering: pixelated;
+}
+
+.weight-caption {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.3;
+}
+
+.weights-legend {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+@media (max-width: 1024px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+  .pane { min-height: auto; }
 }
