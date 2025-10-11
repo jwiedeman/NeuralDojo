@@ -38,117 +38,131 @@
 
       <section class="pane right training-pane">
         <div class="panel-header">SELF-PLAY TRAINING LAB</div>
-        <div class="training-grid">
-          <div class="panel-card card-wide intro-card">
-            <div class="explain">
-              <strong>Growing a neural network.</strong> We know the update rule (gradient descent), not the solution. Every move feeds a replay
-              buffer, gradients nudge weights, and a new evaluator appears. Reset the network to watch a different program emerge.
-            </div>
-            <blockquote>
-              "We designed the learning algorithm… But we don't really understand exactly how they do those things." — Geoffrey Hinton
-            </blockquote>
-          </div>
-
-          <div class="panel-card card-wide controls-card">
-            <div class="controls row">
-              <button id="startBtn">START</button>
-              <button id="pauseBtn">PAUSE</button>
-              <button id="resetBtn">RESET NETWORK</button>
-            </div>
-
-            <div class="grid-2 compact-grid">
-              <div>
-                <div class="label">Learning Rate (α)</div>
-                <input type="range" id="learningRate" min="0.01" max="0.30" step="0.01" value="0.10" />
-                <div class="val" id="learningRateVal">0.10</div>
+        <div class="training-layout">
+          <div class="training-column column-setup">
+            <div class="panel-card intro-card">
+              <div class="explain">
+                <strong>Growing dueling evaluators.</strong> We know the update rule (gradient descent), not the solution. Every move feeds a replay
+                buffer, gradients nudge weights, and two colour-specific evaluators emerge side by side.
               </div>
-              <div>
-                <div class="label">Hidden Units</div>
-                <input type="range" id="hiddenUnits" min="2" max="24" step="1" value="6" />
-                <div class="val" id="hiddenUnitsVal">6</div>
+              <blockquote>
+                "We designed the learning algorithm… But we don't really understand exactly how they do those things." — Geoffrey Hinton
+              </blockquote>
+            </div>
+
+            <div class="panel-card controls-card">
+              <div class="controls row">
+                <button id="startBtn">START</button>
+                <button id="pauseBtn">PAUSE</button>
+                <button id="resetBtn">RESET NETWORK</button>
+              </div>
+
+              <div class="grid-2 compact-grid">
+                <div>
+                  <div class="label">Learning Rate (α)</div>
+                  <input type="range" id="learningRate" min="0.01" max="0.30" step="0.01" value="0.10" />
+                  <div class="val" id="learningRateVal">0.10</div>
+                </div>
+                <div>
+                  <div class="label">Hidden Units</div>
+                  <input type="range" id="hiddenUnits" min="2" max="24" step="1" value="6" />
+                  <div class="val" id="hiddenUnitsVal">6</div>
+                </div>
+              </div>
+
+              <div class="grid-2 compact-grid">
+                <div>
+                  <div class="label">Exploration (ε)</div>
+                  <input type="range" id="epsilon" min="0.00" max="0.40" step="0.01" value="0.10" />
+                  <div class="val" id="epsilonVal">0.10</div>
+                </div>
+                <div>
+                  <div class="label">Move Delay (ms)</div>
+                  <input type="range" id="delayMs" min="0" max="400" step="20" value="160" />
+                  <div class="val" id="delayMsVal">160</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="training-column column-metrics">
+            <div class="panel-card results-card">
+              <div class="panel-sub">Arena results</div>
+              <div class="stats">
+                <div>Total games: <span id="totalGames">0</span></div>
+                <div>Black wins: <span id="blackWins">0</span></div>
+                <div>White wins: <span id="whiteWins">0</span></div>
+                <div>Black win rate: <span id="blackWinRate">—</span></div>
+                <div>Prediction accuracy: <span id="predAccuracy">—</span></div>
+                <div>Avg confidence: <span id="avgConfidence">—</span></div>
+                <div>Training steps: <span id="trainingSteps">0</span></div>
               </div>
             </div>
 
-            <div class="grid-2 compact-grid">
-              <div>
-                <div class="label">Exploration (ε)</div>
-                <input type="range" id="epsilon" min="0.00" max="0.40" step="0.01" value="0.10" />
-                <div class="val" id="epsilonVal">0.10</div>
+            <div class="panel-card model-card">
+              <div class="panel-sub">Model scoreboard (colour-specific evaluators)</div>
+              <div class="model-grid">
+                <div class="model-block">
+                  <div class="model-title">Black model</div>
+                  <div class="stats stats-tight">
+                    <div>Predictions: <span id="blackModelPreds">0</span></div>
+                    <div>Accuracy: <span id="blackModelAccuracy">—</span></div>
+                    <div>Avg confidence: <span id="blackModelAvgConf">—</span></div>
+                    <div>Training steps: <span id="blackModelSteps">0</span></div>
+                  </div>
+                </div>
+                <div class="model-block">
+                  <div class="model-title">White model</div>
+                  <div class="stats stats-tight">
+                    <div>Predictions: <span id="whiteModelPreds">0</span></div>
+                    <div>Accuracy: <span id="whiteModelAccuracy">—</span></div>
+                    <div>Avg confidence: <span id="whiteModelAvgConf">—</span></div>
+                    <div>Training steps: <span id="whiteModelSteps">0</span></div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <div class="label">Move Delay (ms)</div>
-                <input type="range" id="delayMs" min="0" max="400" step="20" value="160" />
-                <div class="val" id="delayMsVal">160</div>
+            </div>
+          </div>
+
+          <div class="training-column column-visuals">
+            <div class="panel-card tab-card">
+              <div class="panel-sub">Training telemetry</div>
+              <div class="tab-buttons">
+                <button class="tab-button active" data-tab="trend">Win probability trace</button>
+                <button class="tab-button" data-tab="history">Learning trajectory</button>
+                <button class="tab-button" data-tab="weights">Input → hidden weights</button>
+                <button class="tab-button" data-tab="output">Output weights</button>
               </div>
-            </div>
-          </div>
-
-          <div class="panel-card">
-            <div class="panel-sub">Arena results</div>
-            <div class="stats">
-              <div>Total games: <span id="totalGames">0</span></div>
-              <div>Black wins: <span id="blackWins">0</span></div>
-              <div>White wins: <span id="whiteWins">0</span></div>
-              <div>Black win rate: <span id="blackWinRate">—</span></div>
-              <div>Prediction accuracy: <span id="predAccuracy">—</span></div>
-              <div>Avg confidence: <span id="avgConfidence">—</span></div>
-              <div>Training steps: <span id="trainingSteps">0</span></div>
-            </div>
-          </div>
-
-          <div class="panel-card">
-            <div class="panel-sub">Black model</div>
-            <div class="stats stats-tight">
-              <div>Predictions: <span id="blackModelPreds">0</span></div>
-              <div>Accuracy: <span id="blackModelAccuracy">—</span></div>
-              <div>Avg confidence: <span id="blackModelAvgConf">—</span></div>
-              <div>Training steps: <span id="blackModelSteps">0</span></div>
-            </div>
-          </div>
-
-          <div class="panel-card">
-            <div class="panel-sub">White model</div>
-            <div class="stats stats-tight">
-              <div>Predictions: <span id="whiteModelPreds">0</span></div>
-              <div>Accuracy: <span id="whiteModelAccuracy">—</span></div>
-              <div>Avg confidence: <span id="whiteModelAvgConf">—</span></div>
-              <div>Training steps: <span id="whiteModelSteps">0</span></div>
-            </div>
-          </div>
-
-          <div class="panel-card">
-            <div class="panel-sub">Win Probability Trace (per move)</div>
-            <canvas id="trend" width="500" height="180"></canvas>
-            <div class="chart-hint">Orange: black model · Blue: white model</div>
-          </div>
-
-          <div class="panel-card">
-            <div class="panel-sub">Learning Trajectory (per game)</div>
-            <canvas id="history" width="500" height="190"></canvas>
-          </div>
-
-          <div class="panel-card card-wide">
-            <div class="panel-sub">Network Weights (Input → Hidden)</div>
-            <div class="weights-legend">Orange = drives toward black victory, Blue = toward white. Gray ≈ neutral. Last column weight = player-to-move feature.</div>
-            <div id="weightsGrid" class="weights-columns"></div>
-            <details class="weights-raw">
-              <summary>Raw parameter dump</summary>
-              <pre id="weightsRaw">—</pre>
-            </details>
-          </div>
-
-          <div class="panel-card card-wide">
-            <div class="panel-sub">Output weights (hidden → win probability)</div>
-            <div class="output-weights-grid">
-              <div class="output-card">
-                <div class="weights-section-title">Black model</div>
-                <canvas id="outputWeightsBlack" width="240" height="100"></canvas>
-                <div class="weights-bias">Bias: <span id="outputBiasBlack">0.000</span></div>
-              </div>
-              <div class="output-card">
-                <div class="weights-section-title">White model</div>
-                <canvas id="outputWeightsWhite" width="240" height="100"></canvas>
-                <div class="weights-bias">Bias: <span id="outputBiasWhite">0.000</span></div>
+              <div class="tab-panels">
+                <div class="tab-panel active" data-tab="trend">
+                  <canvas id="trend" width="520" height="160"></canvas>
+                  <div class="chart-hint">Orange: black model · Blue: white model</div>
+                </div>
+                <div class="tab-panel" data-tab="history">
+                  <canvas id="history" width="520" height="170"></canvas>
+                </div>
+                <div class="tab-panel" data-tab="weights">
+                  <div class="weights-legend">Orange = drives toward black victory, Blue = toward white. Gray ≈ neutral. Last column weight = player-to-move feature.</div>
+                  <div id="weightsGrid" class="weights-columns"></div>
+                  <details class="weights-raw">
+                    <summary>Raw parameter dump</summary>
+                    <pre id="weightsRaw">—</pre>
+                  </details>
+                </div>
+                <div class="tab-panel" data-tab="output">
+                  <div class="output-weights-grid">
+                    <div class="output-card">
+                      <div class="weights-section-title">Black model</div>
+                      <canvas id="outputWeightsBlack" width="220" height="90"></canvas>
+                      <div class="weights-bias">Bias: <span id="outputBiasBlack">0.000</span></div>
+                    </div>
+                    <div class="output-card">
+                      <div class="weights-section-title">White model</div>
+                      <canvas id="outputWeightsWhite" width="220" height="90"></canvas>
+                      <div class="weights-bias">Bias: <span id="outputBiasWhite">0.000</span></div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
