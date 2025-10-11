@@ -63,6 +63,8 @@
   const epsVal = document.getElementById('epsilonVal');
   const delayEl = document.getElementById('delayMs');
   const delayVal = document.getElementById('delayMsVal');
+  const captureBiasEl = document.getElementById('captureBias');
+  const captureBiasVal = document.getElementById('captureBiasVal');
 
   const worker = new Worker('worker.js');
 
@@ -604,6 +606,11 @@
       delayEl.value = cfg.delayMs;
       delayVal.textContent = cfg.delayMs;
     }
+    if (cfg.captureBias != null && captureBiasEl && captureBiasVal) {
+      const formatted = (+cfg.captureBias).toFixed(2);
+      captureBiasEl.value = formatted;
+      captureBiasVal.textContent = formatted;
+    }
   }
 
   function setRunningState(isRunning) {
@@ -725,6 +732,9 @@
   handleSlider(hiddenEl, hiddenVal, v => Math.round(+v), 'hiddenUnits');
   handleSlider(epsEl, epsVal, v => (+v).toFixed(2), 'epsilon');
   handleSlider(delayEl, delayVal, v => Math.round(+v), 'delayMs');
+  if (captureBiasEl && captureBiasVal) {
+    handleSlider(captureBiasEl, captureBiasVal, v => (+v).toFixed(2), 'captureBias');
+  }
 
   // Kick initial render with blank board
   drawBoard();
