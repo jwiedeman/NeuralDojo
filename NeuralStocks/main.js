@@ -42,8 +42,18 @@
   const portfolioRealizedEl = document.getElementById('portfolioRealized');
   const portfolioDrawdownEl = document.getElementById('portfolioDrawdown');
   const portfolioSharpeEl = document.getElementById('portfolioSharpe');
+  const portfolioSortinoEl = document.getElementById('portfolioSortino');
+  const portfolioCalmarEl = document.getElementById('portfolioCalmar');
+  const portfolioCagrEl = document.getElementById('portfolioCagr');
+  const portfolioDownsideEl = document.getElementById('portfolioDownside');
+  const portfolioTurnoverEl = document.getElementById('portfolioTurnover');
+  const portfolioAvgWinLossEl = document.getElementById('portfolioAvgWinLoss');
+  const portfolioAvgHoldEl = document.getElementById('portfolioAvgHold');
+  const portfolioCostDragEl = document.getElementById('portfolioCostDrag');
+  const portfolioCapacityEl = document.getElementById('portfolioCapacity');
   const portfolioTradeCountEl = document.getElementById('portfolioTradeCount');
   const portfolioWinRateEl = document.getElementById('portfolioWinRate');
+  const portfolioCostsPaidEl = document.getElementById('portfolioCostsPaid');
   const tradeLogEl = document.getElementById('tradeLog');
   const tradingLastActionEl = document.getElementById('tradingLastAction');
   const tradingConfidenceEl = document.getElementById('tradingConfidence');
@@ -336,9 +346,17 @@
       const pnlText = Number.isFinite(trade.pnl)
         ? `P/L ${formatCurrency(trade.pnl)}`
         : null;
+      const costText = Number.isFinite(trade.costs) && trade.costs !== 0
+        ? `cost ${formatCurrency(trade.costs)}`
+        : null;
+      const holdText = Number.isFinite(trade.holdingDays) && trade.holdingDays > 0
+        ? `${trade.holdingDays.toFixed(1)}d hold`
+        : null;
       const metaParts = [];
       if (edgeText) metaParts.push(edgeText);
       if (pnlText) metaParts.push(pnlText);
+      if (costText) metaParts.push(costText);
+      if (holdText) metaParts.push(holdText);
       metaSpan.textContent = metaParts.join(' · ');
       if (Number.isFinite(trade.pnl)) {
         metaSpan.classList.add('pnl');
@@ -359,18 +377,28 @@
       portfolioEquityEl.textContent = '—';
       portfolioCashEl.textContent = '—';
       portfolioPositionEl.textContent = '—';
-      portfolioAvgCostEl.textContent = '—';
-      portfolioUnrealizedEl.textContent = '—';
-      portfolioReturnEl.textContent = '—';
-      portfolioRealizedEl.textContent = '—';
-      portfolioDrawdownEl.textContent = '—';
-      portfolioSharpeEl.textContent = '—';
-      portfolioTradeCountEl.textContent = '—';
-      portfolioWinRateEl.textContent = '—';
-      updateTradeLog([]);
-      updateTradingSummary(null);
-      return;
-    }
+    portfolioAvgCostEl.textContent = '—';
+    portfolioUnrealizedEl.textContent = '—';
+    portfolioReturnEl.textContent = '—';
+    portfolioRealizedEl.textContent = '—';
+    portfolioDrawdownEl.textContent = '—';
+    portfolioSharpeEl.textContent = '—';
+    if (portfolioSortinoEl) portfolioSortinoEl.textContent = '—';
+    if (portfolioCalmarEl) portfolioCalmarEl.textContent = '—';
+    if (portfolioCagrEl) portfolioCagrEl.textContent = '—';
+    if (portfolioDownsideEl) portfolioDownsideEl.textContent = '—';
+    if (portfolioTurnoverEl) portfolioTurnoverEl.textContent = '—';
+    if (portfolioAvgWinLossEl) portfolioAvgWinLossEl.textContent = '—';
+    if (portfolioAvgHoldEl) portfolioAvgHoldEl.textContent = '—';
+    if (portfolioCostDragEl) portfolioCostDragEl.textContent = '—';
+    if (portfolioCapacityEl) portfolioCapacityEl.textContent = '—';
+    portfolioTradeCountEl.textContent = '—';
+    portfolioWinRateEl.textContent = '—';
+    if (portfolioCostsPaidEl) portfolioCostsPaidEl.textContent = '—';
+    updateTradeLog([]);
+    updateTradingSummary(null);
+    return;
+  }
 
     portfolioEquityEl.textContent = formatCurrency(portfolio.equity);
     portfolioCashEl.textContent = formatCurrency(portfolio.cash);
@@ -385,8 +413,71 @@
     portfolioSharpeEl.textContent = Number.isFinite(portfolio.sharpe)
       ? formatNumber(portfolio.sharpe, 2)
       : '—';
+    const closedTrades = portfolio.closedTradeCount ?? 0;
+    if (portfolioSortinoEl) {
+      portfolioSortinoEl.textContent = Number.isFinite(portfolio.sortino)
+        ? formatNumber(portfolio.sortino, 2)
+        : '—';
+    }
+    if (portfolioCalmarEl) {
+      portfolioCalmarEl.textContent = Number.isFinite(portfolio.calmar)
+        ? formatNumber(portfolio.calmar, 2)
+        : '—';
+    }
+    if (portfolioCagrEl) {
+      portfolioCagrEl.textContent = Number.isFinite(portfolio.cagr)
+        ? formatPercent(portfolio.cagr, 2)
+        : '—';
+    }
+    if (portfolioDownsideEl) {
+      portfolioDownsideEl.textContent = Number.isFinite(portfolio.downsideDeviation)
+        ? formatPercent(portfolio.downsideDeviation, 2)
+        : '—';
+    }
+    if (portfolioTurnoverEl) {
+      portfolioTurnoverEl.textContent = Number.isFinite(portfolio.turnover)
+        ? formatPercent(portfolio.turnover, 1)
+        : '—';
+    }
+    if (portfolioAvgWinLossEl) {
+      const avgWin = portfolio.avgWin;
+      const avgLoss = portfolio.avgLoss;
+      const hasWin = Number.isFinite(avgWin);
+      const hasLoss = Number.isFinite(avgLoss);
+      if (hasWin || hasLoss) {
+        const winText = hasWin ? formatCurrency(avgWin) : '—';
+        const lossText = hasLoss ? formatCurrency(avgLoss) : '—';
+        let text = `${winText} / ${lossText}`;
+        if (Number.isFinite(portfolio.winLossRatio)) {
+          text += ` (R=${formatNumber(portfolio.winLossRatio, 2)})`;
+        }
+        portfolioAvgWinLossEl.textContent = text;
+      } else {
+        portfolioAvgWinLossEl.textContent = '—';
+      }
+    }
+    if (portfolioAvgHoldEl) {
+      portfolioAvgHoldEl.textContent = closedTrades > 0 && Number.isFinite(portfolio.avgHoldDays)
+        ? `${portfolio.avgHoldDays.toFixed(1)} d`
+        : '—';
+    }
+    if (portfolioCostDragEl) {
+      portfolioCostDragEl.textContent = Number.isFinite(portfolio.costDrag)
+        ? formatPercent(portfolio.costDrag, 2)
+        : '—';
+    }
+    if (portfolioCapacityEl) {
+      portfolioCapacityEl.textContent = Number.isFinite(portfolio.capacityPerShare)
+        ? formatCurrency(portfolio.capacityPerShare)
+        : '—';
+    }
     portfolioTradeCountEl.textContent = formatInteger(portfolio.tradeCount ?? 0);
-    portfolioWinRateEl.textContent = formatPercent(portfolio.winRate, 2);
+    portfolioWinRateEl.textContent = closedTrades > 0
+      ? formatPercent(portfolio.winRate, 2)
+      : '—';
+    if (portfolioCostsPaidEl) {
+      portfolioCostsPaidEl.textContent = formatCurrency(portfolio.costsPaid ?? 0);
+    }
     updateTradeLog(portfolio.trades);
   }
 
