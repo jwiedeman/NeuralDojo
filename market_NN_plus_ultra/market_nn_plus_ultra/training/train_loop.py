@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 from ..data import FeatureRegistry, SQLiteMarketDataset, SlidingWindowDataset
 from ..data.sqlite_loader import SQLiteMarketSource
 from ..models.temporal_transformer import TemporalBackbone, TemporalBackboneConfig, TemporalPolicyHead
+from ..models.omni_mixture import MarketOmniBackbone, OmniBackboneConfig
 from ..models.losses import CompositeTradingLoss
 from .config import DataConfig, ExperimentConfig, ModelConfig, OptimizerConfig, TrainerConfig
 
@@ -24,16 +25,37 @@ class MarketLightningModule(pl.LightningModule):
     def __init__(self, model_config: ModelConfig, optimizer_config: OptimizerConfig) -> None:
         super().__init__()
         self.save_hyperparameters({"model": asdict(model_config), "optimizer": asdict(optimizer_config)})
-        backbone_config = TemporalBackboneConfig(
-            feature_dim=model_config.feature_dim,
-            model_dim=model_config.model_dim,
-            depth=model_config.depth,
-            heads=model_config.heads,
-            dropout=model_config.dropout,
-            conv_kernel_size=model_config.conv_kernel_size,
-            conv_dilations=model_config.conv_dilations,
-        )
-        self.backbone = TemporalBackbone(backbone_config)
+        architecture = model_config.architecture.lower()
+        if architecture in {"hybrid_transformer", "temporal_transformer"}:
+            backbone_config = TemporalBackboneConfig(
+                feature_dim=model_config.feature_dim,
+                model_dim=model_config.model_dim,
+                depth=model_config.depth,
+                heads=model_config.heads,
+                dropout=model_config.dropout,
+                conv_kernel_size=model_config.conv_kernel_size,
+                conv_dilations=model_config.conv_dilations,
+            )
+            self.backbone = TemporalBackbone(backbone_config)
+        elif architecture in {"omni", "omni_mixture", "omni_backbone"}:
+            backbone_config = OmniBackboneConfig(
+                feature_dim=model_config.feature_dim,
+                model_dim=model_config.model_dim,
+                depth=model_config.depth,
+                heads=model_config.heads,
+                dropout=model_config.dropout,
+                ff_mult=model_config.ff_mult,
+                ssm_state_dim=model_config.ssm_state_dim,
+                ssm_kernel_size=model_config.ssm_kernel_size,
+                conv_kernel_size=model_config.conv_kernel_size,
+                conv_dilations=model_config.conv_dilations,
+                coarse_factor=model_config.coarse_factor,
+                cross_every=model_config.cross_every,
+                max_seq_len=model_config.max_seq_len,
+            )
+            self.backbone = MarketOmniBackbone(backbone_config)
+        else:
+            raise ValueError(f"Unknown architecture '{model_config.architecture}'")
         self.head = TemporalPolicyHead(model_config.model_dim, model_config.horizon, model_config.output_dim)
         self.loss_fn = CompositeTradingLoss()
 
@@ -139,7 +161,12 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
     data_cfg = DataConfig(**data_section)
 
     model_section = dict(raw["model"])
-    model_section["conv_dilations"] = tuple(model_section.get("conv_dilations", (1, 2, 4, 8, 16, 32)))
+    if "conv_dilations" in model_section:
+        model_section["conv_dilations"] = tuple(model_section["conv_dilations"])
+    else:
+        model_section["conv_dilations"] = (1, 2, 4, 8, 16, 32)
+    if "architecture" in model_section:
+        model_section["architecture"] = str(model_section["architecture"]).lower()
     model_cfg = ModelConfig(**model_section)
     optimizer_cfg = OptimizerConfig(**raw.get("optimizer", {}))
     trainer_section = dict(raw.get("trainer", {}))

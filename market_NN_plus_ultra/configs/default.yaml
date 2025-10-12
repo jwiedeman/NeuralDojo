@@ -24,6 +24,13 @@ model:
   conv_dilations: [1, 2, 4, 8, 16, 32, 64]
   horizon: 5
   output_dim: 1
+  architecture: omni_mixture
+  ff_mult: 4
+  ssm_state_dim: 256
+  ssm_kernel_size: 16
+  coarse_factor: 4
+  cross_every: 2
+  max_seq_len: 4096
 
 optimizer:
   lr: 0.0002

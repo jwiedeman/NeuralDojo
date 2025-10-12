@@ -36,6 +36,7 @@ market_NN_plus_ultra/
     ├── models/
     │   ├── __init__.py
     │   ├── temporal_transformer.py # Hybrid transformer/state-space backbone
+    │   ├── omni_mixture.py      # Omni-scale backbone with cross-resolution attention
     │   └── losses.py          # Custom loss functions for risk-aware optimisation
     ├── training/
     │   ├── __init__.py
@@ -54,6 +55,7 @@ Each module comes with docstrings explaining expected behaviour so future contri
 ## Core Capabilities
 
 * **Deep temporal modelling** — The default backbone stacks sixteen hybrid transformer layers that mix global attention, dilated convolutions, and state-space inspired mixers for memory retention over thousands of timesteps. Patch embeddings and learned positional encodings are designed to support high-dimensional feature spaces out of the box.
+* **Omni-scale backbone option** — The `omni_mixture` architecture fuses fine-grained transformer layers with coarse cross-scale attention, gated state-space mixers, and dilated convolutions to capture both microstructure and macro regime shifts in one model.
 * **Rich feature engineering** — The feature registry encapsulates momentum, volatility, regime, and spectral features while remaining easily extensible. Adding new indicators only requires registering a `FeatureSpec` with dependency metadata inside `feature_pipeline.py`.
 * **Risk-aware optimisation** — Custom loss functions marry standard regression objectives with differentiable Sharpe and drawdown penalties, rewarding policies that maximise return while respecting risk budgets.
 * **Automated evaluation** — The evaluation module exposes risk-adjusted metrics (Sharpe, Sortino, Calmar, drawdown) and trade-level analytics that plug directly into backtesting or live monitoring loops.
@@ -108,7 +110,7 @@ For a deeper discussion of the data flow, modular boundaries, and suggested exte
 
 ## Model Highlights
 
-* **Hybrid temporal backbone** — stacks multi-head attention, dilated temporal convolutions, and state-space mixers for long-term memory.
+* **Hybrid temporal backbone** — stacks multi-head attention, dilated temporal convolutions, and state-space mixers for long-term memory. A heavier `MarketOmniBackbone` pushes context even further with cross-resolution attention and gated state-space mixers.
 * **Rich data preprocessing** — SQLite ingestion joins OHLCV, indicators, and on-the-fly engineered features with z-score normalisation.
 * **Risk-aware objectives** — differentiable Sharpe/drawdown penalties baked into the default loss encourage ROI-focussed behaviour.
 

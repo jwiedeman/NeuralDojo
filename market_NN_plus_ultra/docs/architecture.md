@@ -57,6 +57,23 @@ dimension while preserving sequence length.
 `TemporalBackboneConfig` exposes all scaling knobs (depth, heads, dilations)
 through configuration files so experiments can scale up without touching code.
 
+### Omni-Scale Variant
+
+For experiments demanding even more capacity, the `MarketOmniBackbone`
+combines fine-grained transformer layers with:
+
+* **Cross-scale attention** — fine tokens attend into a coarse context derived
+  via learnable pooling, enabling awareness of macro regimes without losing
+  microstructure detail.
+* **State-space mixers** — gated depthwise convolutions mimic diagonal
+  state-space models and propagate information over thousands of timesteps.
+* **Dilated temporal mixers** — inherited from the hybrid backbone to
+  reinforce local inductive bias.
+
+This variant is controlled through the experiment configuration by setting
+`model.architecture: omni_mixture` and tweaking the `ssm_state_dim`,
+`coarse_factor`, and `cross_every` knobs.
+
 ## Training Loop
 
 * **Risk-aware loss** – `CompositeTradingLoss` combines prediction error with
