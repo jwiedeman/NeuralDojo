@@ -145,16 +145,17 @@ function createModelStats() {
   };
 }
 
-function encodeBoard(b) {
+function encodeBoardFor(b, perspective) {
   const arr = new Float32Array(config.size * config.size + 1);
   const total = config.size * config.size;
+  const opp = perspective === BLACK ? WHITE : BLACK;
   for (let i = 0; i < total; i++) {
     const v = b.cells[i];
-    if (v === BLACK) arr[i] = 1;
-    else if (v === WHITE) arr[i] = -1;
+    if (v === perspective) arr[i] = 1;
+    else if (v === opp) arr[i] = -1;
     else arr[i] = 0;
   }
-  arr[arr.length - 1] = b.toPlay === BLACK ? 1 : -1;
+  arr[arr.length - 1] = b.toPlay === perspective ? 1 : -1;
   return arr;
 }
 
@@ -178,10 +179,9 @@ function colorKey(player) {
 }
 
 function evaluateBoardConfidence(b) {
-  const encoded = encodeBoard(b);
   return {
-    black: nets.black.forward(encoded).output,
-    white: nets.white.forward(encoded).output
+    black: nets.black.forward(encodeBoardFor(b, BLACK)).output,
+    white: nets.white.forward(encodeBoardFor(b, WHITE)).output
   };
 }
 
@@ -221,7 +221,7 @@ function stepSelfPlay() {
     return;
   }
 
-  const encoded = encodeBoard(board);
+  const encoded = encodeBoardFor(board, board.toPlay);
   const playerKey = colorKey(board.toPlay);
   const mover = board.toPlay;
   const net = nets[playerKey];
@@ -256,13 +256,14 @@ function chooseMove() {
   }
   const playerKey = colorKey(board.toPlay);
   const net = nets[playerKey];
+  const mover = board.toPlay;
   let bestMove = moves[0];
   let bestValue = -Infinity;
   for (const mv of moves) {
     const clone = board.clone();
     const res = clone.play(mv);
     if (!res.ok) continue;
-    const { output } = net.forward(encodeBoard(clone));
+    const { output } = net.forward(encodeBoardFor(clone, mover));
     let value = output;
     if (config.captureBias > 0 && res.captured) {
       value += config.captureBias * res.captured;
