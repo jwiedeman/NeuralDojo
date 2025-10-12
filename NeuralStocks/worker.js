@@ -100,6 +100,149 @@ class PriceNet {
   }
 }
 
+class RLTrader {
+  constructor(inputSize, hiddenUnits, learningRate) {
+    this.inputSize = inputSize;
+    this.hiddenUnits = hiddenUnits;
+    this.actionCount = 3; // hold, buy, sell
+    this.learningRate = learningRate;
+    this.initWeights();
+  }
+
+  initWeights() {
+    const scale1 = 1 / Math.sqrt(this.inputSize);
+    const scale2 = 1 / Math.sqrt(this.hiddenUnits);
+    this.w1 = new Float32Array(this.hiddenUnits * this.inputSize);
+    this.b1 = new Float32Array(this.hiddenUnits);
+    this.w2 = new Float32Array(this.actionCount * this.hiddenUnits);
+    this.b2 = new Float32Array(this.actionCount);
+    for (let i = 0; i < this.w1.length; i++) {
+      this.w1[i] = (Math.random() * 2 - 1) * scale1;
+    }
+    for (let i = 0; i < this.w2.length; i++) {
+      this.w2[i] = (Math.random() * 2 - 1) * scale2;
+    }
+    this.b1.fill(0);
+    this.b2.fill(0);
+  }
+
+  setLearningRate(lr) {
+    this.learningRate = lr;
+  }
+
+  forward(features) {
+    const hidden = new Float32Array(this.hiddenUnits);
+    for (let h = 0; h < this.hiddenUnits; h++) {
+      let sum = this.b1[h];
+      const offset = h * this.inputSize;
+      for (let i = 0; i < this.inputSize; i++) {
+        sum += this.w1[offset + i] * features[i];
+      }
+      hidden[h] = Math.tanh(sum);
+    }
+
+    const logits = new Float32Array(this.actionCount);
+    for (let a = 0; a < this.actionCount; a++) {
+      let sum = this.b2[a];
+      const offset = a * this.hiddenUnits;
+      for (let h = 0; h < this.hiddenUnits; h++) {
+        sum += this.w2[offset + h] * hidden[h];
+      }
+      logits[a] = sum;
+    }
+
+    const maxLogit = Math.max(...logits);
+    let total = 0;
+    const probs = new Float32Array(this.actionCount);
+    for (let a = 0; a < this.actionCount; a++) {
+      const exp = Math.exp(logits[a] - maxLogit);
+      probs[a] = exp;
+      total += exp;
+    }
+    if (total > 0) {
+      for (let a = 0; a < this.actionCount; a++) {
+        probs[a] /= total;
+      }
+    } else {
+      const uniform = 1 / this.actionCount;
+      probs.fill(uniform);
+    }
+
+    return { hidden, probs, logits };
+  }
+
+  act(features, exploration = 0) {
+    const { hidden, probs, logits } = this.forward(features);
+    let actionIndex = this.sampleFromDistribution(probs);
+    if (Math.random() < exploration) {
+      actionIndex = Math.floor(Math.random() * this.actionCount);
+    }
+    const confidence = probs[actionIndex] ?? 0;
+    return {
+      index: actionIndex,
+      confidence,
+      probs,
+      logits,
+      hidden,
+      features
+    };
+  }
+
+  sampleFromDistribution(probs) {
+    const r = Math.random();
+    let cume = 0;
+    for (let i = 0; i < probs.length; i++) {
+      cume += probs[i];
+      if (r <= cume) {
+        return i;
+      }
+    }
+    return probs.length - 1;
+  }
+
+  train(decision, reward) {
+    if (!decision || !decision.features || !decision.hidden || !decision.probs) return;
+    const lr = this.learningRate;
+    const { features, hidden, probs, index: actionIndex } = decision;
+    const gradLogits = new Float32Array(this.actionCount);
+    for (let a = 0; a < this.actionCount; a++) {
+      let value = probs[a];
+      if (a === actionIndex) {
+        value -= 1;
+      }
+      gradLogits[a] = value * reward;
+    }
+
+    for (let a = 0; a < this.actionCount; a++) {
+      const grad = gradLogits[a];
+      this.b2[a] -= lr * grad;
+      const offset = a * this.hiddenUnits;
+      for (let h = 0; h < this.hiddenUnits; h++) {
+        this.w2[offset + h] -= lr * grad * hidden[h];
+      }
+    }
+
+    const gradHidden = new Float32Array(this.hiddenUnits);
+    for (let h = 0; h < this.hiddenUnits; h++) {
+      let sum = 0;
+      for (let a = 0; a < this.actionCount; a++) {
+        const offset = a * this.hiddenUnits + h;
+        sum += gradLogits[a] * this.w2[offset];
+      }
+      gradHidden[h] = sum * (1 - hidden[h] * hidden[h]);
+    }
+
+    for (let h = 0; h < this.hiddenUnits; h++) {
+      const grad = gradHidden[h];
+      const offset = h * this.inputSize;
+      for (let i = 0; i < this.inputSize; i++) {
+        this.w1[offset + i] -= lr * grad * features[i];
+      }
+      this.b1[h] -= lr * grad;
+    }
+  }
+}
+
 const historyLimit = 240;
 const recentLimit = 8;
 
@@ -108,7 +251,11 @@ const config = {
   hiddenUnits: 18,
   windowSize: 24,
   noise: 0.01,
-  delayMs: 100
+  delayMs: 100,
+  traderLearningRate: 0.01,
+  traderHiddenUnits: 24,
+  traderExploration: 0.05,
+  traderRewardScale: 120
 };
 
 let net = new PriceNet(config.windowSize, config.hiddenUnits, config.learningRate);
@@ -146,6 +293,30 @@ function createPortfolio() {
 }
 
 let portfolio = createPortfolio();
+
+function createTraderInputSize() {
+  return config.windowSize + 2;
+}
+
+function createTrader() {
+  return new RLTrader(createTraderInputSize(), config.traderHiddenUnits, config.traderLearningRate);
+}
+
+function createTradingStats() {
+  return {
+    steps: 0,
+    avgReward: 0,
+    lastReward: 0,
+    lastAction: 'HOLD',
+    lastConfidence: 0,
+    lastEdge: 0,
+    exploration: config.traderExploration,
+    learningRate: config.traderLearningRate
+  };
+}
+
+let trader = createTrader();
+let tradingStats = createTradingStats();
 
 function formatClock() {
   const now = new Date();
@@ -347,25 +518,61 @@ function attemptSell(price, fraction, date, edge) {
   return true;
 }
 
+function tradingActionLabel(index) {
+  if (index === 1) return 'BUY';
+  if (index === 2) return 'SELL';
+  return 'HOLD';
+}
+
+function buildTradingFeatures(sample, predictedPrice) {
+  const features = new Float32Array(createTraderInputSize());
+  features.set(sample.features);
+  const predictedNorm = Number.isFinite(predictedPrice) ? normalize(predictedPrice) : 0;
+  features[config.windowSize] = predictedNorm;
+  const edge = Number.isFinite(predictedPrice) && sample.targetPrice > 0
+    ? (predictedPrice - sample.targetPrice) / sample.targetPrice
+    : 0;
+  features[config.windowSize + 1] = edge;
+  return { features, edge };
+}
+
+function updateTradingStats(decision, reward, edge) {
+  tradingStats.steps += 1;
+  tradingStats.lastAction = tradingActionLabel(decision?.index ?? 0);
+  const confidence = decision?.confidence ?? 0;
+  tradingStats.lastConfidence = Math.max(0, Math.min(1, confidence));
+  tradingStats.lastEdge = Number.isFinite(edge) ? edge : 0;
+  const safeReward = Number.isFinite(reward) ? reward : 0;
+  tradingStats.lastReward = safeReward;
+  const step = tradingStats.steps;
+  tradingStats.avgReward += (safeReward - tradingStats.avgReward) / step;
+  tradingStats.exploration = config.traderExploration;
+  tradingStats.learningRate = config.traderLearningRate;
+}
+
 function applyTradingPolicy(sample, predictedPrice) {
   if (!portfolio || !sample || !Number.isFinite(sample.targetPrice)) return;
+  const { features, edge } = buildTradingFeatures(sample, predictedPrice);
+  const decision = trader.act(features, config.traderExploration);
   const price = sample.targetPrice;
-  const edge = Number.isFinite(predictedPrice) && price > 0
-    ? (predictedPrice - price) / price
-    : 0;
-  const threshold = 0.0015;
-  const absEdge = Math.abs(edge);
-  const intensity = Math.min(1, Math.max(0, (absEdge - threshold) / 0.02));
-  const fraction = 0.05 + intensity * 0.45;
+  const prevEquity = portfolio.equity;
   let traded = false;
-  if (edge > threshold) {
+  const minFraction = 0.05;
+  const maxFraction = 0.5;
+  const fraction = Math.min(maxFraction, minFraction + (maxFraction - minFraction) * Math.max(0, decision.confidence));
+  if (decision.index === 1) {
     traded = attemptBuy(price, fraction, sample.date, edge);
-  } else if (edge < -threshold) {
+  } else if (decision.index === 2) {
     traded = attemptSell(price, fraction, sample.date, edge);
   }
   if (!traded) {
     markToMarket(sample.date, price);
   }
+  const equityChange = portfolio.equity - prevEquity;
+  const normalizedReward = equityChange / Math.max(1, portfolio.initialCash);
+  const scaledReward = Math.max(-5, Math.min(5, normalizedReward * config.traderRewardScale));
+  trader.train(decision, scaledReward);
+  updateTradingStats(decision, normalizedReward, edge);
 }
 
 function createPortfolioSnapshot() {
@@ -463,7 +670,17 @@ function postSnapshot() {
       predicted: item.predicted,
       error: item.error
     })),
-    portfolio: createPortfolioSnapshot()
+    portfolio: createPortfolioSnapshot(),
+    trading: {
+      steps: tradingStats.steps,
+      avgReward: tradingStats.avgReward,
+      lastReward: tradingStats.lastReward,
+      lastAction: tradingStats.lastAction,
+      lastConfidence: tradingStats.lastConfidence,
+      lastEdge: tradingStats.lastEdge,
+      exploration: tradingStats.exploration,
+      learningRate: tradingStats.learningRate
+    }
   };
   self.postMessage({ type: 'snapshot', snapshot });
 }
@@ -479,6 +696,8 @@ function resetState(resume = false) {
   stats = createStats();
   stats.lastReset = formatClock();
   portfolio = createPortfolio();
+  trader = createTrader();
+  tradingStats = createTradingStats();
   postSnapshot();
   if (resume || wasRunning) {
     setRunning(true);
@@ -488,7 +707,8 @@ function resetState(resume = false) {
 function applyConfig(newConfig) {
   const requiresReset = (
     (newConfig.hiddenUnits != null && newConfig.hiddenUnits !== config.hiddenUnits) ||
-    (newConfig.windowSize != null && newConfig.windowSize !== config.windowSize)
+    (newConfig.windowSize != null && newConfig.windowSize !== config.windowSize) ||
+    (newConfig.traderHiddenUnits != null && newConfig.traderHiddenUnits !== config.traderHiddenUnits)
   );
   Object.assign(config, newConfig);
   config.windowSize = Math.max(4, Math.min(config.windowSize, Math.max(4, totalPoints - 1)));
@@ -496,9 +716,18 @@ function applyConfig(newConfig) {
   config.learningRate = Math.max(1e-4, config.learningRate);
   config.noise = Math.max(0, config.noise);
   config.delayMs = Math.max(0, config.delayMs | 0);
+  config.traderLearningRate = Math.max(1e-4, Number.isFinite(config.traderLearningRate) ? config.traderLearningRate : 0.01);
+  config.traderHiddenUnits = Math.max(2, Number.isFinite(config.traderHiddenUnits) ? (config.traderHiddenUnits | 0) : 24);
+  config.traderExploration = Math.min(1, Math.max(0, Number.isFinite(config.traderExploration) ? config.traderExploration : 0.05));
+  config.traderRewardScale = Number.isFinite(config.traderRewardScale)
+    ? Math.max(1, config.traderRewardScale)
+    : 120;
 
   if (!requiresReset) {
     net.setLearningRate(config.learningRate);
+    trader.setLearningRate(config.traderLearningRate);
+    tradingStats.exploration = config.traderExploration;
+    tradingStats.learningRate = config.traderLearningRate;
     stats.learningRate = config.learningRate;
     stats.noise = config.noise;
     stats.windowSize = config.windowSize;
