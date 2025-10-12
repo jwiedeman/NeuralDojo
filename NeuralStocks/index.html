@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Neural Garden: Market Forecaster Lab</title>
+  <link rel="stylesheet" href="../shared/ui.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="title">MARKET ARENA — HISTORICAL FORECAST LAB</div>
+      <div class="subtitle">We stream S&P 500 (SPY) closing prices and train a tiny neural forecaster live. Same network, rolling window inputs. Watch it learn to anticipate the next close from historical context.</div>
+    </header>
+
+    <main class="split">
+      <section class="pane left">
+        <div class="panel-header">MARKET PLAYBACK — ACTUAL VS FORECAST</div>
+        <canvas id="priceChart" width="540" height="280"></canvas>
+        <div class="chart-hint">Orange: actual historical close · Blue: model forecast for the next session.</div>
+        <canvas id="errorChart" width="540" height="140"></canvas>
+        <div class="chart-hint">Mean absolute error per streaming mini-batch.</div>
+
+        <div class="hud">
+          <div>Latest close: <span id="latestActual">—</span></div>
+          <div>Model forecast: <span id="latestPred">—</span></div>
+          <div>Absolute error: <span id="latestError">—</span></div>
+        </div>
+        <div class="hud secondary">
+          <div>Dataset progress: <span id="datasetProgress">—</span></div>
+          <div>Lookback window: <span id="windowSizeLabel">—</span></div>
+          <div>Hidden units: <span id="hiddenUnitsLabel">—</span></div>
+        </div>
+
+        <div class="panel-sub">Rolling training stats</div>
+        <div class="stats compact">
+          <div>Steps processed: <span id="stepCount">0</span></div>
+          <div>Mean absolute error: <span id="mae">—</span></div>
+          <div>Root mean square error: <span id="rmse">—</span></div>
+          <div>Best MAE: <span id="bestMae">—</span></div>
+          <div>Learning rate: <span id="lrLabel">—</span></div>
+          <div>Noise injected: <span id="noiseLabel">—</span></div>
+        </div>
+      </section>
+
+      <section class="pane right training-pane">
+        <div class="panel-header">TIME-SERIES TRAINING LAB</div>
+        <div class="training-layout">
+          <div class="training-column column-setup">
+            <div class="panel-card intro-card">
+              <div class="explain">
+                <strong>Sequence-in, price-out.</strong> We feed a sliding window of recent closes into a compact tanh MLP and update it after every prediction. No tricks: just stochastic gradient descent nudging the same network forward in time.
+              </div>
+              <blockquote>
+                "Markets are a mathematical collective hallucination." — Inspired by Benoit Mandelbrot
+              </blockquote>
+            </div>
+
+            <div class="panel-card controls-card">
+              <div class="controls row">
+                <button id="startBtn">START</button>
+                <button id="pauseBtn" disabled>PAUSE</button>
+                <button id="resetBtn">RESET NETWORK</button>
+              </div>
+
+              <div class="grid-2 compact-grid">
+                <div>
+                  <div class="label">Learning rate (α)</div>
+                  <input type="range" id="learningRate" min="0.005" max="0.200" step="0.005" value="0.050" />
+                  <div class="val" id="learningRateVal">0.050</div>
+                </div>
+                <div>
+                  <div class="label">Hidden units</div>
+                  <input type="range" id="hiddenUnits" min="4" max="48" step="1" value="18" />
+                  <div class="val" id="hiddenUnitsVal">18</div>
+                </div>
+              </div>
+
+              <div class="grid-2 compact-grid">
+                <div>
+                  <div class="label">Lookback window</div>
+                  <input type="range" id="windowSize" min="8" max="48" step="1" value="24" />
+                  <div class="val" id="windowSizeVal">24</div>
+                </div>
+                <div>
+                  <div class="label">Feature noise</div>
+                  <input type="range" id="noise" min="0.000" max="0.050" step="0.001" value="0.010" />
+                  <div class="val" id="noiseVal">0.010</div>
+                </div>
+              </div>
+
+              <div class="grid-2 compact-grid">
+                <div>
+                  <div class="label">Step delay (ms)</div>
+                  <input type="range" id="delayMs" min="0" max="300" step="20" value="100" />
+                  <div class="val" id="delayMsVal">100</div>
+                </div>
+                <div class="hint-block">Zero delay = fastest possible training. Raise it to watch learning unfold slowly.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="training-column column-metrics">
+            <div class="panel-card results-card">
+              <div class="panel-sub">Recent forecasts</div>
+              <ul id="recentList" class="recent-list"></ul>
+            </div>
+
+            <div class="panel-card data-card">
+              <div class="panel-sub">Dataset feed</div>
+              <div class="stats stats-tight">
+                <div>Instrument: <span>SPY (S&P 500 ETF)</span></div>
+                <div>Points streamed: <span id="pointsStreamed">0</span></div>
+                <div>Window coverage: <span id="windowCoverage">—</span></div>
+                <div>Replay loops: <span id="loopCount">0</span></div>
+                <div>Best MAE so far: <span id="bestMaeSecondary">—</span></div>
+                <div>Last reset: <span id="lastReset">—</span></div>
+              </div>
+              <div class="dataset-note">Source: Stooq daily SPY closes (most recent 360 trading sessions).</div>
+            </div>
+          </div>
+
+          <div class="training-column column-visuals">
+            <div class="panel-card tab-card">
+              <div class="panel-sub">Model internals</div>
+              <div class="tab-buttons">
+                <button class="tab-button active" data-tab="weights">Feature weights</button>
+                <button class="tab-button" data-tab="output">Hidden → output</button>
+                <button class="tab-button" data-tab="raw">Raw parameters</button>
+              </div>
+              <div class="tab-panels">
+                <div class="tab-panel active" data-tab="weights">
+                  <canvas id="weightsCanvas" width="520" height="220"></canvas>
+                  <div class="chart-hint">Rows: hidden neurons · Columns: lookback steps. Orange = positive influence · Teal = negative.</div>
+                </div>
+                <div class="tab-panel" data-tab="output">
+                  <canvas id="outputCanvas" width="520" height="120"></canvas>
+                  <div class="chart-hint">Contribution of each hidden neuron on the final price prediction.</div>
+                </div>
+                <div class="tab-panel" data-tab="raw">
+                  <details class="weights-raw">
+                    <summary>Inspect raw weight tensors</summary>
+                    <pre id="weightsRaw">—</pre>
+                  </details>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="../shared/ui.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
