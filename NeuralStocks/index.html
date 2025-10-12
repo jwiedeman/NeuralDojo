@@ -4,9 +4,61 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Neural Garden: Market Forecaster Lab</title>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="../shared/ui.css" />
-  <link rel="stylesheet" href="styles.css" />
+  <script>
+    (function ensureDirectoryBase() {
+      try {
+        var doc = document;
+        var head = doc.head || doc.getElementsByTagName('head')[0];
+        if (!head) return;
+        var location = window.location;
+        var path = location && typeof location.pathname === 'string' ? location.pathname : '/';
+        var lastSlash = path.lastIndexOf('/');
+        var lastSegment = lastSlash >= 0 ? path.slice(lastSlash + 1) : path;
+        if (!path.endsWith('/')) {
+          if (lastSegment && lastSegment.indexOf('.') === -1) {
+            path += '/';
+          } else {
+            path = path.slice(0, lastSlash + 1);
+          }
+        }
+        var origin = typeof location.origin === 'string' && location.origin !== 'null'
+          ? location.origin
+          : location.href.slice(0, location.href.indexOf(path));
+        var baseHref = origin + path;
+        var base = doc.querySelector('base');
+        if (!base) {
+          base = doc.createElement('base');
+          base.href = baseHref;
+          head.insertBefore(base, head.firstChild || null);
+        } else {
+          base.href = baseHref;
+        }
+
+        var sharedCss = doc.createElement('link');
+        sharedCss.rel = 'stylesheet';
+        sharedCss.href = new URL('../shared/ui.css', baseHref).href;
+        head.appendChild(sharedCss);
+
+        var localCss = doc.createElement('link');
+        localCss.rel = 'stylesheet';
+        localCss.href = new URL('styles.css', baseHref).href;
+        head.appendChild(localCss);
+
+        var icon = doc.createElement('link');
+        icon.rel = 'icon';
+        icon.type = 'image/svg+xml';
+        icon.href = new URL('favicon.svg', baseHref).href;
+        head.appendChild(icon);
+
+        var moduleScript = doc.createElement('script');
+        moduleScript.type = 'module';
+        moduleScript.src = new URL('main.js', baseHref).href;
+        head.appendChild(moduleScript);
+      } catch (error) {
+        console.warn('Failed to stabilise base path', error);
+      }
+    })();
+  </script>
 </head>
 <body>
   <div id="app">
@@ -204,6 +256,5 @@
   </div>
 
   <script src="../shared/ui.js"></script>
-  <script type="module" src="main.js"></script>
 </body>
 </html>
