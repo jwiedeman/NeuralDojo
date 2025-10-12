@@ -107,6 +107,18 @@ For a deeper discussion of the data flow, modular boundaries, and suggested exte
 4. **Iterate and evaluate**:
    * Use `market_nn_plus_ultra.evaluation.metrics` to compute risk-adjusted scores on trade logs.
    * Inspect checkpoints saved under `training.checkpoint_dir` and feed results back into the task tracker to prioritise the next steps.
+   * Deploy the new inference agent (`scripts/run_agent.py`) to mirror the classic market agent workflow on fresh SQLite dumps.
+
+### Running the Inference Agent
+
+Once a model has been trained (or even with random weights for smoke tests) the Plus Ultra agent can be executed directly against a SQLite database:
+
+```bash
+python scripts/run_agent.py --config configs/default.yaml --checkpoint path/to/checkpoint.ckpt --device cuda:0 \
+  --output outputs/predictions.parquet
+```
+
+The script orchestrates data loading, feature enrichment, sliding-window inference, and optional ROI evaluation if realised returns are present. Use `--no-eval` to skip metrics and `--return-column` to target a specific realised return column in the generated prediction frame.
 
 ## Model Highlights
 

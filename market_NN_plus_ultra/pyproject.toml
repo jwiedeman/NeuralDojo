@@ -34,6 +34,7 @@ packages = [
     "market_nn_plus_ultra.data",
     "market_nn_plus_ultra.models",
     "market_nn_plus_ultra.training",
+    "market_nn_plus_ultra.trading",
     "market_nn_plus_ultra.evaluation",
     "market_nn_plus_ultra.utils"
 ]

@@ -18,6 +18,16 @@ class WindowSpec:
     stride: int = 1
 
 
+@dataclass(slots=True)
+class WindowMetadata:
+    """Metadata describing a single sliding window sample."""
+
+    symbol: str
+    start_index: int
+    input_timestamps: pd.Index
+    target_timestamps: pd.Index
+
+
 class SlidingWindowDataset(Dataset):
     """Turn a multi-indexed market panel into sliding windows."""
 
@@ -35,8 +45,8 @@ class SlidingWindowDataset(Dataset):
             raise ValueError("Panel must be indexed by ('timestamp', 'symbol')")
 
         self.panel = panel
-        self.feature_columns = feature_columns or [c for c in panel.columns if c not in ("symbol",)]
-        self.target_columns = target_columns or ["close"]
+        self.feature_columns = list(feature_columns or [c for c in panel.columns if c not in ("symbol",)])
+        self.target_columns = list(target_columns or ["close"])
         self.window_size = window_size
         self.horizon = horizon
         self.stride = stride
@@ -79,4 +89,18 @@ class SlidingWindowDataset(Dataset):
             "features": torch.from_numpy(window),
             "targets": torch.from_numpy(targets),
         }
+
+    def get_metadata(self, idx: int) -> WindowMetadata:
+        """Return metadata for a specific window without disturbing training."""
+
+        symbol, start = self._indices[idx]
+        sym_df = self.panel.xs(symbol, level="symbol")
+        window_slice = slice(start, start + self.window_size)
+        target_slice = slice(start + self.window_size, start + self.window_size + self.horizon)
+        return WindowMetadata(
+            symbol=symbol,
+            start_index=start,
+            input_timestamps=sym_df.iloc[window_slice].index,
+            target_timestamps=sym_df.iloc[target_slice].index,
+        )
 

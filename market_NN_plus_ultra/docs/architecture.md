@@ -85,6 +85,9 @@ This variant is controlled through the experiment configuration by setting
   are persisted for offline analysis. The evaluation module exposes ROI metrics
   (Sharpe, Sortino, drawdown, Calmar, volatility) suitable for leaderboards and
   automatic reporting.
+* **Inference agent** – `MarketNNPlusUltraAgent` mirrors the NeuralDojo market
+  agent loop, restoring checkpoints, running sliding-window inference over
+  SQLite data, and emitting prediction frames plus risk analytics.
 
 ## Extension Opportunities
 
