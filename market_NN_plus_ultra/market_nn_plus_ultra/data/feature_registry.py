@@ -1,10 +1,18 @@
-"""Registry for engineered features and indicator functions."""
+"""Registry of advanced feature engineering functions for Market NN Plus Ultra.
+
+The goal of this module is to keep an extensible catalogue of market
+representations that feed the high-capacity temporal backbone.  The default
+registry purposely mixes classical technical analysis, statistical descriptors
+of the return distribution, and lightweight spectral transforms so the model is
+exposed to diverse explanatory signals without requiring external dependencies.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Callable, Dict, Iterable, Mapping, MutableMapping, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 
 FeatureFn = Callable[[pd.DataFrame], pd.Series | pd.DataFrame]
@@ -169,6 +177,30 @@ class FeatureRegistry:
             depends_on=("close",),
         )
 
+        def log_return(df: pd.DataFrame) -> pd.Series:
+            log_price = df["close"].groupby(level=0).apply(lambda s: np.log(s))
+            return log_price.groupby(level=0).diff().fillna(0.0)
+
+        registry.register(
+            "log_return",
+            log_return,
+            description="Log returns capturing multiplicative changes",
+            tags=("momentum", "distribution"),
+            depends_on=("close",),
+        )
+
+        def price_velocity(df: pd.DataFrame, window: int = 5) -> pd.Series:
+            close = df["close"].groupby(level=0)
+            return close.diff(window)
+
+        registry.register(
+            "price_velocity",
+            price_velocity,
+            description="n-step price displacement for acceleration cues",
+            tags=("momentum",),
+            depends_on=("close",),
+        )
+
         def atr(df: pd.DataFrame, window: int = 14) -> pd.Series:
             high = df["high"]
             low = df["low"]
@@ -216,6 +248,61 @@ class FeatureRegistry:
             realized_vol,
             description="Annualised realised volatility of close-to-close returns",
             tags=("volatility", "risk"),
+            depends_on=("close",),
+        )
+
+        def realized_skew_kurtosis(df: pd.DataFrame, window: int = 60) -> pd.DataFrame:
+            returns = df.groupby(level=0)["close"].pct_change().fillna(0.0)
+            grouped = returns.groupby(level=0)
+            skew = grouped.rolling(window=window, min_periods=window).skew()
+            kurt = grouped.rolling(window=window, min_periods=window).kurt()
+            return pd.DataFrame({"skew": skew, "kurtosis": kurt})
+
+        registry.register(
+            "return_moments",
+            realized_skew_kurtosis,
+            description="Rolling higher moments for asymmetric risk awareness",
+            tags=("risk", "distribution"),
+            depends_on=("close",),
+        )
+
+        def spectral_energy(df: pd.DataFrame, window: int = 128) -> pd.DataFrame:
+            records: list[tuple[int, pd.Timestamp, float, float, float]] = []
+            for asset_id, series in df["close"].groupby(level=0):
+                series = series.droplevel(0).sort_index().ffill()
+                if len(series) < window:
+                    continue
+                values = series.values
+                timestamps = series.index
+                for idx in range(window - 1, len(values)):
+                    segment = values[idx - window + 1 : idx + 1]
+                    fft = np.fft.rfft(segment)
+                    power = np.abs(fft) ** 2
+                    total = power.sum() + 1e-9
+                    low = power[: len(power) // 4].sum() / total
+                    mid = power[len(power) // 4 : len(power) // 2].sum() / total
+                    high = power[len(power) // 2 :].sum() / total
+                    records.append((asset_id, timestamps[idx], low, mid, high))
+
+            if not records:
+                return pd.DataFrame(index=pd.MultiIndex(levels=[[], []], codes=[[], []], names=["asset_id", "timestamp"]))
+
+            index = pd.MultiIndex.from_tuples(
+                [(asset_id, timestamp) for asset_id, timestamp, *_ in records],
+                names=["asset_id", "timestamp"],
+            )
+            data = {
+                "spectral_energy_low": [low for _, _, low, _, _ in records],
+                "spectral_energy_mid": [mid for _, _, _, mid, _ in records],
+                "spectral_energy_high": [high for _, _, _, _, high in records],
+            }
+            return pd.DataFrame(data, index=index)
+
+        registry.register(
+            "spectral_energy",
+            spectral_energy,
+            description="Normalised FFT band energy distribution",
+            tags=("spectral", "regime"),
             depends_on=("close",),
         )
 
