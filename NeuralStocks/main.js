@@ -738,9 +738,25 @@
     pauseBtn.disabled = !running;
   }
 
-  function initWorker() {
+  function resolveWorkerUrl() {
+    const scriptEl = document.currentScript;
+    const base = scriptEl?.src || document.baseURI || window.location?.href;
+    if (!base) return 'worker.js';
     try {
-      const workerUrl = new URL('./worker.js', window.location.href);
+      return new URL('worker.js', base).toString();
+    } catch (error) {
+      console.warn('Falling back to relative worker script path', error);
+      return 'worker.js';
+    }
+  }
+
+  function initWorker() {
+    if (typeof Worker !== 'function') {
+      showFatalError('This browser does not support Web Workers, which are required for this experience.');
+      return null;
+    }
+    try {
+      const workerUrl = resolveWorkerUrl();
       const instance = new Worker(workerUrl, { type: 'classic' });
       instance.onmessage = ev => {
         const msg = ev.data;
