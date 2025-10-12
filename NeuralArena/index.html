@@ -109,6 +109,26 @@
                 font-size: 13px;
             }
 
+            input[type="text"] {
+                width: 100%;
+                padding: 10px;
+                border: 2px solid #000;
+                font-family: 'Berkeley Mono', monospace;
+                font-size: 12px;
+                background: #fff;
+                margin-bottom: 10px;
+            }
+
+            input[type="text"]:focus {
+                outline: none;
+                border-color: #000;
+                background: #f5f5f5;
+            }
+
+            input[type="text"]::placeholder {
+                color: #888;
+            }
+
             button {
                 width: 100%;
                 padding: 12px;
@@ -271,6 +291,253 @@
                 margin-top: 20px;
                 padding-top: 20px;
                 border-top: 2px dotted #000;
+            }
+
+            .class-gallery {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+                gap: 12px;
+                margin-bottom: 20px;
+            }
+
+            .class-card {
+                background: #fff;
+                border: 3px solid #000;
+                padding: 10px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 8px;
+                text-align: center;
+            }
+
+            .class-card h4 {
+                font-size: 11px;
+                letter-spacing: 1px;
+                color: #000;
+            }
+
+            .class-preview-grid {
+                display: grid;
+                grid-template-columns: repeat(8, 1fr);
+                width: 80px;
+                height: 80px;
+                border: 3px solid #000;
+                background: #fff;
+            }
+
+            .class-preview-grid div,
+            .pattern-preview-grid div {
+                border: 1px solid #000;
+                background: #fff;
+            }
+
+            .class-preview-grid div.filled,
+            .pattern-preview-grid div.filled {
+                background: #000;
+            }
+
+            .class-preview-grid div.changed,
+            .pattern-preview-grid div.changed {
+                outline: 2px solid #f97316;
+            }
+
+            .dataset-builder {
+                background: #fff;
+                border: 3px solid #000;
+                padding: 20px;
+                margin-bottom: 20px;
+            }
+
+            .dataset-builder h3 {
+                color: #000;
+                font-size: 14px;
+                font-weight: bold;
+                text-transform: uppercase;
+                margin-bottom: 10px;
+            }
+
+            .dataset-builder p {
+                font-size: 12px;
+                line-height: 1.5;
+                color: #000;
+                margin-bottom: 15px;
+            }
+
+            .pattern-family-list {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                margin-bottom: 15px;
+            }
+
+            .pattern-family {
+                border: 2px dotted #000;
+                padding: 12px;
+                background: #fdfdfd;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .pattern-family.disabled {
+                opacity: 0.6;
+            }
+
+            .pattern-family-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .pattern-family-header label {
+                font-size: 12px;
+                font-weight: bold;
+                letter-spacing: 0.5px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .pattern-family-body {
+                display: flex;
+                gap: 12px;
+                align-items: center;
+            }
+
+            .pattern-controls {
+                flex: 1;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+                gap: 10px;
+                font-size: 11px;
+            }
+
+            .pattern-controls label {
+                display: block;
+                color: #000;
+                font-weight: bold;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin-bottom: 4px;
+            }
+
+            .pattern-controls .value {
+                font-weight: normal;
+                display: block;
+                margin-top: 4px;
+            }
+
+            .pattern-preview-grid.small {
+                width: 64px;
+                height: 64px;
+            }
+
+            .pattern-preview-grid {
+                display: grid;
+                grid-template-columns: repeat(8, 1fr);
+                border: 3px solid #000;
+                background: #fff;
+            }
+
+            .pattern-preview-grid div {
+                border: 1px solid #000;
+                background: #fff;
+            }
+
+            .dataset-builder button.small {
+                font-size: 12px;
+                padding: 8px;
+            }
+
+            .dataset-builder button.tiny {
+                font-size: 11px;
+                padding: 6px 8px;
+            }
+
+            .custom-builder {
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .custom-builder-grid {
+                display: flex;
+                gap: 20px;
+                align-items: flex-start;
+                flex-wrap: wrap;
+            }
+
+            .custom-builder-canvas {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                flex-shrink: 0;
+            }
+
+            .custom-builder-actions {
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+
+            .custom-builder-config {
+                flex: 1;
+                min-width: 220px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .custom-builder-config label {
+                font-size: 11px;
+                font-weight: bold;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                color: #000;
+            }
+
+            .custom-builder-slider {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .custom-builder-slider .value {
+                font-size: 11px;
+                color: #000;
+            }
+
+            .custom-variant-list {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .custom-variant {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                align-items: center;
+            }
+
+            .builder-message {
+                font-size: 11px;
+                color: #444;
+                min-height: 14px;
+            }
+
+            .builder-message.error {
+                color: #c53030;
+            }
+
+            .builder-message.success {
+                color: #1a7f37;
+            }
+
+            .pattern-family-header button.remove-family {
+                flex-shrink: 0;
             }
 
 
@@ -518,6 +785,20 @@
                 .visualization > div > div[style*="grid-template-columns: repeat(4, 1fr)"] {
                     grid-template-columns: repeat(2, 1fr) !important;
                 }
+                .pattern-family-body {
+                    flex-direction: column;
+                    align-items: flex-start;
+                }
+                .pattern-family .pattern-preview-grid {
+                    margin-bottom: 10px;
+                }
+                .pattern-controls {
+                    grid-template-columns: 1fr !important;
+                    width: 100%;
+                }
+                .dataset-builder {
+                    margin-bottom: 15px;
+                }
             }
         </style>
     </head>
@@ -608,374 +889,12 @@
                                 line-height: 1.5;
                             "
                         >
-                            OBJECTIVE: Classify 8×8 pixel patterns into 4
-                            categories. 300 training samples total.
+                            OBJECTIVE: Classify 8×8 pixel patterns into
+                            <span id="classCountText">4</span> categories.
+                            <span id="sampleCountText">300</span> training
+                            samples total.
                         </p>
-                        <div
-                            style="
-                                display: grid;
-                                grid-template-columns: repeat(4, 1fr);
-                                gap: 8px;
-                                font-size: 11px;
-                            "
-                        >
-                            <div style="text-align: center">
-                                <div
-                                    style="
-                                        color: #000;
-                                        margin-bottom: 5px;
-                                        font-weight: bold;
-                                        font-size: 11px;
-                                    "
-                                >
-                                    H-STRIPE
-                                </div>
-                                <div
-                                    style="
-                                        display: grid;
-                                        grid-template-columns: repeat(8, 1fr);
-                                        gap: 0;
-                                        width: 80px;
-                                        height: 80px;
-                                        margin: 0 auto;
-                                        background: #fff;
-                                        border: 3px solid #000;
-                                    "
-                                >
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                </div>
-                            </div>
-                            <div style="text-align: center">
-                                <div
-                                    style="
-                                        color: #000;
-                                        margin-bottom: 5px;
-                                        font-weight: bold;
-                                        font-size: 11px;
-                                    "
-                                >
-                                    V-STRIPE
-                                </div>
-                                <div
-                                    style="
-                                        display: grid;
-                                        grid-template-columns: repeat(8, 1fr);
-                                        gap: 0;
-                                        width: 80px;
-                                        height: 80px;
-                                        margin: 0 auto;
-                                        background: #fff;
-                                        border: 3px solid #000;
-                                    "
-                                >
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                </div>
-                            </div>
-                            <div style="text-align: center">
-                                <div
-                                    style="
-                                        color: #000;
-                                        margin-bottom: 5px;
-                                        font-weight: bold;
-                                        font-size: 11px;
-                                    "
-                                >
-                                    DIAGONAL
-                                </div>
-                                <div
-                                    style="
-                                        display: grid;
-                                        grid-template-columns: repeat(8, 1fr);
-                                        gap: 0;
-                                        width: 80px;
-                                        height: 80px;
-                                        margin: 0 auto;
-                                        background: #fff;
-                                        border: 3px solid #000;
-                                    "
-                                >
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                </div>
-                            </div>
-                            <div style="text-align: center">
-                                <div
-                                    style="
-                                        color: #000;
-                                        margin-bottom: 5px;
-                                        font-weight: bold;
-                                        font-size: 11px;
-                                    "
-                                >
-                                    CHECKER
-                                </div>
-                                <div
-                                    style="
-                                        display: grid;
-                                        grid-template-columns: repeat(8, 1fr);
-                                        gap: 0;
-                                        width: 80px;
-                                        height: 80px;
-                                        margin: 0 auto;
-                                        background: #fff;
-                                        border: 3px solid #000;
-                                    "
-                                >
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                    <div></div>
-                                    <div style="background: #000"></div>
-                                </div>
-                            </div>
-                        </div>
+                        <div id="classGallery" class="class-gallery"></div>
                     </div>
                     <canvas id="patternCanvas"></canvas>
 
@@ -1043,14 +962,12 @@
                             <div class="arrow">→</div>
                             <div class="layer">
                                 <div class="layer-label">
-                                    Output Layer<br />(4 classes)
+                                    Output Layer<br />(<span id="outputCount"
+                                        >4</span
+                                    >
+                                    classes)
                                 </div>
-                                <div class="layer-nodes">
-                                    <div class="node output"></div>
-                                    <div class="node output"></div>
-                                    <div class="node output"></div>
-                                    <div class="node output"></div>
-                                </div>
+                                <div class="layer-nodes" id="outputLayerViz"></div>
                             </div>
                         </div>
                         <p
@@ -1109,7 +1026,7 @@
                                     <div id="activationsViz" style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 15px;"></div>
 
                                     <div style="font-size: 12px; color: #000; margin-bottom: 8px; font-weight: bold; padding-top: 10px; border-top: 1px dotted #ccc;">
-                                        OUTPUT LAYER (4 classes)
+                                        OUTPUT LAYER (<span id="outputCountDraw">4</span> classes)
                                     </div>
                                     <div id="outputActivationsViz" style="display: flex; gap: 4px; flex-wrap: wrap;"></div>
                                 </div>
@@ -1119,6 +1036,126 @@
                 </div>
 
                 <div class="controls">
+                    <div class="dataset-builder">
+                        <h3>Pattern Library</h3>
+                        <p>
+                            Pick the synthetic pattern families to train on.
+                            Adjust sample counts and noise to remix the
+                            dataset.
+                        </p>
+                        <div
+                            id="patternFamilyList"
+                            class="pattern-family-list"
+                        ></div>
+                        <button
+                            id="regenerateDatasetBtn"
+                            class="secondary small"
+                        >
+                            REGENERATE DATASET
+                        </button>
+                    </div>
+                    <div class="dataset-builder custom-pattern-builder">
+                        <h3>Custom Pattern Builder</h3>
+                        <p>
+                            Sketch brand-new pattern families. Add a few
+                            variations, choose how noisy the class should be,
+                            and grow a fresh category from your prototypes.
+                        </p>
+                        <div class="custom-builder">
+                            <div class="custom-builder-grid">
+                                <div class="custom-builder-canvas">
+                                    <div
+                                        class="draw-canvas"
+                                        id="customPatternCanvas"
+                                    ></div>
+                                    <div class="custom-builder-actions">
+                                        <button
+                                            id="customPatternClear"
+                                            class="secondary tiny"
+                                        >
+                                            Clear Sketch
+                                        </button>
+                                        <button
+                                            id="customPatternAdd"
+                                            class="secondary tiny"
+                                        >
+                                            Add Variation
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="custom-builder-config">
+                                    <div>
+                                        <label for="customPatternName"
+                                            >Pattern Name</label
+                                        >
+                                        <input
+                                            type="text"
+                                            id="customPatternName"
+                                            placeholder="e.g. Spiral"
+                                        />
+                                    </div>
+                                    <div class="custom-builder-slider">
+                                        <label for="customPatternSamples"
+                                            >Samples</label
+                                        >
+                                        <input
+                                            type="range"
+                                            id="customPatternSamples"
+                                            min="24"
+                                            max="240"
+                                            step="12"
+                                            value="60"
+                                        />
+                                        <span class="value"
+                                            ><span id="customPatternSamplesValue"
+                                                >60</span
+                                            >
+                                            samples</span
+                                        >
+                                    </div>
+                                    <div class="custom-builder-slider">
+                                        <label for="customPatternNoise"
+                                            >Noise</label
+                                        >
+                                        <input
+                                            type="range"
+                                            id="customPatternNoise"
+                                            min="0"
+                                            max="0.45"
+                                            step="0.01"
+                                            value="0.18"
+                                        />
+                                        <span class="value"
+                                            ><span id="customPatternNoiseValue"
+                                                >18</span
+                                            >
+                                            % noise</span
+                                        >
+                                    </div>
+                                    <div>
+                                        <label>Variations</label>
+                                        <div
+                                            id="customPatternVariants"
+                                            class="custom-variant-list"
+                                        ></div>
+                                    </div>
+                                    <div
+                                        class="builder-message"
+                                        id="customPatternMessage"
+                                    ></div>
+                                    <button id="customPatternCreate">
+                                        Create Pattern Type
+                                    </button>
+                                    <button
+                                        id="customPatternReset"
+                                        class="secondary small"
+                                    >
+                                        Reset Builder
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="algorithm-box">
                         <code>for each batch:
   gradient = ∂Loss/∂θ
@@ -1231,6 +1268,19 @@ where:
             const patternCtx = patternCanvas.getContext("2d");
             const weightsCanvas = document.getElementById("weightsCanvas");
             const weightsCtx = weightsCanvas.getContext("2d");
+            const classGalleryEl = document.getElementById("classGallery");
+            const classCountText = document.getElementById("classCountText");
+            const sampleCountText = document.getElementById("sampleCountText");
+            const patternFamilyListEl = document.getElementById(
+                "patternFamilyList",
+            );
+            const regenerateDatasetBtn = document.getElementById(
+                "regenerateDatasetBtn",
+            );
+            const outputCountLabel = document.getElementById("outputCount");
+            const outputCountDrawLabel = document.getElementById(
+                "outputCountDraw",
+            );
 
             const GRID_SIZE = 8;
             let trainingData = [];
@@ -1260,6 +1310,755 @@ where:
             let maxGradientNormW2 = 0;
             const CALIBRATION_STEPS = 20; // Track max gradient for first N steps
 
+            const patternLibrary = [
+                {
+                    id: "horizontal_stripes",
+                    name: "Horizontal Stripes",
+                    description:
+                        "Alternating horizontal bands with jittered offsets.",
+                    defaultEnabled: true,
+                    defaultSamples: 75,
+                    defaultNoise: 0.12,
+                    previewSeed: 11,
+                    generate({ rng, gridSize }) {
+                        const pattern = new Array(gridSize * gridSize).fill(0);
+                        const stripeHeight = 1 + Math.floor(rng() * 3);
+                        const offset = Math.floor(rng() * stripeHeight);
+                        for (let row = 0; row < gridSize; row++) {
+                            const active =
+                                Math.floor((row + offset) / stripeHeight) % 2 ===
+                                0;
+                            for (let col = 0; col < gridSize; col++) {
+                                if (active) {
+                                    pattern[row * gridSize + col] = 1;
+                                }
+                            }
+                        }
+                        return pattern;
+                    },
+                },
+                {
+                    id: "vertical_stripes",
+                    name: "Vertical Stripes",
+                    description: "Crisp vertical bars with random thickness.",
+                    defaultEnabled: true,
+                    defaultSamples: 75,
+                    defaultNoise: 0.12,
+                    previewSeed: 23,
+                    generate({ rng, gridSize }) {
+                        const pattern = new Array(gridSize * gridSize).fill(0);
+                        const stripeWidth = 1 + Math.floor(rng() * 3);
+                        const offset = Math.floor(rng() * stripeWidth);
+                        for (let col = 0; col < gridSize; col++) {
+                            const active =
+                                Math.floor((col + offset) / stripeWidth) % 2 ===
+                                0;
+                            for (let row = 0; row < gridSize; row++) {
+                                if (active) {
+                                    pattern[row * gridSize + col] = 1;
+                                }
+                            }
+                        }
+                        return pattern;
+                    },
+                },
+                {
+                    id: "slash",
+                    name: "Slash Diagonal",
+                    description: "Strong / diagonals with soft falloff.",
+                    defaultEnabled: true,
+                    defaultSamples: 75,
+                    defaultNoise: 0.14,
+                    previewSeed: 37,
+                    generate({ rng, gridSize }) {
+                        const pattern = new Array(gridSize * gridSize).fill(0);
+                        const thickness = 1 + Math.floor(rng() * 2);
+                        const offset = Math.floor(rng() * (gridSize + 4)) - 2;
+                        for (let row = 0; row < gridSize; row++) {
+                            for (let col = 0; col < gridSize; col++) {
+                                const diag = row + col;
+                                if (Math.abs(diag - offset) <= thickness) {
+                                    pattern[row * gridSize + col] = 1;
+                                }
+                            }
+                        }
+                        return pattern;
+                    },
+                },
+                {
+                    id: "checker",
+                    name: "Checkerboard",
+                    description: "Alternating squares with parity shifts.",
+                    defaultEnabled: true,
+                    defaultSamples: 75,
+                    defaultNoise: 0.12,
+                    previewSeed: 41,
+                    generate({ rng, gridSize }) {
+                        const pattern = new Array(gridSize * gridSize).fill(0);
+                        const offsetRow = Math.floor(rng() * 2);
+                        const offsetCol = Math.floor(rng() * 2);
+                        for (let row = 0; row < gridSize; row++) {
+                            for (let col = 0; col < gridSize; col++) {
+                                if (
+                                    (row + col + offsetRow + offsetCol) % 2 ===
+                                    0
+                                ) {
+                                    pattern[row * gridSize + col] = 1;
+                                }
+                            }
+                        }
+                        return pattern;
+                    },
+                },
+                {
+                    id: "backslash",
+                    name: "Backslash",
+                    description: "\\ diagonals with variable offset.",
+                    defaultEnabled: false,
+                    defaultSamples: 60,
+                    defaultNoise: 0.16,
+                    previewSeed: 53,
+                    generate({ rng, gridSize }) {
+                        const pattern = new Array(gridSize * gridSize).fill(0);
+                        const thickness = 1 + Math.floor(rng() * 2);
+                        const offset = Math.floor(rng() * (gridSize + 4)) - 2;
+                        for (let row = 0; row < gridSize; row++) {
+                            for (let col = 0; col < gridSize; col++) {
+                                const diag = col - row;
+                                if (Math.abs(diag - offset) <= thickness) {
+                                    pattern[row * gridSize + col] = 1;
+                                }
+                            }
+                        }
+                        return pattern;
+                    },
+                },
+                {
+                    id: "outline",
+                    name: "Outline Box",
+                    description: "Framed squares with random thickness.",
+                    defaultEnabled: false,
+                    defaultSamples: 60,
+                    defaultNoise: 0.1,
+                    previewSeed: 67,
+                    generate({ rng, gridSize }) {
+                        const pattern = new Array(gridSize * gridSize).fill(0);
+                        const thickness = 1 + Math.floor(rng() * 2);
+                        const inset = Math.floor(rng() * 2);
+                        for (let row = inset; row < gridSize - inset; row++) {
+                            for (
+                                let col = inset;
+                                col < gridSize - inset;
+                                col++
+                            ) {
+                                const top = row < inset + thickness;
+                                const bottom =
+                                    row >= gridSize - inset - thickness;
+                                const left = col < inset + thickness;
+                                const right = col >= gridSize - inset - thickness;
+                                if (top || bottom || left || right) {
+                                    pattern[row * gridSize + col] = 1;
+                                }
+                            }
+                        }
+                        return pattern;
+                    },
+                },
+                {
+                    id: "plus",
+                    name: "Plus",
+                    description: "Cross shapes centred with wobble.",
+                    defaultEnabled: false,
+                    defaultSamples: 60,
+                    defaultNoise: 0.18,
+                    previewSeed: 79,
+                    generate({ rng, gridSize }) {
+                        const pattern = new Array(gridSize * gridSize).fill(0);
+                        const center = Math.floor(gridSize / 2) +
+                            (rng() < 0.5 ? 0 : -1);
+                        const armWidth = 1 + Math.floor(rng() * 2);
+                        for (let row = 0; row < gridSize; row++) {
+                            for (let col = 0; col < gridSize; col++) {
+                                const vertical =
+                                    Math.abs(col - center) < armWidth;
+                                const horizontal =
+                                    Math.abs(row - center) < armWidth;
+                                if (vertical || horizontal) {
+                                    pattern[row * gridSize + col] = 1;
+                                }
+                            }
+                        }
+                        return pattern;
+                    },
+                },
+                {
+                    id: "diamond",
+                    name: "Diamond",
+                    description: "Rhombus silhouettes with soft corners.",
+                    defaultEnabled: false,
+                    defaultSamples: 60,
+                    defaultNoise: 0.15,
+                    previewSeed: 83,
+                    generate({ rng, gridSize }) {
+                        const pattern = new Array(gridSize * gridSize).fill(0);
+                        const center = (gridSize - 1) / 2;
+                        const radius = 2.5 + rng() * 1.5;
+                        for (let row = 0; row < gridSize; row++) {
+                            for (let col = 0; col < gridSize; col++) {
+                                const dist =
+                                    Math.abs(row - center) +
+                                    Math.abs(col - center);
+                                if (dist <= radius) {
+                                    pattern[row * gridSize + col] = 1;
+                                }
+                            }
+                        }
+                        return pattern;
+                    },
+                },
+                {
+                    id: "clusters",
+                    name: "Dot Clusters",
+                    description: "Small constellations of bright pixels.",
+                    defaultEnabled: false,
+                    defaultSamples: 60,
+                    defaultNoise: 0.22,
+                    previewSeed: 97,
+                    generate({ rng, gridSize }) {
+                        const pattern = new Array(gridSize * gridSize).fill(0);
+                        const clusters = 2 + Math.floor(rng() * 3);
+                        for (let c = 0; c < clusters; c++) {
+                            const cx = Math.floor(rng() * gridSize);
+                            const cy = Math.floor(rng() * gridSize);
+                            const size = 1 + Math.floor(rng() * 2);
+                            for (let dy = -size; dy <= size; dy++) {
+                                for (let dx = -size; dx <= size; dx++) {
+                                    if (
+                                        Math.abs(dx) + Math.abs(dy) <= size &&
+                                        rng() > 0.1
+                                    ) {
+                                        const nx = cx + dx;
+                                        const ny = cy + dy;
+                                        if (
+                                            nx >= 0 &&
+                                            nx < gridSize &&
+                                            ny >= 0 &&
+                                            ny < gridSize
+                                        ) {
+                                            pattern[ny * gridSize + nx] = 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        return pattern;
+                    },
+                },
+            ];
+
+            const patternLibraryById = new Map();
+            for (const family of patternLibrary) {
+                patternLibraryById.set(family.id, family);
+            }
+
+            const datasetConfig = new Map(
+                patternLibrary.map((family) => [
+                    family.id,
+                    {
+                        enabled: family.defaultEnabled,
+                        samples: family.defaultSamples,
+                        noise: family.defaultNoise,
+                    },
+                ]),
+            );
+
+            let activeFamilies = [];
+            let classNames = [];
+            let totalSamples = 0;
+            const patternFamilyElements = new Map();
+            let datasetUpdateTimeout = null;
+            let customSketchpad = null;
+            let drawSketchpad = null;
+
+            function registerCustomPatternFamily({
+                name,
+                prototypes,
+                samples,
+                noise,
+            }) {
+                if (!prototypes || prototypes.length === 0) {
+                    return null;
+                }
+
+                const id = `custom_${Date.now()}_${Math.floor(
+                    Math.random() * 100000,
+                )}`;
+                const family = {
+                    id,
+                    name,
+                    description: `Custom pattern with ${prototypes.length} variations.`,
+                    defaultEnabled: true,
+                    defaultSamples: samples,
+                    defaultNoise: noise,
+                    previewSeed: Math.floor(Math.random() * 1e9),
+                    isCustom: true,
+                    prototypes: prototypes.map((pattern) => pattern.slice()),
+                    generate({ rng }) {
+                        if (!this.prototypes.length) {
+                            return new Array(GRID_SIZE * GRID_SIZE).fill(0);
+                        }
+                        const choice = Math.floor(rng() * this.prototypes.length);
+                        return this.prototypes[choice].slice();
+                    },
+                };
+
+                patternLibrary.push(family);
+                patternLibraryById.set(id, family);
+                datasetConfig.set(id, {
+                    enabled: true,
+                    samples,
+                    noise,
+                });
+
+                return family;
+            }
+
+            function removePatternFamily(familyId) {
+                const family = patternLibraryById.get(familyId);
+                if (!family || !family.isCustom) {
+                    return;
+                }
+
+                const index = patternLibrary.findIndex(
+                    (entry) => entry.id === familyId,
+                );
+                if (index >= 0) {
+                    patternLibrary.splice(index, 1);
+                }
+
+                patternLibraryById.delete(familyId);
+                datasetConfig.delete(familyId);
+                patternFamilyElements.delete(familyId);
+            }
+
+            function createRng(seed) {
+                let value = seed >>> 0;
+                return function () {
+                    value += 0x6d2b79f5;
+                    let t = value;
+                    t = Math.imul(t ^ (t >>> 15), t | 1);
+                    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+                    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+                };
+            }
+
+            function clonePattern(pattern) {
+                return pattern.slice();
+            }
+
+            function flipHorizontal(pattern) {
+                const result = new Array(pattern.length).fill(0);
+                for (let row = 0; row < GRID_SIZE; row++) {
+                    for (let col = 0; col < GRID_SIZE; col++) {
+                        const idx = row * GRID_SIZE + col;
+                        const mirrored = row * GRID_SIZE + (GRID_SIZE - 1 - col);
+                        result[idx] = pattern[mirrored];
+                    }
+                }
+                return result;
+            }
+
+            function flipVertical(pattern) {
+                const result = new Array(pattern.length).fill(0);
+                for (let row = 0; row < GRID_SIZE; row++) {
+                    for (let col = 0; col < GRID_SIZE; col++) {
+                        const idx = row * GRID_SIZE + col;
+                        const mirrored =
+                            (GRID_SIZE - 1 - row) * GRID_SIZE + col;
+                        result[idx] = pattern[mirrored];
+                    }
+                }
+                return result;
+            }
+
+            function transposePattern(pattern) {
+                const result = new Array(pattern.length).fill(0);
+                for (let row = 0; row < GRID_SIZE; row++) {
+                    for (let col = 0; col < GRID_SIZE; col++) {
+                        result[col * GRID_SIZE + row] =
+                            pattern[row * GRID_SIZE + col];
+                    }
+                }
+                return result;
+            }
+
+            function shiftPattern(pattern, dx, dy) {
+                if (dx === 0 && dy === 0) return clonePattern(pattern);
+                const result = new Array(pattern.length).fill(0);
+                for (let row = 0; row < GRID_SIZE; row++) {
+                    for (let col = 0; col < GRID_SIZE; col++) {
+                        const newRow = row + dy;
+                        const newCol = col + dx;
+                        if (
+                            newRow >= 0 &&
+                            newRow < GRID_SIZE &&
+                            newCol >= 0 &&
+                            newCol < GRID_SIZE
+                        ) {
+                            result[newRow * GRID_SIZE + newCol] =
+                                pattern[row * GRID_SIZE + col];
+                        }
+                    }
+                }
+                return result;
+            }
+
+            function applyRandomTransforms(pattern, rng) {
+                let result = clonePattern(pattern);
+                if (rng() < 0.5) {
+                    result = flipHorizontal(result);
+                }
+                if (rng() < 0.5) {
+                    result = flipVertical(result);
+                }
+                if (rng() < 0.25) {
+                    result = transposePattern(result);
+                }
+                const shiftX = Math.floor(rng() * 3) - 1;
+                const shiftY = Math.floor(rng() * 3) - 1;
+                if (shiftX !== 0 || shiftY !== 0) {
+                    result = shiftPattern(result, shiftX, shiftY);
+                }
+                return result;
+            }
+
+            function applyNoise(pattern, noiseLevel, rng) {
+                const result = clonePattern(pattern);
+                if (noiseLevel <= 0) return result;
+                for (let i = 0; i < result.length; i++) {
+                    if (rng() < noiseLevel) {
+                        result[i] = result[i] === 1 ? 0 : 1;
+                    }
+                }
+
+                // Occasional dilation/erosion to create structured noise
+                if (noiseLevel > 0.18 && rng() < 0.4) {
+                    const dilated = clonePattern(result);
+                    for (let row = 0; row < GRID_SIZE; row++) {
+                        for (let col = 0; col < GRID_SIZE; col++) {
+                            const idx = row * GRID_SIZE + col;
+                            if (result[idx] === 1) {
+                                continue;
+                            }
+                            let neighbors = 0;
+                            for (let dy = -1; dy <= 1; dy++) {
+                                for (let dx = -1; dx <= 1; dx++) {
+                                    const nr = row + dy;
+                                    const nc = col + dx;
+                                    if (
+                                        nr >= 0 &&
+                                        nr < GRID_SIZE &&
+                                        nc >= 0 &&
+                                        nc < GRID_SIZE &&
+                                        !(dx === 0 && dy === 0)
+                                    ) {
+                                        neighbors += result[nr * GRID_SIZE + nc];
+                                    }
+                                }
+                            }
+                            if (neighbors >= 5) {
+                                dilated[idx] = 1;
+                            }
+                        }
+                    }
+                    return dilated;
+                }
+
+                return result;
+            }
+
+            function renderPatternPreview(element, basePattern, noisyPattern) {
+                element.innerHTML = "";
+                for (let i = 0; i < basePattern.length; i++) {
+                    const cell = document.createElement("div");
+                    if (noisyPattern[i] === 1) {
+                        cell.classList.add("filled");
+                    }
+                    if (noisyPattern[i] !== basePattern[i]) {
+                        cell.classList.add("changed");
+                    }
+                    element.appendChild(cell);
+                }
+            }
+
+            function updatePatternFamilyStats(familyId) {
+                const config = datasetConfig.get(familyId);
+                const elements = patternFamilyElements.get(familyId);
+                const family = patternLibraryById.get(familyId);
+                if (!config || !elements) return;
+                const noisePercent = Math.round(config.noise * 100);
+                let statsText = `${config.samples} samples · ${noisePercent}% noise`;
+                if (family && Array.isArray(family.prototypes)) {
+                    statsText += ` · ${family.prototypes.length} variations`;
+                }
+                if (elements.statsLabel) {
+                    elements.statsLabel.textContent = statsText;
+                }
+                if (elements.noiseValue) {
+                    elements.noiseValue.textContent = `${noisePercent}%`;
+                }
+                if (elements.sampleValue) {
+                    elements.sampleValue.textContent = config.samples;
+                }
+            }
+
+            function updatePatternFamilyPreview(familyId) {
+                const family = patternLibraryById.get(familyId);
+                const elements = patternFamilyElements.get(familyId);
+                if (!family || !elements) return;
+                const config = datasetConfig.get(familyId);
+                const rng = createRng(family.previewSeed);
+                if (
+                    family.prototypes &&
+                    Array.isArray(family.prototypes) &&
+                    family.prototypes.length === 0
+                ) {
+                    elements.preview.innerHTML =
+                        "<div style=\"font-size:10px;color:#555;padding:6px;text-align:center;\">Add variations</div>";
+                    return;
+                }
+                const base = applyRandomTransforms(
+                    family.generate({ rng, gridSize: GRID_SIZE }),
+                    rng,
+                );
+                const noisy = applyNoise(base, config.noise, rng);
+                renderPatternPreview(elements.preview, base, noisy);
+            }
+
+            function updateAllPatternPreviews() {
+                for (const family of patternLibrary) {
+                    updatePatternFamilyPreview(family.id);
+                    updatePatternFamilyStats(family.id);
+                }
+            }
+
+            function updateDatasetSummaries() {
+                classCountText.textContent = activeFamilies.length;
+                sampleCountText.textContent = totalSamples;
+                outputCountLabel.textContent = activeFamilies.length;
+                outputCountDrawLabel.textContent = activeFamilies.length;
+            }
+
+            function renderClassGallery() {
+                classGalleryEl.innerHTML = "";
+                if (activeFamilies.length === 0) {
+                    const card = document.createElement("div");
+                    card.className = "class-card";
+                    const title = document.createElement("h4");
+                    title.textContent = "NO DATA";
+                    card.appendChild(title);
+                    const message = document.createElement("div");
+                    message.style.fontSize = "11px";
+                    message.style.color = "#555";
+                    message.textContent =
+                        "Enable pattern families to generate a dataset.";
+                    card.appendChild(message);
+                    classGalleryEl.appendChild(card);
+                    return;
+                }
+
+                for (const entry of activeFamilies) {
+                    const { family, config } = entry;
+                    const card = document.createElement("div");
+                    card.className = "class-card";
+                    const title = document.createElement("h4");
+                    title.textContent = family.name.toUpperCase();
+                    card.appendChild(title);
+                    const preview = document.createElement("div");
+                    preview.className = "class-preview-grid";
+                    card.appendChild(preview);
+                    const meta = document.createElement("div");
+                    meta.style.fontSize = "10px";
+                    meta.style.color = "#000";
+                    let metaText = `${config.samples} samples · ${Math.round(
+                        config.noise * 100,
+                    )}% noise`;
+                    if (family.prototypes) {
+                        metaText += ` · ${family.prototypes.length} variations`;
+                    }
+                    meta.textContent = metaText;
+                    card.appendChild(meta);
+                    const rng = createRng(family.previewSeed + 1337);
+                    const base = applyRandomTransforms(
+                        family.generate({ rng, gridSize: GRID_SIZE }),
+                        rng,
+                    );
+                    const noisy = applyNoise(base, config.noise, rng);
+                    renderPatternPreview(preview, base, noisy);
+                    classGalleryEl.appendChild(card);
+                }
+            }
+
+            function scheduleDatasetUpdate(immediate = false) {
+                if (immediate) {
+                    if (datasetUpdateTimeout) {
+                        clearTimeout(datasetUpdateTimeout);
+                        datasetUpdateTimeout = null;
+                    }
+                    regenerateDataset();
+                    return;
+                }
+                if (datasetUpdateTimeout) {
+                    clearTimeout(datasetUpdateTimeout);
+                }
+                datasetUpdateTimeout = setTimeout(() => {
+                    datasetUpdateTimeout = null;
+                    regenerateDataset();
+                }, 180);
+            }
+
+            function buildPatternLibraryUI() {
+                patternFamilyListEl.innerHTML = "";
+                patternFamilyElements.clear();
+
+                for (const family of patternLibrary) {
+                    const config = datasetConfig.get(family.id);
+                    const container = document.createElement("div");
+                    container.className = "pattern-family";
+                    if (!config.enabled) {
+                        container.classList.add("disabled");
+                    }
+
+                    const header = document.createElement("div");
+                    header.className = "pattern-family-header";
+
+                    const label = document.createElement("label");
+                    const checkbox = document.createElement("input");
+                    checkbox.type = "checkbox";
+                    checkbox.checked = config.enabled;
+                    label.appendChild(checkbox);
+                    const nameSpan = document.createElement("span");
+                    nameSpan.textContent = family.name.toUpperCase();
+                    label.appendChild(nameSpan);
+                    header.appendChild(label);
+
+                    const stats = document.createElement("div");
+                    stats.style.fontSize = "10px";
+                    stats.style.color = "#000";
+                    header.appendChild(stats);
+
+                    if (family.isCustom) {
+                        const removeBtn = document.createElement("button");
+                        removeBtn.type = "button";
+                        removeBtn.className = "secondary tiny remove-family";
+                        removeBtn.textContent = "Remove";
+                        removeBtn.addEventListener("click", (event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            removePatternFamily(family.id);
+                            buildPatternLibraryUI();
+                            regenerateDataset();
+                        });
+                        header.appendChild(removeBtn);
+                    }
+
+                    container.appendChild(header);
+
+                    if (family.description) {
+                        const description = document.createElement("div");
+                        description.style.fontSize = "11px";
+                        description.style.color = "#444";
+                        description.textContent = family.description;
+                        container.appendChild(description);
+                    }
+
+                    const body = document.createElement("div");
+                    body.className = "pattern-family-body";
+
+                    const preview = document.createElement("div");
+                    preview.className = "pattern-preview-grid small";
+                    body.appendChild(preview);
+
+                    const controls = document.createElement("div");
+                    controls.className = "pattern-controls";
+
+                    const sampleWrapper = document.createElement("div");
+                    const sampleLabel = document.createElement("label");
+                    sampleLabel.textContent = "Samples";
+                    const sampleInput = document.createElement("input");
+                    sampleInput.type = "range";
+                    sampleInput.min = "24";
+                    sampleInput.max = "240";
+                    sampleInput.step = "12";
+                    sampleInput.value = config.samples;
+                    const sampleValue = document.createElement("span");
+                    sampleValue.className = "value";
+                    sampleWrapper.appendChild(sampleLabel);
+                    sampleWrapper.appendChild(sampleInput);
+                    sampleWrapper.appendChild(sampleValue);
+                    controls.appendChild(sampleWrapper);
+
+                    const noiseWrapper = document.createElement("div");
+                    const noiseLabel = document.createElement("label");
+                    noiseLabel.textContent = "Noise";
+                    const noiseInput = document.createElement("input");
+                    noiseInput.type = "range";
+                    noiseInput.min = "0";
+                    noiseInput.max = "0.45";
+                    noiseInput.step = "0.01";
+                    noiseInput.value = config.noise;
+                    const noiseValue = document.createElement("span");
+                    noiseValue.className = "value";
+                    noiseWrapper.appendChild(noiseLabel);
+                    noiseWrapper.appendChild(noiseInput);
+                    noiseWrapper.appendChild(noiseValue);
+                    controls.appendChild(noiseWrapper);
+
+                    body.appendChild(controls);
+                    container.appendChild(body);
+
+                    patternFamilyListEl.appendChild(container);
+
+                    patternFamilyElements.set(family.id, {
+                        container,
+                        checkbox,
+                        sampleInput,
+                        sampleValue,
+                        noiseInput,
+                        noiseValue,
+                        preview,
+                        statsLabel: stats,
+                    });
+
+                    checkbox.addEventListener("change", () => {
+                        datasetConfig.get(family.id).enabled = checkbox.checked;
+                        container.classList.toggle("disabled", !checkbox.checked);
+                        updatePatternFamilyStats(family.id);
+                        scheduleDatasetUpdate(true);
+                    });
+
+                    sampleInput.addEventListener("input", () => {
+                        datasetConfig.get(family.id).samples = parseInt(
+                            sampleInput.value,
+                            10,
+                        );
+                        updatePatternFamilyStats(family.id);
+                        scheduleDatasetUpdate();
+                    });
+
+                    noiseInput.addEventListener("input", () => {
+                        datasetConfig.get(family.id).noise = parseFloat(
+                            noiseInput.value,
+                        );
+                        updatePatternFamilyStats(family.id);
+                        updatePatternFamilyPreview(family.id);
+                        scheduleDatasetUpdate();
+                    });
+                }
+
+                updateAllPatternPreviews();
+            }
+
             function updateNetworkDiagram() {
                 // Update hidden layer count
                 document.getElementById("hiddenCount").textContent =
@@ -1277,6 +2076,28 @@ where:
                     node.className = "node hidden";
                     hiddenLayerViz.appendChild(node);
                 }
+
+                // Update output layer visualization
+                outputCountLabel.textContent = activeFamilies.length;
+                outputCountDrawLabel.textContent = activeFamilies.length;
+                const outputLayerViz = document.getElementById(
+                    "outputLayerViz",
+                );
+                outputLayerViz.innerHTML = "";
+
+                if (activeFamilies.length === 0) {
+                    const placeholder = document.createElement("div");
+                    placeholder.style.fontSize = "10px";
+                    placeholder.style.color = "#555";
+                    placeholder.textContent = "—";
+                    outputLayerViz.appendChild(placeholder);
+                } else {
+                    for (let i = 0; i < activeFamilies.length; i++) {
+                        const node = document.createElement("div");
+                        node.className = "node output";
+                        outputLayerViz.appendChild(node);
+                    }
+                }
             }
 
             function resizePatternCanvas() {
@@ -1286,7 +2107,9 @@ where:
                 // Calculate required height based on samples
                 const topPadding = 30;
                 const cols = 25;
-                const rows = Math.ceil((trainingData.length || 300) / cols);
+                const estimatedSamples =
+                    trainingData.length || Math.max(totalSamples, cols);
+                const rows = Math.max(1, Math.ceil(estimatedSamples / cols));
                 const cellSize = rect.width / cols;
                 const requiredHeight = topPadding + (rows * cellSize);
 
@@ -1330,94 +2153,99 @@ where:
 
             function generatePatterns() {
                 trainingData = [];
+                activeFamilies = [];
+                classNames = [];
+                totalSamples = 0;
 
-                // Class 0: Horizontal stripes
-                for (let i = 0; i < 75; i++) {
-                    const pattern = new Array(GRID_SIZE * GRID_SIZE).fill(0);
-                    const offset = Math.floor(Math.random() * 2); // Random 0 or 1
-                    for (let row = 0; row < GRID_SIZE; row++) {
-                        if ((row + offset) % 2 === 0) {
-                            for (let col = 0; col < GRID_SIZE; col++) {
-                                if (Math.random() > 0.15)
-                                    pattern[row * GRID_SIZE + col] = 1;
-                            }
-                        } else {
-                            for (let col = 0; col < GRID_SIZE; col++) {
-                                if (Math.random() > 0.85)
-                                    pattern[row * GRID_SIZE + col] = 1;
-                            }
-                        }
+                const active = [];
+                for (const family of patternLibrary) {
+                    const config = datasetConfig.get(family.id);
+                    if (config && config.enabled && config.samples > 0) {
+                        active.push({ family, config });
                     }
-                    trainingData.push({ input: pattern, label: 0 });
                 }
 
-                // Class 1: Vertical stripes
-                for (let i = 0; i < 75; i++) {
-                    const pattern = new Array(GRID_SIZE * GRID_SIZE).fill(0);
-                    const offset = Math.floor(Math.random() * 2); // Random 0 or 1
-                    for (let row = 0; row < GRID_SIZE; row++) {
-                        for (let col = 0; col < GRID_SIZE; col++) {
-                            if ((col + offset) % 2 === 0) {
-                                if (Math.random() > 0.15)
-                                    pattern[row * GRID_SIZE + col] = 1;
-                            } else {
-                                if (Math.random() > 0.85)
-                                    pattern[row * GRID_SIZE + col] = 1;
-                            }
-                        }
-                    }
-                    trainingData.push({ input: pattern, label: 1 });
+                activeFamilies = active.map(({ family, config }) => ({
+                    family,
+                    config,
+                }));
+                classNames = activeFamilies.map(({ family }) => family.name);
+                totalSamples = activeFamilies.reduce(
+                    (sum, { config }) => sum + config.samples,
+                    0,
+                );
+
+                if (activeFamilies.length === 0) {
+                    renderClassGallery();
+                    updateDatasetSummaries();
+                    return;
                 }
 
-                // Class 2: Diagonal (both orientations)
-                for (let i = 0; i < 75; i++) {
-                    const pattern = new Array(GRID_SIZE * GRID_SIZE).fill(0);
-                    const offset = Math.floor(Math.random() * 3) - 1; // Random -1, 0, or 1
-                    const flipped = Math.random() > 0.5; // Randomly choose orientation
+                const baseSeed = Math.floor(Math.random() * 1e9);
 
-                    for (let row = 0; row < GRID_SIZE; row++) {
-                        for (let col = 0; col < GRID_SIZE; col++) {
-                            const dist = flipped
-                                ? Math.abs(row + col - (GRID_SIZE - 1) - offset)
-                                : Math.abs(row - col - offset);
-                            if (dist <= 2) {
-                                if (Math.random() > 0.2)
-                                    pattern[row * GRID_SIZE + col] = 1;
-                            } else {
-                                if (Math.random() > 0.9)
-                                    pattern[row * GRID_SIZE + col] = 1;
-                            }
-                        }
+                activeFamilies.forEach(({ family, config }, classIndex) => {
+                    for (let i = 0; i < config.samples; i++) {
+                        const rng = createRng(
+                            baseSeed + classIndex * 9973 + i * 53,
+                        );
+                        const basePattern = applyRandomTransforms(
+                            family.generate({ rng, gridSize: GRID_SIZE }),
+                            rng,
+                        );
+                        const noisyPattern = applyNoise(
+                            basePattern,
+                            config.noise,
+                            rng,
+                        );
+                        trainingData.push({
+                            input: noisyPattern,
+                            label: classIndex,
+                            familyId: family.id,
+                        });
                     }
-                    trainingData.push({ input: pattern, label: 2 });
+                });
+
+                for (let i = trainingData.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [trainingData[i], trainingData[j]] = [
+                        trainingData[j],
+                        trainingData[i],
+                    ];
                 }
 
-                // Class 3: Checkerboard
-                for (let i = 0; i < 75; i++) {
-                    const pattern = new Array(GRID_SIZE * GRID_SIZE).fill(0);
-                    const offset = Math.floor(Math.random() * 2); // Random 0 or 1
-                    for (let row = 0; row < GRID_SIZE; row++) {
-                        for (let col = 0; col < GRID_SIZE; col++) {
-                            if ((row + col + offset) % 2 === 0) {
-                                if (Math.random() > 0.15)
-                                    pattern[row * GRID_SIZE + col] = 1;
-                            } else {
-                                if (Math.random() > 0.85)
-                                    pattern[row * GRID_SIZE + col] = 1;
-                            }
-                        }
-                    }
-                    trainingData.push({ input: pattern, label: 3 });
+                renderClassGallery();
+                updateDatasetSummaries();
+            }
+
+            function regenerateDataset({ resetNetwork = true } = {}) {
+                patternRunning = false;
+                document.getElementById("patternStartBtn").textContent =
+                    "START LEARNING";
+                lastFrameTime = 0;
+                stepAccumulator = 0;
+
+                generatePatterns();
+
+                if (resetNetwork) {
+                    initPatternNetwork();
                 }
+
+                updateNetworkDiagram();
+                resizePatternCanvas();
+                drawPattern();
+                visualizeWeights();
+                drawLossLandscape();
+                updatePatternStats();
+                classifyDrawing();
             }
 
             function initPatternNetwork() {
                 const inputSize = GRID_SIZE * GRID_SIZE;
-                const outputSize = 4;
+                const outputSize = activeFamilies.length;
 
                 // He initialization for ReLU: std = sqrt(2 / fan_in)
                 const std_W1 = Math.sqrt(2 / inputSize);
-                const std_W2 = Math.sqrt(2 / hiddenUnits);
+                const std_W2 = Math.sqrt(2 / Math.max(hiddenUnits, 1));
 
                 W1 = [];
                 for (let i = 0; i < hiddenUnits; i++) {
@@ -1459,12 +2287,17 @@ where:
 
                 // Initialize with random batch for visualization
                 currentBatchIndices = [];
-                while (currentBatchIndices.length < 4) {
+                const desiredBatch = Math.min(4, trainingData.length);
+                const usedIndices = new Set();
+                while (currentBatchIndices.length < desiredBatch) {
                     const idx = Math.floor(Math.random() * trainingData.length);
-                    if (!currentBatchIndices.includes(idx)) {
+                    if (!usedIndices.has(idx)) {
+                        usedIndices.add(idx);
                         currentBatchIndices.push(idx);
                     }
                 }
+
+                classifyDrawing();
             }
 
             // Track 2D projection of weights for visualization
@@ -1487,35 +2320,43 @@ where:
                 }
 
                 // Output layer
-                const output = new Array(4);
-                const outputRaw = new Array(4);
-                for (let i = 0; i < 4; i++) {
-                    let sum = b2[i];
-                    for (let j = 0; j < hiddenUnits; j++) {
-                        sum += W2[i][j] * hidden[j];
-                    }
-                    outputRaw[i] = sum;
-                }
+                const outputSize = W2.length;
+                const output = new Array(outputSize).fill(0);
+                const outputRaw = new Array(outputSize).fill(0);
 
-                // Softmax
-                const maxVal = Math.max(...outputRaw);
-                const expVals = outputRaw.map((x) => Math.exp(x - maxVal));
-                const sumExp = expVals.reduce((a, b) => a + b, 0);
-                for (let i = 0; i < 4; i++) {
-                    output[i] = expVals[i] / sumExp;
+                if (outputSize > 0) {
+                    for (let i = 0; i < outputSize; i++) {
+                        let sum = b2[i];
+                        for (let j = 0; j < hiddenUnits; j++) {
+                            sum += W2[i][j] * hidden[j];
+                        }
+                        outputRaw[i] = sum;
+                    }
+
+                    const maxVal = Math.max(...outputRaw);
+                    const expVals = outputRaw.map((x) => Math.exp(x - maxVal));
+                    const sumExp = expVals.reduce((a, b) => a + b, 0) || 1;
+                    for (let i = 0; i < outputSize; i++) {
+                        output[i] = expVals[i] / sumExp;
+                    }
                 }
 
                 return { hidden, hiddenRaw, output, outputRaw };
             }
 
             function patternSGDStep() {
+                if (trainingData.length === 0 || W2.length === 0) {
+                    return;
+                }
+
                 // Sample random batch
                 const batchIndices = [];
                 const batch = [];
                 const usedIndices = new Set();
 
                 // Sample 4 random examples for the batch
-                while (batch.length < 4) {
+                const desiredBatch = Math.min(4, trainingData.length);
+                while (batch.length < desiredBatch) {
                     const idx = Math.floor(Math.random() * trainingData.length);
                     if (!usedIndices.has(idx)) {
                         usedIndices.add(idx);
@@ -1529,6 +2370,7 @@ where:
 
                 // Process each sample in batch
                 const allGradients = { W1: [], b1: [], W2: [], b2: [] };
+                const outputSize = W2.length;
 
                 for (const sample of batch) {
                     const input = sample.input;
@@ -1539,13 +2381,14 @@ where:
                         forwardPass(input);
 
                     // Compute output gradient (cross-entropy + softmax)
-                    const outputGrad = [...output];
-                    outputGrad[label] -= 1;
+                    const outputGrad = output.map((value, idx) =>
+                        idx === label ? value - 1 : value,
+                    );
 
                     // Backprop to hidden layer
                     const hiddenGrad = new Array(hiddenUnits).fill(0);
                     for (let i = 0; i < hiddenUnits; i++) {
-                        for (let j = 0; j < 4; j++) {
+                        for (let j = 0; j < outputSize; j++) {
                             hiddenGrad[i] += outputGrad[j] * W2[j][i];
                         }
                         hiddenGrad[i] *= reluDerivative(hiddenRaw[i]);
@@ -1556,10 +2399,10 @@ where:
                         allGradients.W1 = W1.map((row) => row.map(() => 0));
                         allGradients.b1 = new Array(hiddenUnits).fill(0);
                         allGradients.W2 = W2.map((row) => row.map(() => 0));
-                        allGradients.b2 = new Array(4).fill(0);
+                        allGradients.b2 = new Array(outputSize).fill(0);
                     }
 
-                    for (let i = 0; i < 4; i++) {
+                    for (let i = 0; i < outputSize; i++) {
                         for (let j = 0; j < hiddenUnits; j++) {
                             allGradients.W2[i][j] += outputGrad[i] * hidden[j];
                         }
@@ -1594,7 +2437,7 @@ where:
                 // Store W2 gradients
                 currentGradientsW2 = [];
                 let stepMaxGradW2 = 0;
-                for (let i = 0; i < 4; i++) {
+                for (let i = 0; i < outputSize; i++) {
                     currentGradientsW2[i] = [];
                     for (let j = 0; j < hiddenUnits; j++) {
                         const grad = Math.abs(
@@ -1612,7 +2455,7 @@ where:
                 }
 
                 // Apply gradients
-                for (let i = 0; i < 4; i++) {
+                for (let i = 0; i < outputSize; i++) {
                     for (let j = 0; j < hiddenUnits; j++) {
                         W2[i][j] -=
                             (patternLearningRate * allGradients.W2[i][j]) /
@@ -1646,15 +2489,29 @@ where:
             }
 
             function computePatternStats() {
+                if (trainingData.length === 0 || W2.length === 0) {
+                    return { loss: 0, accuracy: 0 };
+                }
+
                 let totalLoss = 0;
                 let correct = 0;
 
                 for (const sample of trainingData) {
                     const { output } = forwardPass(sample.input);
-                    const predicted = output.indexOf(Math.max(...output));
+                    if (output.length === 0) continue;
+
+                    let predicted = 0;
+                    let maxVal = -Infinity;
+                    for (let i = 0; i < output.length; i++) {
+                        if (output[i] > maxVal) {
+                            maxVal = output[i];
+                            predicted = i;
+                        }
+                    }
                     if (predicted === sample.label) correct++;
 
-                    totalLoss += -Math.log(output[sample.label] + 1e-10);
+                    const prob = output[sample.label] || 1e-10;
+                    totalLoss += -Math.log(prob + 1e-10);
                 }
 
                 return {
@@ -1670,13 +2527,6 @@ where:
 
                 patternCtx.fillStyle = "#fff";
                 patternCtx.fillRect(0, 0, width, height);
-
-                const classNames = [
-                    "H-Stripe",
-                    "V-Stripe",
-                    "Diagonal",
-                    "Checker",
-                ];
 
                 // Draw legend at top
                 patternCtx.font = "11px 'Berkeley Mono', monospace";
@@ -1696,9 +2546,20 @@ where:
                 patternCtx.font = "11px 'Berkeley Mono', monospace";
                 patternCtx.fillText("BATCH", 185, 15);
 
+                if (trainingData.length === 0) {
+                    patternCtx.font = "13px 'Berkeley Mono', monospace";
+                    patternCtx.fillStyle = "#555";
+                    patternCtx.fillText(
+                        "No samples yet. Enable pattern families to see data.",
+                        10,
+                        55,
+                    );
+                    return;
+                }
+
                 const topPadding = 30;
                 const cols = 25;
-                const rows = Math.ceil(trainingData.length / cols);
+                const rows = Math.max(1, Math.ceil(trainingData.length / cols));
                 const cellSize = width / cols;
                 const pixelSize = cellSize / GRID_SIZE;
 
@@ -1713,8 +2574,16 @@ where:
 
                     // Predict and check correctness
                     const { output } = forwardPass(sample.input);
-                    const predicted = output.indexOf(Math.max(...output));
-                    const isCorrect = predicted === sample.label;
+                    let predicted = -1;
+                    let maxVal = -Infinity;
+                    for (let idx = 0; idx < output.length; idx++) {
+                        if (output[idx] > maxVal) {
+                            maxVal = output[idx];
+                            predicted = idx;
+                        }
+                    }
+                    const isCorrect =
+                        predicted === sample.label && predicted !== -1;
 
                     // Draw pattern (very small)
                     for (let py = 0; py < GRID_SIZE; py++) {
@@ -1780,7 +2649,7 @@ where:
                 for (let h = 0; h < hiddenUnits; h++) {
                     allWeights.push(...W1[h]);
                 }
-                for (let i = 0; i < 4; i++) {
+                for (let i = 0; i < W2.length; i++) {
                     allWeights.push(...W2[i]);
                 }
                 const min = Math.min(...allWeights);
@@ -1789,7 +2658,7 @@ where:
 
                 // Total weights: W1 (64 * hiddenUnits) + W2 (4 * hiddenUnits)
                 const totalW1 = 64 * hiddenUnits;
-                const totalW2 = 4 * hiddenUnits;
+                const totalW2 = W2.length * hiddenUnits;
                 const totalWeights = totalW1 + totalW2;
 
                 // Layout as a grid with padding
@@ -1830,7 +2699,7 @@ where:
                 }
 
                 // Draw W2 weights
-                for (let outClass = 0; outClass < 4; outClass++) {
+                for (let outClass = 0; outClass < W2.length; outClass++) {
                     for (let h = 0; h < hiddenUnits; h++) {
                         const weight = W2[outClass][h];
                         const normalized = range > 0 ? (weight - min) / range : 0.5;
@@ -1839,7 +2708,10 @@ where:
                         let r = intensity, g = intensity, b = intensity;
 
                         // Gradient overlay
-                        if (currentGradientsW2[outClass] && maxGradientNormW2 > 0) {
+                        if (
+                            currentGradientsW2[outClass] &&
+                            maxGradientNormW2 > 0
+                        ) {
                             const gradMag = currentGradientsW2[outClass][h];
                             const normGrad = Math.min(1, gradMag / maxGradientNormW2);
                             r = Math.floor(intensity + (255 - intensity) * normGrad * 0.7);
@@ -2013,6 +2885,19 @@ where:
                 const stats = computePatternStats();
                 document.getElementById("patternIteration").textContent =
                     patternIteration;
+                if (trainingData.length === 0 || W2.length === 0) {
+                    document.getElementById("patternLoss").textContent = "—";
+                    document.getElementById("patternAccuracy").textContent =
+                        "—";
+                    document.getElementById("patternStatus").textContent =
+                        "SELECT PATTERNS";
+                    document.getElementById("patternStatus").style.color =
+                        "#555";
+                    document.getElementById("patternStatus").style.fontWeight =
+                        "normal";
+                    return;
+                }
+
                 document.getElementById("patternLoss").textContent =
                     stats.loss.toFixed(3);
                 document.getElementById("patternAccuracy").textContent =
@@ -2041,6 +2926,13 @@ where:
 
             function animatePattern(timestamp) {
                 if (!patternRunning) return;
+                if (trainingData.length === 0 || W2.length === 0) {
+                    patternRunning = false;
+                    document.getElementById("patternStartBtn").textContent =
+                        "START LEARNING";
+                    updatePatternStats();
+                    return;
+                }
 
                 // Initialize lastFrameTime on first frame
                 if (lastFrameTime === 0) {
@@ -2078,6 +2970,10 @@ where:
             document
                 .getElementById("patternStartBtn")
                 .addEventListener("click", () => {
+                    if (trainingData.length === 0 || W2.length === 0) {
+                        updatePatternStats();
+                        return;
+                    }
                     patternRunning = !patternRunning;
                     const btn = document.getElementById("patternStartBtn");
                     if (patternRunning) {
@@ -2149,46 +3045,163 @@ where:
                     }
                 });
 
-            // ============================================
-            // DRAWING INTERFACE
-            // ============================================
-            const drawCanvasContainer = document.getElementById("drawCanvas");
-            let drawState = new Array(GRID_SIZE * GRID_SIZE).fill(0);
-            let isDrawing = false;
-            let drawMode = 1; // 1 = drawing, 0 = erasing
+            regenerateDatasetBtn.addEventListener("click", () => {
+                regenerateDataset();
+            });
 
-            // Initialize drawing canvas
-            function initDrawCanvas() {
-                drawCanvasContainer.innerHTML = "";
+            // ============================================
+            // PIXEL SKETCHPAD UTILITIES
+            // ============================================
+            function createPixelSketchpad(container, options = {}) {
+                let changeHandler = options.onChange || null;
+                let state = options.initialState
+                    ? options.initialState.slice()
+                    : new Array(GRID_SIZE * GRID_SIZE).fill(0);
+
+                container.innerHTML = "";
+                const pixels = [];
                 for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
                     const pixel = document.createElement("div");
                     pixel.className = "draw-pixel";
                     pixel.dataset.index = i;
-                    drawCanvasContainer.appendChild(pixel);
+                    container.appendChild(pixel);
+                    pixels.push(pixel);
                 }
-            }
 
-            function updateDrawCanvas() {
-                const pixels =
-                    drawCanvasContainer.querySelectorAll(".draw-pixel");
-                pixels.forEach((pixel, i) => {
-                    if (drawState[i] === 1) {
-                        pixel.classList.add("active");
+                function updatePixel(index) {
+                    if (state[index] === 1) {
+                        pixels[index].classList.add("active");
                     } else {
-                        pixel.classList.remove("active");
+                        pixels[index].classList.remove("active");
+                    }
+                }
+
+                function syncAll() {
+                    for (let i = 0; i < state.length; i++) {
+                        updatePixel(i);
+                    }
+                }
+
+                function emitChange() {
+                    if (typeof changeHandler === "function") {
+                        changeHandler(state.slice());
+                    }
+                }
+
+                let isDrawing = false;
+                let drawMode = 1;
+
+                function handleIndexChange(index, value) {
+                    const nextValue =
+                        typeof value === "number"
+                            ? value
+                            : state[index] === 1
+                            ? 0
+                            : 1;
+                    if (state[index] === nextValue) {
+                        return;
+                    }
+                    state[index] = nextValue;
+                    updatePixel(index);
+                    emitChange();
+                }
+
+                container.addEventListener("mousedown", (event) => {
+                    if (event.target.classList.contains("draw-pixel")) {
+                        const index = parseInt(event.target.dataset.index, 10);
+                        isDrawing = true;
+                        drawMode = state[index] === 1 ? 0 : 1;
+                        handleIndexChange(index, drawMode);
                     }
                 });
+
+                container.addEventListener("mouseover", (event) => {
+                    if (isDrawing && event.target.classList.contains("draw-pixel")) {
+                        const index = parseInt(event.target.dataset.index, 10);
+                        if (state[index] !== drawMode) {
+                            handleIndexChange(index, drawMode);
+                        }
+                    }
+                });
+
+                document.addEventListener("mouseup", () => {
+                    isDrawing = false;
+                });
+
+                container.addEventListener("touchstart", (event) => {
+                    event.preventDefault();
+                    const touch = event.touches[0];
+                    const element = document.elementFromPoint(
+                        touch.clientX,
+                        touch.clientY,
+                    );
+                    if (element && element.classList.contains("draw-pixel")) {
+                        const index = parseInt(element.dataset.index, 10);
+                        isDrawing = true;
+                        drawMode = state[index] === 1 ? 0 : 1;
+                        handleIndexChange(index, drawMode);
+                    }
+                });
+
+                container.addEventListener("touchmove", (event) => {
+                    event.preventDefault();
+                    if (!isDrawing) return;
+                    const touch = event.touches[0];
+                    const element = document.elementFromPoint(
+                        touch.clientX,
+                        touch.clientY,
+                    );
+                    if (element && element.classList.contains("draw-pixel")) {
+                        const index = parseInt(element.dataset.index, 10);
+                        if (state[index] !== drawMode) {
+                            handleIndexChange(index, drawMode);
+                        }
+                    }
+                });
+
+                document.addEventListener("touchend", () => {
+                    isDrawing = false;
+                });
+
+                syncAll();
+
+                return {
+                    getState() {
+                        return state.slice();
+                    },
+                    setState(newState) {
+                        state = newState.slice();
+                        syncAll();
+                        emitChange();
+                    },
+                    clear() {
+                        let changed = false;
+                        for (let i = 0; i < state.length; i++) {
+                            if (state[i] !== 0) {
+                                state[i] = 0;
+                                changed = true;
+                            }
+                        }
+                        if (changed) {
+                            syncAll();
+                            emitChange();
+                        } else {
+                            syncAll();
+                        }
+                    },
+                    setOnChange(handler) {
+                        changeHandler = handler;
+                    },
+                };
             }
 
             function classifyDrawing() {
-                const classNames = [
-                    "H-Stripe",
-                    "V-Stripe",
-                    "Diagonal",
-                    "Checker",
-                ];
+                if (!drawSketchpad) {
+                    return;
+                }
 
-                // Check if anything is drawn
+                const drawState = drawSketchpad.getState();
+
                 if (drawState.every((v) => v === 0)) {
                     document.getElementById("drawPrediction").textContent = "—";
                     document.getElementById("drawConfidence").textContent = "—";
@@ -2197,17 +3210,37 @@ where:
                     return;
                 }
 
-                // Classify
+                if (classNames.length === 0 || W2.length === 0) {
+                    document.getElementById("drawPrediction").textContent = "—";
+                    document.getElementById("drawConfidence").textContent = "—";
+                    document.getElementById("activationsViz").innerHTML = "";
+                    const outputContainer = document.getElementById(
+                        "outputActivationsViz",
+                    );
+                    outputContainer.innerHTML =
+                        "<div style=\"font-size:11px;color:#555;\">Add pattern families to enable classification.</div>";
+                    return;
+                }
+
                 const { output, hidden } = forwardPass(drawState);
-                const predicted = output.indexOf(Math.max(...output));
-                const confidence = (output[predicted] * 100).toFixed(1);
+                let predicted = -1;
+                let maxVal = -Infinity;
+                for (let i = 0; i < output.length; i++) {
+                    if (output[i] > maxVal) {
+                        maxVal = output[i];
+                        predicted = i;
+                    }
+                }
+                const confidence =
+                    predicted >= 0 ? (output[predicted] * 100).toFixed(1) : "0.0";
 
                 document.getElementById("drawPrediction").textContent =
-                    classNames[predicted];
+                    predicted >= 0 && classNames[predicted]
+                        ? classNames[predicted]
+                        : "—";
                 document.getElementById("drawConfidence").textContent =
-                    `${confidence}%`;
+                    predicted >= 0 ? `${confidence}%` : "—";
 
-                // Visualize hidden layer activations
                 const activationsContainer = document.getElementById("activationsViz");
                 activationsContainer.innerHTML = "";
 
@@ -2234,7 +3267,6 @@ where:
                     activationsContainer.appendChild(cell);
                 }
 
-                // Visualize output layer activations
                 const outputContainer = document.getElementById("outputActivationsViz");
                 outputContainer.innerHTML = "";
 
@@ -2261,7 +3293,7 @@ where:
 
                     const label = document.createElement("div");
                     label.style.fontSize = "8px";
-                    label.textContent = classNames[i].toUpperCase();
+                    label.textContent = (classNames[i] || "?").toUpperCase();
 
                     const value = document.createElement("div");
                     value.textContent = (activation * 100).toFixed(0) + "%";
@@ -2273,100 +3305,219 @@ where:
                 }
             }
 
-            function togglePixel(index) {
-                drawState[index] = drawState[index] === 1 ? 0 : 1;
-                updateDrawCanvas();
-                classifyDrawing();
+            // ============================================
+            // CUSTOM PATTERN BUILDER
+            // ============================================
+            const customPatternCanvasEl = document.getElementById(
+                "customPatternCanvas",
+            );
+            const customPatternAddBtn = document.getElementById("customPatternAdd");
+            const customPatternClearBtn = document.getElementById(
+                "customPatternClear",
+            );
+            const customPatternCreateBtn = document.getElementById(
+                "customPatternCreate",
+            );
+            const customPatternResetBtn = document.getElementById(
+                "customPatternReset",
+            );
+            const customPatternNameInput = document.getElementById(
+                "customPatternName",
+            );
+            const customPatternSamplesInput = document.getElementById(
+                "customPatternSamples",
+            );
+            const customPatternSamplesValue = document.getElementById(
+                "customPatternSamplesValue",
+            );
+            const customPatternNoiseInput = document.getElementById(
+                "customPatternNoise",
+            );
+            const customPatternNoiseValue = document.getElementById(
+                "customPatternNoiseValue",
+            );
+            const customPatternVariantsEl = document.getElementById(
+                "customPatternVariants",
+            );
+            const customPatternMessageEl = document.getElementById(
+                "customPatternMessage",
+            );
+            let customPatternPrototypes = [];
+
+            customSketchpad = createPixelSketchpad(customPatternCanvasEl);
+
+            function setCustomBuilderMessage(text, type = "") {
+                customPatternMessageEl.textContent = text;
+                customPatternMessageEl.classList.remove("error", "success");
+                if (type) {
+                    customPatternMessageEl.classList.add(type);
+                }
             }
 
-            // Mouse events
-            drawCanvasContainer.addEventListener("mousedown", (e) => {
-                if (e.target.classList.contains("draw-pixel")) {
-                    const index = parseInt(e.target.dataset.index);
-                    isDrawing = true;
-                    // Set draw mode based on current pixel state (toggle)
-                    drawMode = drawState[index] === 1 ? 0 : 1;
-                    drawState[index] = drawMode;
-                    updateDrawCanvas();
-                    classifyDrawing();
+            function renderCustomPatternVariants() {
+                customPatternVariantsEl.innerHTML = "";
+                if (customPatternPrototypes.length === 0) {
+                    const placeholder = document.createElement("div");
+                    placeholder.style.fontSize = "11px";
+                    placeholder.style.color = "#555";
+                    placeholder.textContent =
+                        "No variations yet. Sketch a pattern and add it.";
+                    customPatternVariantsEl.appendChild(placeholder);
+                    return;
                 }
-            });
 
-            drawCanvasContainer.addEventListener("mouseover", (e) => {
-                if (isDrawing && e.target.classList.contains("draw-pixel")) {
-                    const index = parseInt(e.target.dataset.index);
-                    if (drawState[index] !== drawMode) {
-                        drawState[index] = drawMode;
-                        updateDrawCanvas();
-                        classifyDrawing();
-                    }
+                customPatternPrototypes.forEach((pattern, index) => {
+                    const variant = document.createElement("div");
+                    variant.className = "custom-variant";
+
+                    const preview = document.createElement("div");
+                    preview.className = "pattern-preview-grid small";
+                    renderPatternPreview(preview, pattern, pattern);
+                    variant.appendChild(preview);
+
+                    const caption = document.createElement("div");
+                    caption.style.fontSize = "10px";
+                    caption.style.color = "#000";
+                    caption.textContent = `Variation ${index + 1}`;
+                    variant.appendChild(caption);
+
+                    const removeBtn = document.createElement("button");
+                    removeBtn.type = "button";
+                    removeBtn.className = "secondary tiny";
+                    removeBtn.textContent = "Remove";
+                    removeBtn.addEventListener("click", () => {
+                        customPatternPrototypes.splice(index, 1);
+                        renderCustomPatternVariants();
+                        setCustomBuilderMessage("Removed variation.", "");
+                    });
+                    variant.appendChild(removeBtn);
+
+                    customPatternVariantsEl.appendChild(variant);
+                });
+            }
+
+            function resetCustomPatternBuilder() {
+                customPatternPrototypes = [];
+                if (customSketchpad) {
+                    customSketchpad.clear();
                 }
+                customPatternNameInput.value = "";
+                customPatternSamplesInput.value = "60";
+                customPatternSamplesValue.textContent = "60";
+                customPatternNoiseInput.value = "0.18";
+                customPatternNoiseValue.textContent = "18";
+                renderCustomPatternVariants();
+                setCustomBuilderMessage("Start by sketching a pattern above.", "");
+            }
+
+            customPatternSamplesInput.addEventListener("input", () => {
+                customPatternSamplesValue.textContent =
+                    customPatternSamplesInput.value;
             });
 
-            document.addEventListener("mouseup", () => {
-                isDrawing = false;
-            });
-
-            // Touch events for mobile
-            drawCanvasContainer.addEventListener("touchstart", (e) => {
-                e.preventDefault();
-                const touch = e.touches[0];
-                const element = document.elementFromPoint(
-                    touch.clientX,
-                    touch.clientY,
+            customPatternNoiseInput.addEventListener("input", () => {
+                const percent = Math.round(
+                    parseFloat(customPatternNoiseInput.value) * 100,
                 );
-                if (element && element.classList.contains("draw-pixel")) {
-                    const index = parseInt(element.dataset.index);
-                    isDrawing = true;
-                    // Set draw mode based on current pixel state (toggle)
-                    drawMode = drawState[index] === 1 ? 0 : 1;
-                    drawState[index] = drawMode;
-                    updateDrawCanvas();
-                    classifyDrawing();
-                }
+                customPatternNoiseValue.textContent = percent;
             });
 
-            drawCanvasContainer.addEventListener("touchmove", (e) => {
-                e.preventDefault();
-                if (isDrawing) {
-                    const touch = e.touches[0];
-                    const element = document.elementFromPoint(
-                        touch.clientX,
-                        touch.clientY,
+            customPatternClearBtn.addEventListener("click", () => {
+                if (customSketchpad) {
+                    customSketchpad.clear();
+                }
+                setCustomBuilderMessage("Cleared sketch.", "");
+            });
+
+            customPatternAddBtn.addEventListener("click", () => {
+                if (!customSketchpad) return;
+                const pattern = customSketchpad.getState();
+                const hasInk = pattern.some((value) => value === 1);
+                if (!hasInk) {
+                    setCustomBuilderMessage(
+                        "Draw something before adding a variation.",
+                        "error",
                     );
-                    if (element && element.classList.contains("draw-pixel")) {
-                        const index = parseInt(element.dataset.index);
-                        if (drawState[index] !== drawMode) {
-                            drawState[index] = drawMode;
-                            updateDrawCanvas();
-                            classifyDrawing();
-                        }
-                    }
+                    return;
                 }
+                customPatternPrototypes.push(pattern);
+                renderCustomPatternVariants();
+                setCustomBuilderMessage("Captured variation.", "success");
+                customSketchpad.clear();
             });
 
-            document.addEventListener("touchend", () => {
-                isDrawing = false;
+            customPatternCreateBtn.addEventListener("click", () => {
+                const name = customPatternNameInput.value.trim();
+                if (!name) {
+                    setCustomBuilderMessage(
+                        "Give your pattern type a name.",
+                        "error",
+                    );
+                    return;
+                }
+
+                if (customPatternPrototypes.length === 0) {
+                    setCustomBuilderMessage(
+                        "Add at least one variation before creating a pattern type.",
+                        "error",
+                    );
+                    return;
+                }
+
+                const samples = parseInt(customPatternSamplesInput.value, 10);
+                const noise = parseFloat(customPatternNoiseInput.value);
+
+                const family = registerCustomPatternFamily({
+                    name,
+                    prototypes: customPatternPrototypes,
+                    samples,
+                    noise,
+                });
+
+                if (!family) {
+                    setCustomBuilderMessage(
+                        "Couldn't create pattern family. Try again.",
+                        "error",
+                    );
+                    return;
+                }
+
+                buildPatternLibraryUI();
+                scheduleDatasetUpdate(true);
+                resetCustomPatternBuilder();
+                setCustomBuilderMessage(
+                    `Created “${family.name}” with ${family.prototypes.length} variations.`,
+                    "success",
+                );
+            });
+
+            customPatternResetBtn.addEventListener("click", () => {
+                resetCustomPatternBuilder();
+            });
+
+            // ============================================
+            // DRAWING INTERFACE
+            // ============================================
+            const drawCanvasContainer = document.getElementById("drawCanvas");
+            drawSketchpad = createPixelSketchpad(drawCanvasContainer, {
+                onChange: () => {
+                    classifyDrawing();
+                },
             });
 
             document
                 .getElementById("clearDrawing")
                 .addEventListener("click", () => {
-                    drawState = new Array(GRID_SIZE * GRID_SIZE).fill(0);
-                    updateDrawCanvas();
-                    classifyDrawing();
+                    if (drawSketchpad) {
+                        drawSketchpad.clear();
+                    }
                 });
 
             // Initialize everything
-            generatePatterns();
-            initPatternNetwork();
-            resizePatternCanvas(); // Resize now that we have data
-            updatePatternStats();
-            drawPattern();
-            visualizeWeights();
-            updateNetworkDiagram();
-            drawLossLandscape();
-            initDrawCanvas();
+            buildPatternLibraryUI();
+            resetCustomPatternBuilder();
+            regenerateDataset();
+            classifyDrawing();
         </script>
     </body>
 </html>
