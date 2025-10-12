@@ -1,4 +1,4 @@
-  },
+self.MARKET_HISTORY = [
   {
     "symbol": "MSFT",
     "name": "Microsoft Corporation",
@@ -25936,4 +25936,5 @@
         "close": 510.96
       }
     ]
-]
+  }
+];
