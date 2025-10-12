@@ -6,6 +6,7 @@ const earliestDateStr = '2000-01-01';
 const latestDateLimit = '2025-12-31';
 const todayStr = new Date().toISOString().slice(0, 10);
 const latestAllowedDateStr = todayStr <= latestDateLimit ? todayStr : latestDateLimit;
+const forecastHorizon = 15;
 
 function coerceNumber(value) {
   const num = Number(value);
@@ -595,20 +596,21 @@ function normalizeOrZero(value, idx) {
 }
 
 class PriceNet {
-  constructor(inputSize, hiddenUnits, learningRate) {
+  constructor(inputSize, hiddenUnits, horizon, learningRate) {
     this.inputSize = inputSize;
     this.hiddenUnits = hiddenUnits;
+    this.horizon = Math.max(1, horizon | 0);
     this.learningRate = learningRate;
     this.initWeights();
   }
 
   initWeights() {
     const scale1 = 1 / Math.sqrt(this.inputSize);
-    const scale2 = 1 / Math.sqrt(this.hiddenUnits);
+    const scale2 = 1 / Math.sqrt(Math.max(this.hiddenUnits, 1));
     this.w1 = new Float32Array(this.hiddenUnits * this.inputSize);
     this.b1 = new Float32Array(this.hiddenUnits);
-    this.w2 = new Float32Array(this.hiddenUnits);
-    this.b2 = 0;
+    this.w2 = new Float32Array(this.hiddenUnits * this.horizon);
+    this.b2 = new Float32Array(this.horizon);
     for (let i = 0; i < this.w1.length; i++) {
       this.w1[i] = (Math.random() * 2 - 1) * scale1;
     }
@@ -616,7 +618,7 @@ class PriceNet {
       this.w2[i] = (Math.random() * 2 - 1) * scale2;
     }
     this.b1.fill(0);
-    this.b2 = 0;
+    this.b2.fill(0);
   }
 
   setLearningRate(lr) {
@@ -633,39 +635,62 @@ class PriceNet {
       }
       hidden[h] = Math.tanh(sum);
     }
-    let output = this.b2;
-    for (let h = 0; h < this.hiddenUnits; h++) {
-      output += this.w2[h] * hidden[h];
+    const output = new Float32Array(this.horizon);
+    for (let o = 0; o < this.horizon; o++) {
+      let sum = this.b2[o];
+      const offset = o * this.hiddenUnits;
+      for (let h = 0; h < this.hiddenUnits; h++) {
+        sum += this.w2[offset + h] * hidden[h];
+      }
+      output[o] = sum;
     }
     return { hidden, output };
   }
 
-  trainSample(features, target) {
+  trainSample(features, targets) {
     const { hidden, output } = this.forward(features);
-    const error = output - target;
+    const errors = new Float32Array(this.horizon);
     const lr = this.learningRate;
 
+    for (let o = 0; o < this.horizon; o++) {
+      const target = targets[o] ?? 0;
+      errors[o] = output[o] - target;
+    }
+
     const gradHidden = new Float32Array(this.hiddenUnits);
-    for (let h = 0; h < this.hiddenUnits; h++) {
-      gradHidden[h] = error * this.w2[h] * (1 - hidden[h] * hidden[h]);
+    for (let o = 0; o < this.horizon; o++) {
+      const error = errors[o];
+      const offset = o * this.hiddenUnits;
+      for (let h = 0; h < this.hiddenUnits; h++) {
+        gradHidden[h] += error * this.w2[offset + h];
+      }
+    }
+
+    for (let o = 0; o < this.horizon; o++) {
+      const error = errors[o];
+      const offset = o * this.hiddenUnits;
+      for (let h = 0; h < this.hiddenUnits; h++) {
+        this.w2[offset + h] -= lr * error * hidden[h];
+      }
+      this.b2[o] -= lr * error;
     }
 
     for (let h = 0; h < this.hiddenUnits; h++) {
-      const delta = error * hidden[h];
-      this.w2[h] -= lr * delta;
-    }
-    this.b2 -= lr * error;
-
-    for (let h = 0; h < this.hiddenUnits; h++) {
+      const grad = gradHidden[h] * (1 - hidden[h] * hidden[h]);
       const offset = h * this.inputSize;
-      const grad = gradHidden[h];
       for (let i = 0; i < this.inputSize; i++) {
         this.w1[offset + i] -= lr * grad * features[i];
       }
       this.b1[h] -= lr * grad;
     }
 
-    return { error, output };
+    let mse = 0;
+    for (let o = 0; o < this.horizon; o++) {
+      mse += errors[o] * errors[o];
+    }
+    mse /= this.horizon;
+
+    return { errors, output, loss: mse };
   }
 }
 
@@ -896,6 +921,7 @@ let history = {
   errors: []
 };
 let recentPredictions = [];
+let latestForecast = null;
 
 const portfolioConfig = {
   initialCash: 100000,
@@ -1139,13 +1165,14 @@ function setActiveDataset(dataset, { resetNetwork = false, resetTrader = false }
   totalPoints = length;
   computeNormalizationSeries();
   refreshTechnicalSeries();
-  const maxWindow = Math.max(4, Math.min(config.windowSize | 0 || 24, Math.max(4, totalPoints - 1)));
+  const maxLookback = Math.max(4, totalPoints - forecastHorizon);
+  const maxWindow = Math.max(4, Math.min(config.windowSize | 0 || 24, maxLookback));
   if (maxWindow !== config.windowSize) {
     config.windowSize = maxWindow;
   }
-  cursor = Math.max(config.windowSize, Math.min(totalPoints - 1, config.windowSize));
-  if (!net || resetNetwork || net.inputSize !== config.windowSize || net.hiddenUnits !== config.hiddenUnits) {
-    net = new PriceNet(config.windowSize, config.hiddenUnits, config.learningRate);
+  cursor = Math.min(lastSampleIndex(), config.windowSize);
+  if (!net || resetNetwork || net.inputSize !== config.windowSize || net.hiddenUnits !== config.hiddenUnits || net.horizon !== forecastHorizon) {
+    net = new PriceNet(config.windowSize, config.hiddenUnits, forecastHorizon, config.learningRate);
   } else {
     net.setLearningRate(config.learningRate);
   }
@@ -1164,6 +1191,7 @@ function setActiveDataset(dataset, { resetNetwork = false, resetTrader = false }
   tradingStats.playlistSize = playlist.length;
   history = { actual: [], predicted: [], errors: [] };
   recentPredictions = [];
+  latestForecast = null;
   resetRiskState();
   portfolio = createPortfolio();
   stats = createStats();
@@ -1206,7 +1234,9 @@ function tradingFeatureCount() {
     1 + // volatility z-score
     1 + // volatility regime bucket
     calendarDowCount +
-    calendarMonthCount
+    calendarMonthCount +
+    forecastHorizon * 2 +
+    3 // forward forecast path, relative returns, and summary stats
   );
 }
 
@@ -1280,6 +1310,7 @@ function createStats() {
     noise: config.noise,
     windowSize: config.windowSize,
     hiddenUnits: config.hiddenUnits,
+    forecastHorizon,
     progressPct: 0,
     windowCoverage: windowCoverage(),
     lastReset: '—',
@@ -1339,14 +1370,35 @@ function sampleAt(index) {
     }
     features[i] = value;
   }
-  const targetPrice = prices[index];
+  const targetNorms = new Float32Array(forecastHorizon);
+  const targetPrices = new Float32Array(forecastHorizon);
+  const targetDates = new Array(forecastHorizon);
+  for (let h = 0; h < forecastHorizon; h++) {
+    const priceIdx = clampIndex(index + h);
+    const price = prices[priceIdx];
+    const safePrice = Number.isFinite(price) ? price : prices[index];
+    targetPrices[h] = safePrice;
+    targetNorms[h] = normalize(safePrice, priceIdx);
+    targetDates[h] = dates[priceIdx];
+  }
+  const targetPrice = targetPrices[0];
   return {
     features,
-    targetNorm: normalize(targetPrice, index),
+    targetNorms,
+    targetPrices,
+    targetDates,
     targetPrice,
-    date: dates[index],
+    date: targetDates[0],
+    anchorDate: dates[index - 1] ?? targetDates[0],
     index
   };
+}
+
+function lastSampleIndex() {
+  if (!totalPoints) return 0;
+  const upperBound = totalPoints - forecastHorizon;
+  const capped = Math.min(upperBound, totalPoints - 1);
+  return Math.max(config.windowSize, capped);
 }
 
 function pushHistory(actual, predicted, absError) {
@@ -1532,13 +1584,20 @@ function tradingActionLabel(index) {
   return 'HOLD';
 }
 
-function buildTradingFeatures(sample, predictedPrice) {
+function buildTradingFeatures(sample, forecast) {
   const features = new Float32Array(createTraderInputSize());
   features.set(sample.features);
   const price = sample.targetPrice;
   const statsIdx = sample.index ?? cursor;
-  const safePredicted = Number.isFinite(predictedPrice) ? predictedPrice : price;
-  const predictedNorm = Number.isFinite(safePredicted) ? normalize(safePredicted, statsIdx) : 0;
+  const predictedPath = forecast?.prices;
+  const predictedNorms = forecast?.normalized;
+  const firstPredicted = Array.isArray(predictedPath) || predictedPath instanceof Float32Array
+    ? predictedPath[0]
+    : undefined;
+  const safePredicted = Number.isFinite(firstPredicted) ? firstPredicted : price;
+  const predictedNorm = Number.isFinite(predictedNorms?.[0])
+    ? predictedNorms[0]
+    : (Number.isFinite(safePredicted) ? normalize(safePredicted, statsIdx) : 0);
   const prevIdx = Math.max(0, statsIdx - 1);
   let offset = config.windowSize;
   features[offset++] = predictedNorm;
@@ -1662,6 +1721,29 @@ function buildTradingFeatures(sample, predictedPrice) {
   for (let i = 0; i < monthOneHotSeries.length; i++) {
     features[offset++] = monthOneHotSeries[i]?.[idx] ?? 0;
   }
+  for (let i = 0; i < forecastHorizon; i++) {
+    const value = predictedNorms?.[i];
+    const clamped = Number.isFinite(value) ? Math.max(-10, Math.min(10, value)) : predictedNorm;
+    features[offset++] = clamped;
+  }
+  const relativeReturns = [];
+  for (let i = 0; i < forecastHorizon; i++) {
+    const futurePrice = predictedPath?.[i];
+    const rel = Number.isFinite(futurePrice) && Number.isFinite(price) && price > 0
+      ? (futurePrice - price) / price
+      : 0;
+    const clamped = Math.max(-5, Math.min(5, rel));
+    features[offset++] = clamped;
+    relativeReturns.push(clamped);
+  }
+  const finalReturn = relativeReturns.length ? relativeReturns[relativeReturns.length - 1] : 0;
+  const meanReturn = relativeReturns.length
+    ? relativeReturns.reduce((sum, v) => sum + v, 0) / relativeReturns.length
+    : 0;
+  const maxReturn = relativeReturns.length ? Math.max(...relativeReturns) : 0;
+  features[offset++] = Math.max(-5, Math.min(5, finalReturn));
+  features[offset++] = Math.max(-5, Math.min(5, meanReturn));
+  features[offset++] = Math.max(-5, Math.min(5, maxReturn));
   return { features, edge };
 }
 
@@ -1716,10 +1798,10 @@ function updateTradingStats(decision, reward, edge, gating) {
   }
 }
 
-function applyTradingPolicy(sample, predictedPrice) {
+function applyTradingPolicy(sample, forecast) {
   if (!portfolio || !sample || !Number.isFinite(sample.targetPrice)) return;
   const idx = sample.index ?? cursor;
-  const { features, edge } = buildTradingFeatures(sample, predictedPrice);
+  const { features, edge } = buildTradingFeatures(sample, forecast);
   const rawDecision = trader.act(features, config.traderExploration);
   const gating = evaluatePositionGating(sample, edge, rawDecision.index);
   const executedDecision = {
@@ -1929,22 +2011,31 @@ function stepOnce() {
     setRunning(false);
     return;
   }
-  if (totalPoints <= config.windowSize) {
+  if (totalPoints < config.windowSize + forecastHorizon) {
     setRunning(false);
     return;
   }
-  if (cursor >= totalPoints) {
+  const maxIndex = lastSampleIndex();
+  if (cursor > maxIndex) {
     completeCycle();
     if (!advanceToNextDataset({ resetNetwork: false, resetTrader: false })) {
       setRunning(false);
       return;
     }
   }
+  if (cursor < config.windowSize) {
+    cursor = config.windowSize;
+  }
   const sample = sampleAt(cursor);
-  const { error, output } = net.trainSample(sample.features, sample.targetNorm);
-  const predictedPrice = denormalize(output, sample.index);
+  const { output: predictedNorms } = net.trainSample(sample.features, sample.targetNorms);
+  const predictedPrices = new Float32Array(forecastHorizon);
+  for (let i = 0; i < forecastHorizon; i++) {
+    predictedPrices[i] = denormalize(predictedNorms[i] ?? predictedNorms[0] ?? 0, sample.index + i);
+  }
+  const predictedPrice = predictedPrices[0];
   const diff = predictedPrice - sample.targetPrice;
   const absError = Math.abs(diff);
+  const direction = diff > 0 ? 'over' : diff < 0 ? 'under' : 'even';
 
   stats.steps += 1;
   stats.pointsSeen += 1;
@@ -1964,17 +2055,41 @@ function stepOnce() {
   pushHistory(sample.targetPrice, predictedPrice, absError);
   pushRecent({
     label: sample.date,
+    ticker: activeDataset?.symbol ?? '—',
+    date: sample.date,
     actual: sample.targetPrice,
     predicted: predictedPrice,
-    error: diff
+    error: diff,
+    absError,
+    direction,
+    pathPredicted: Array.from(predictedPrices),
+    pathActual: Array.from(sample.targetPrices),
+    dates: sample.targetDates.slice()
   });
 
-  applyTradingPolicy(sample, predictedPrice);
+  const forecastForTrader = {
+    normalized: predictedNorms,
+    prices: predictedPrices
+  };
+
+  latestForecast = {
+    ticker: activeDataset?.symbol ?? null,
+    name: activeDataset?.name ?? null,
+    anchorDate: sample.anchorDate ?? null,
+    horizon: forecastHorizon,
+    dates: sample.targetDates.slice(),
+    predicted: Array.from(predictedPrices),
+    actual: Array.from(sample.targetPrices),
+    absError,
+    direction
+  };
+
+  applyTradingPolicy(sample, forecastForTrader);
 
   cursor += 1;
-  const progressDenom = Math.max(1, totalPoints - config.windowSize);
+  const totalSamples = Math.max(1, lastSampleIndex() - config.windowSize + 1);
   const relativeCursor = Math.max(0, cursor - config.windowSize);
-  stats.progressPct = progressDenom <= 0 ? 0 : Math.min(100, (relativeCursor / progressDenom) * 100);
+  stats.progressPct = totalSamples <= 0 ? 0 : Math.min(100, (relativeCursor / totalSamples) * 100);
 
   postSnapshot();
 }
@@ -2060,12 +2175,32 @@ function postSnapshot() {
     weights: weightsSnapshot,
     recentPredictions: recentPredictions.map(item => ({
       label: item.label,
+      ticker: item.ticker,
+      date: item.date,
       actual: item.actual,
       predicted: item.predicted,
-      error: item.error
+      error: item.error,
+      absError: item.absError,
+      direction: item.direction,
+      pathPredicted: Array.isArray(item.pathPredicted) ? item.pathPredicted.slice() : [],
+      pathActual: Array.isArray(item.pathActual) ? item.pathActual.slice() : [],
+      dates: Array.isArray(item.dates) ? item.dates.slice() : []
     })),
     portfolio: createPortfolioSnapshot(),
-    trading: tradingSummary
+    trading: tradingSummary,
+    forecast: latestForecast
+      ? {
+          ticker: latestForecast.ticker,
+          name: latestForecast.name,
+          anchorDate: latestForecast.anchorDate,
+          horizon: latestForecast.horizon,
+          dates: Array.isArray(latestForecast.dates) ? latestForecast.dates.slice() : [],
+          predicted: Array.isArray(latestForecast.predicted) ? latestForecast.predicted.slice() : [],
+          actual: Array.isArray(latestForecast.actual) ? latestForecast.actual.slice() : [],
+          absError: latestForecast.absError,
+          direction: latestForecast.direction
+        }
+      : null
   };
   self.postMessage({ type: 'snapshot', snapshot });
 }
@@ -2076,6 +2211,7 @@ function resetState(resume = false) {
   net = null;
   history = { actual: [], predicted: [], errors: [] };
   recentPredictions = [];
+  latestForecast = null;
   loops = 0;
   cursor = 0;
   stats = null;
@@ -2194,6 +2330,7 @@ function applyConfig(newConfig) {
       stats.noise = config.noise;
       stats.windowSize = config.windowSize;
       stats.hiddenUnits = config.hiddenUnits;
+      stats.forecastHorizon = forecastHorizon;
       stats.windowCoverage = windowCoverage();
     }
     postSnapshot();
