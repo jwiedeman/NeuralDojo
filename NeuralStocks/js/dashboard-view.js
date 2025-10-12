@@ -392,16 +392,31 @@ export class DashboardView {
       if (tradingVolatilityEl) tradingVolatilityEl.textContent = '—';
       if (tradingRiskEl) tradingRiskEl.textContent = '—';
       if (tradingThresholdEl) tradingThresholdEl.textContent = '—';
+      this.applyPolicyClass(tradingConfidenceEl, null);
+      this.applyPolicyClass(tradingEdgeEl, null);
+      this.applyPolicyClass(tradingLastRewardEl, null);
+      this.applyPolicyClass(tradingAvgRewardEl, null);
+      this.applyPolicyClass(tradingLastCycleEl, null);
+      this.applyPolicyClass(tradingBestCycleEl, null);
+      this.applyPolicyClass(tradingRegimeEl, null);
+      this.applyPolicyClass(tradingVolatilityEl, null);
+      this.applyPolicyClass(tradingRiskEl, null);
       return;
     }
 
-    const haveSamples = (trading?.samples ?? 0) > 0;
+    const sampleCount = trading?.samples ?? trading?.steps ?? trading?.trades ?? trading?.tradeCount ?? 0;
+    const haveSamples = sampleCount > 0;
     if (tradingLastActionEl) tradingLastActionEl.textContent = trading.lastAction ?? '—';
+    const confidenceVal = Number.isFinite(trading.confidence)
+      ? trading.confidence
+      : Number.isFinite(trading.lastConfidence)
+        ? trading.lastConfidence
+        : null;
     if (tradingConfidenceEl) {
-      tradingConfidenceEl.textContent = Number.isFinite(trading.confidence)
-        ? `${(trading.confidence * 100).toFixed(1)}%`
+      tradingConfidenceEl.textContent = Number.isFinite(confidenceVal)
+        ? `${(confidenceVal * 100).toFixed(1)}%`
         : '—';
-      this.applyPolicyClass(tradingConfidenceEl, trading.confidence);
+      this.applyPolicyClass(tradingConfidenceEl, confidenceVal);
     }
     if (tradingEdgeEl) {
       tradingEdgeEl.textContent = Number.isFinite(trading.lastEdge)
@@ -452,7 +467,8 @@ export class DashboardView {
         : '—';
     }
     if (tradingTradeCountEl) {
-      tradingTradeCountEl.textContent = formatInteger(trading.tradeCount ?? 0);
+      const tradeTotal = trading.tradeCount ?? trading.trades ?? 0;
+      tradingTradeCountEl.textContent = formatInteger(tradeTotal);
     }
     if (tradingWinRateEl) {
       tradingWinRateEl.textContent = haveSamples && Number.isFinite(trading.winRate)
@@ -460,8 +476,13 @@ export class DashboardView {
         : '—';
     }
     if (tradingRegimeEl) {
-      if (haveSamples && Number.isFinite(trading.trend)) {
-        const trend = trading.trend;
+      const trendValue = Number.isFinite(trading.trend)
+        ? trading.trend
+        : Number.isFinite(trading.regime)
+          ? trading.regime
+          : null;
+      if (haveSamples && Number.isFinite(trendValue)) {
+        const trend = trendValue;
         const direction = trend > 0 ? 'Uptrend' : trend < 0 ? 'Downtrend' : 'Sideways';
         tradingRegimeEl.textContent = `${direction} (${formatSigned(trend, 2)})`;
         this.applyPolicyClass(tradingRegimeEl, trend);
@@ -473,16 +494,23 @@ export class DashboardView {
     if (tradingVolatilityEl) {
       if (haveSamples && (Number.isFinite(trading.realizedVol) || Number.isFinite(trading.volZ))) {
         const volParts = [];
-        if (Number.isFinite(trading.realizedVol)) {
-          volParts.push(`σ=${formatPercent(trading.realizedVol, 2)}`);
+        const realizedVol = Number.isFinite(trading.realizedVol)
+          ? trading.realizedVol
+          : Number.isFinite(trading.volatility)
+            ? trading.volatility
+            : null;
+        if (Number.isFinite(realizedVol)) {
+          volParts.push(`σ=${formatPercent(realizedVol, 2)}`);
         }
-        if (Number.isFinite(trading.volZ)) {
-          volParts.push(`z=${formatSigned(trading.volZ, 2)}`);
+        const volZ = Number.isFinite(trading.volZ) ? trading.volZ : null;
+        if (Number.isFinite(volZ)) {
+          volParts.push(`z=${formatSigned(volZ, 2)}`);
         }
-        const bucketLabel = trading.volBucket > 0 ? 'High' : trading.volBucket < 0 ? 'Low' : 'Normal';
+        const bucket = Number.isFinite(trading.volBucket) ? trading.volBucket : 0;
+        const bucketLabel = bucket > 0 ? 'High' : bucket < 0 ? 'Low' : 'Normal';
         volParts.push(bucketLabel);
         tradingVolatilityEl.textContent = volParts.join(' · ');
-        this.applyPolicyClass(tradingVolatilityEl, -trading.volBucket);
+        this.applyPolicyClass(tradingVolatilityEl, -bucket);
       } else {
         tradingVolatilityEl.textContent = '—';
         this.applyPolicyClass(tradingVolatilityEl, null);
