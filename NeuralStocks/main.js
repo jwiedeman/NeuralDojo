@@ -68,7 +68,10 @@ const elements = {
   tradingRegimeEl: document.getElementById('tradingRegime'),
   tradingVolatilityEl: document.getElementById('tradingVolatility'),
   tradingRiskEl: document.getElementById('tradingRisk'),
-  tradingThresholdEl: document.getElementById('tradingThreshold')
+  tradingThresholdEl: document.getElementById('tradingThreshold'),
+  forecastHorizonLabelEl: document.getElementById('forecastHorizonLabel'),
+  forwardTableBodyEl: document.getElementById('forwardTableBody'),
+  forwardEmptyEl: document.getElementById('forwardEmpty')
 };
 
 const view = new DashboardView(elements);

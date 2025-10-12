@@ -214,13 +214,17 @@ export class DashboardView {
       const predicted = formatNumber(item?.predicted, 2);
       details.textContent = `actual ${actual} → forecast ${predicted}`;
 
-      const absError = item?.absError;
-      errorSpan.textContent = Number.isFinite(absError)
-        ? `err ${formatNumber(absError, 4)}`
-        : 'err —';
+      const absError = Number.isFinite(item?.absError) ? Math.abs(item.absError) : null;
       if (Number.isFinite(absError)) {
-        if (absError < 0.1) errorSpan.classList.add('good');
+        errorSpan.textContent = `err ${formatNumber(absError, 4)}`;
+        if (item?.direction === 'over') errorSpan.classList.add('over');
+        else if (item?.direction === 'under') errorSpan.classList.add('under');
+        else errorSpan.classList.add('even');
+        if (absError < 0.1) errorSpan.classList.add('low');
         else if (absError > 0.5) errorSpan.classList.add('bad');
+      } else {
+        errorSpan.textContent = 'err —';
+        errorSpan.classList.add('even');
       }
 
       li.appendChild(label);
@@ -653,6 +657,85 @@ export class DashboardView {
     el.textContent = sections.join('\n\n');
   }
 
+  updateForwardProjection(forecast) {
+    const body = this.el.forwardTableBodyEl;
+    const emptyEl = this.el.forwardEmptyEl;
+    if (!body) return;
+    body.innerHTML = '';
+    const hasForecast = forecast && Array.isArray(forecast.predicted) && forecast.predicted.length;
+    if (!hasForecast) {
+      if (emptyEl) emptyEl.style.display = 'block';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+    const predictedList = Array.isArray(forecast.predicted) ? forecast.predicted : [];
+    const actualList = Array.isArray(forecast.actual) ? forecast.actual : [];
+    const dateList = Array.isArray(forecast.dates) ? forecast.dates : [];
+    for (let i = 0; i < predictedList.length; i++) {
+      const row = document.createElement('tr');
+
+      const stepCell = document.createElement('td');
+      stepCell.className = 'step';
+      stepCell.textContent = `${i + 1}`;
+
+      const dateCell = document.createElement('td');
+      dateCell.className = 'date';
+      dateCell.textContent = dateList[i] ?? '—';
+
+      const forecastCell = document.createElement('td');
+      forecastCell.className = 'forecast';
+      const predictedValue = predictedList[i];
+      forecastCell.textContent = Number.isFinite(predictedValue)
+        ? formatNumber(predictedValue, 2)
+        : '—';
+
+      const actualCell = document.createElement('td');
+      actualCell.className = 'actual';
+      const actualValue = actualList[i];
+      actualCell.textContent = Number.isFinite(actualValue)
+        ? formatNumber(actualValue, 2)
+        : '—';
+
+      const deltaCell = document.createElement('td');
+      deltaCell.className = 'delta';
+      const diff = Number.isFinite(actualValue) && Number.isFinite(predictedValue)
+        ? actualValue - predictedValue
+        : null;
+      if (Number.isFinite(diff)) {
+        deltaCell.textContent = formatSigned(diff, 2);
+        if (diff > 0.0001) deltaCell.classList.add('positive');
+        else if (diff < -0.0001) deltaCell.classList.add('negative');
+        else deltaCell.classList.add('neutral');
+      } else {
+        deltaCell.textContent = '—';
+        deltaCell.classList.add('neutral');
+      }
+
+      const pctCell = document.createElement('td');
+      pctCell.className = 'delta-pct';
+      const pct = Number.isFinite(diff) && Number.isFinite(actualValue) && Math.abs(actualValue) > 1e-6
+        ? diff / actualValue
+        : null;
+      if (Number.isFinite(pct)) {
+        pctCell.textContent = formatPercent(pct, 2);
+        if (pct > 0.0001) pctCell.classList.add('positive');
+        else if (pct < -0.0001) pctCell.classList.add('negative');
+        else pctCell.classList.add('neutral');
+      } else {
+        pctCell.textContent = '—';
+        pctCell.classList.add('neutral');
+      }
+
+      row.appendChild(stepCell);
+      row.appendChild(dateCell);
+      row.appendChild(forecastCell);
+      row.appendChild(actualCell);
+      row.appendChild(deltaCell);
+      row.appendChild(pctCell);
+      body.appendChild(row);
+    }
+  }
+
   applySnapshot(snapshot) {
     if (!snapshot) return;
     const { history, stats, weights } = snapshot;
@@ -662,6 +745,7 @@ export class DashboardView {
     this.drawOutputWeights(weights?.outputWeights);
     this.updateWeightsRaw(snapshot);
     this.updateRecentList(snapshot.recentPredictions);
+    this.updateForwardProjection(snapshot.forecast);
 
     const {
       latestActualEl,
@@ -684,7 +768,8 @@ export class DashboardView {
       instrumentLabelEl,
       datasetDateRangeEl,
       datasetPlaylistEl,
-      datasetUniverseEl
+      datasetUniverseEl,
+      forecastHorizonLabelEl
     } = this.el;
 
     if (latestActualEl) latestActualEl.textContent = formatNumber(stats?.lastActual, 2);
@@ -730,6 +815,12 @@ export class DashboardView {
       datasetPlaylistEl.textContent = size > 0 ? `${position}/${size}` : '—';
     }
     if (datasetUniverseEl) datasetUniverseEl.textContent = formatInteger(stats?.availableTickers);
+    if (forecastHorizonLabelEl) {
+      const horizon = stats?.forecastHorizon;
+      forecastHorizonLabelEl.textContent = Number.isFinite(horizon)
+        ? `${horizon} sessions`
+        : '—';
+    }
 
     this.updatePortfolioCard(snapshot.portfolio);
     this.updateTradingSummary(snapshot.trading);

@@ -84,6 +84,7 @@
           <div>Dataset progress: <span id="datasetProgress">—</span></div>
           <div>Lookback window: <span id="windowSizeLabel">—</span></div>
           <div>Hidden units: <span id="hiddenUnitsLabel">—</span></div>
+          <div>Forecast horizon: <span id="forecastHorizonLabel">—</span></div>
         </div>
 
         <div class="panel-sub">Rolling training stats</div>
@@ -158,6 +159,23 @@
             <div class="panel-card results-card">
               <div class="panel-sub">Recent forecasts</div>
               <ul id="recentList" class="recent-list"></ul>
+              <div class="panel-sub secondary">Forward projection</div>
+              <div class="forward-wrapper">
+                <div id="forwardEmpty" class="forward-empty">Waiting for the next prediction window…</div>
+                <table class="forward-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Date</th>
+                      <th>Forecast</th>
+                      <th>Actual</th>
+                      <th>Δ</th>
+                      <th>Δ%</th>
+                    </tr>
+                  </thead>
+                  <tbody id="forwardTableBody"></tbody>
+                </table>
+              </div>
             </div>
 
             <div class="panel-card data-card">
