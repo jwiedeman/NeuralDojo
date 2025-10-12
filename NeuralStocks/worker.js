@@ -1185,13 +1185,18 @@ function tradingFeatureCount() {
   return (
     6 + // predicted z, edge, normalized price, log price delta, log predicted delta, |edge|%
     smaPeriods.length +
+    smaPeriods.length + // distance of price to each SMA
     emaPeriods.length +
+    emaPeriods.length + // distance of price to each EMA
     rsiPeriods.length +
-    3 +
+    rsiPeriods.length + // RSI slope
+    3 + // MACD, signal, histogram
+    3 + // MACD slopes
     returnPeriods.length +
     logReturnPeriods.length +
     realizedVolPeriods.length +
-    realizedVolPeriods.length +
+    realizedVolPeriods.length + // downside volatility
+    1 + // realized vol trend ratio
     skewPeriods.length +
     kurtosisPeriods.length +
     atrPeriods.length +
@@ -1534,6 +1539,7 @@ function buildTradingFeatures(sample, predictedPrice) {
   const statsIdx = sample.index ?? cursor;
   const safePredicted = Number.isFinite(predictedPrice) ? predictedPrice : price;
   const predictedNorm = Number.isFinite(safePredicted) ? normalize(safePredicted, statsIdx) : 0;
+  const prevIdx = Math.max(0, statsIdx - 1);
   let offset = config.windowSize;
   features[offset++] = predictedNorm;
   const edge = Number.isFinite(safePredicted) && price > 0
@@ -1556,22 +1562,53 @@ function buildTradingFeatures(sample, predictedPrice) {
     const value = smaSeries[i][idx];
     features[offset++] = normalizeOrZero(Number.isFinite(value) ? value : sample.targetPrice, idx);
   }
+  for (let i = 0; i < smaSeries.length; i++) {
+    const value = smaSeries[i][idx];
+    const dist = Number.isFinite(value) && Number.isFinite(price) && value !== 0
+      ? (price - value) / value
+      : 0;
+    features[offset++] = Math.max(-5, Math.min(5, dist));
+  }
   for (let i = 0; i < emaSeries.length; i++) {
     const value = emaSeries[i][idx];
     features[offset++] = normalizeOrZero(Number.isFinite(value) ? value : sample.targetPrice, idx);
+  }
+  for (let i = 0; i < emaSeries.length; i++) {
+    const value = emaSeries[i][idx];
+    const dist = Number.isFinite(value) && Number.isFinite(price) && value !== 0
+      ? (price - value) / value
+      : 0;
+    features[offset++] = Math.max(-5, Math.min(5, dist));
   }
   for (let i = 0; i < rsiSeries.length; i++) {
     const value = rsiSeries[i][idx];
     const normalizedRsi = Number.isFinite(value) ? (value - 50) / 50 : 0;
     features[offset++] = Math.max(-2, Math.min(2, normalizedRsi));
   }
+  for (let i = 0; i < rsiSeries.length; i++) {
+    const curr = rsiSeries[i][idx];
+    const prev = rsiSeries[i][prevIdx];
+    const delta = Number.isFinite(curr) && Number.isFinite(prev)
+      ? (curr - prev) / 100
+      : 0;
+    features[offset++] = Math.max(-1, Math.min(1, delta));
+  }
   const macdVal = macdSeries.macd[idx];
   const signalVal = macdSeries.signal[idx];
   const histVal = macdSeries.histogram[idx];
+  const prevMacd = macdSeries.macd[prevIdx];
+  const prevSignal = macdSeries.signal[prevIdx];
+  const prevHist = macdSeries.histogram[prevIdx];
   const safeStd = stats.std > 0 ? stats.std : datasetStd;
   features[offset++] = Number.isFinite(macdVal) ? macdVal / safeStd : 0;
   features[offset++] = Number.isFinite(signalVal) ? signalVal / safeStd : 0;
   features[offset++] = Number.isFinite(histVal) ? histVal / safeStd : 0;
+  const macdSlope = Number.isFinite(macdVal) && Number.isFinite(prevMacd) ? (macdVal - prevMacd) / safeStd : 0;
+  const signalSlope = Number.isFinite(signalVal) && Number.isFinite(prevSignal) ? (signalVal - prevSignal) / safeStd : 0;
+  const histSlope = Number.isFinite(histVal) && Number.isFinite(prevHist) ? (histVal - prevHist) / safeStd : 0;
+  features[offset++] = Math.max(-5, Math.min(5, macdSlope));
+  features[offset++] = Math.max(-5, Math.min(5, signalSlope));
+  features[offset++] = Math.max(-5, Math.min(5, histSlope));
   for (let i = 0; i < returnSeries.length; i++) {
     const value = returnSeries[i][idx];
     const clamped = Number.isFinite(value) ? Math.max(-3, Math.min(3, value)) : 0;
@@ -1590,6 +1627,12 @@ function buildTradingFeatures(sample, predictedPrice) {
     const value = downsideVolSeries[i][idx];
     features[offset++] = Number.isFinite(value) ? Math.min(5, Math.max(0, value)) : 0;
   }
+  const shortVol = realizedVolSeries[0]?.[idx];
+  const longVol = realizedVolSeries[realizedVolSeries.length - 1]?.[idx];
+  const volTrend = Number.isFinite(shortVol) && Number.isFinite(longVol) && longVol !== 0
+    ? (shortVol - longVol) / Math.max(Math.abs(longVol), 1e-6)
+    : 0;
+  features[offset++] = Math.max(-5, Math.min(5, volTrend));
   for (let i = 0; i < skewSeries.length; i++) {
     const value = skewSeries[i][idx];
     features[offset++] = Number.isFinite(value) ? Math.max(-5, Math.min(5, value)) : 0;
