@@ -809,6 +809,17 @@ const config = {
   traderHiddenUnits2: 24,
   traderExploration: 0.05,
   traderRewardScale: 120,
+  traderBaseFraction: 0.05,
+  traderMaxFraction: 0.5,
+  traderMinTradeFraction: 0.01,
+  traderTargetVol: 0.25,
+  traderMaxExposure: 0.75,
+  traderMinEdge: 0.002,
+  traderTrendThreshold: 0.1,
+  traderMaxVolZ: 2.5,
+  traderMaxRealizedVol: 0.6,
+  traderCooldownBars: 3,
+  traderStopoutReturn: -0.02,
   tickerSubsetMin: 5,
   tickerSubsetMax: 10,
   costPerSideBps: 0.0005,
@@ -837,6 +848,12 @@ const portfolioConfig = {
   equityHistoryLimit: historyLimit
 };
 
+const riskState = {
+  cooldown: 0,
+  lastStopReturn: null,
+  lastStopReason: null
+};
+
 function createPortfolio() {
   return {
     initialCash: portfolioConfig.initialCash,
@@ -863,6 +880,139 @@ function createPortfolio() {
     closedPositions: 0,
     avgHoldDays: 0
   };
+}
+
+function resetRiskState() {
+  riskState.cooldown = 0;
+  riskState.lastStopReturn = null;
+  riskState.lastStopReason = null;
+}
+
+function computePortfolioExposure(price) {
+  if (!portfolio || !Number.isFinite(price) || price <= 0) {
+    return 0;
+  }
+  const equity = Number.isFinite(portfolio.equity) && portfolio.equity > 0 ? portfolio.equity : portfolio.cash;
+  if (!Number.isFinite(equity) || equity <= 0) {
+    return 0;
+  }
+  return Math.max(0, (portfolio.position * price) / equity);
+}
+
+function computeTradeFraction(confidence, gating, price, action) {
+  const minFraction = Math.max(0, Math.min(1, config.traderBaseFraction));
+  const maxFraction = Math.max(minFraction, Math.min(1, config.traderMaxFraction));
+  const minTrade = Math.max(0, Math.min(1, config.traderMinTradeFraction));
+  const boundedConfidence = Math.max(0, Math.min(1, confidence ?? 0));
+  const range = Math.max(0, maxFraction - minFraction);
+  let fraction = minFraction + range * boundedConfidence;
+  if (action === 1) {
+    const volatility = Number.isFinite(gating?.volatility) ? Math.max(gating.volatility, 1e-6) : null;
+    if (volatility && config.traderTargetVol > 0) {
+      const volScale = Math.min(1, config.traderTargetVol / volatility);
+      fraction *= volScale;
+    }
+    fraction = Math.min(fraction, maxFraction);
+    const remainingExposure = Math.max(0, config.traderMaxExposure - (gating?.exposure ?? 0));
+    fraction = Math.min(fraction, remainingExposure);
+    if (fraction < minTrade) {
+      return remainingExposure >= minTrade ? minTrade : 0;
+    }
+    return Math.max(0, fraction);
+  }
+  if (fraction < minTrade) {
+    fraction = minTrade;
+  }
+  return Math.max(0, Math.min(1, fraction));
+}
+
+function registerStopout(returnPct, reason = 'stop') {
+  if (!Number.isFinite(returnPct)) {
+    return;
+  }
+  if (returnPct <= config.traderStopoutReturn) {
+    const cooldown = Math.max(0, config.traderCooldownBars | 0);
+    if (cooldown > 0) {
+      riskState.cooldown = Math.max(riskState.cooldown, cooldown);
+      riskState.lastStopReturn = returnPct;
+      riskState.lastStopReason = reason;
+    }
+  }
+}
+
+function evaluatePositionGating(sample, edge, desiredAction) {
+  const idx = sample.index ?? cursor;
+  const price = sample.targetPrice;
+  const trend = Number.isFinite(trendRegimeSeries[idx]) ? trendRegimeSeries[idx] : 0;
+  const volBucket = Number.isFinite(volatilityRegimeSeries[idx]) ? volatilityRegimeSeries[idx] : 0;
+  const volZ = Number.isFinite(volatilityZScoreSeries[idx]) ? volatilityZScoreSeries[idx] : 0;
+  const vol10 = realizedVolSeries[0]?.[idx];
+  const vol20 = realizedVolSeries[realizedVolSeries.length - 1]?.[idx];
+  const realizedVol = Math.max(
+    0,
+    Number.isFinite(vol10) ? vol10 : 0,
+    Number.isFinite(vol20) ? vol20 : 0
+  );
+  const exposure = computePortfolioExposure(price);
+
+  const gating = {
+    desiredAction,
+    action: desiredAction,
+    reasons: [],
+    trend,
+    volBucket,
+    volZ,
+    volatility: realizedVol,
+    exposure,
+    cooldown: riskState.cooldown,
+    edge: edge ?? 0,
+    minEdge: config.traderMinEdge,
+    trendThreshold: config.traderTrendThreshold,
+    volatilityCap: config.traderMaxRealizedVol,
+    volZCap: config.traderMaxVolZ,
+    targetVol: config.traderTargetVol,
+    maxExposure: config.traderMaxExposure,
+    cooldownReason: riskState.lastStopReason,
+    lastStopReturn: riskState.lastStopReturn
+  };
+
+  const absEdge = Math.abs(edge ?? 0);
+  const minEdge = config.traderMinEdge;
+  const trendThreshold = config.traderTrendThreshold;
+  const maxVolZ = config.traderMaxVolZ;
+  const maxVol = config.traderMaxRealizedVol;
+
+  if (desiredAction === 1) {
+    if (riskState.cooldown > 0) gating.reasons.push('cooldown');
+    if (absEdge < minEdge) gating.reasons.push('edge');
+    if (trend < trendThreshold) gating.reasons.push('trend');
+    if (Math.abs(volZ) > maxVolZ) gating.reasons.push('vol_z');
+    if (realizedVol > maxVol) gating.reasons.push('volatility');
+    if (exposure >= config.traderMaxExposure - 1e-6) gating.reasons.push('exposure');
+    if (gating.reasons.length) {
+      gating.action = 0;
+    }
+  } else if (desiredAction === 2) {
+    if (!portfolio || portfolio.position <= 0) {
+      gating.reasons.push('flat');
+      gating.action = 0;
+    } else {
+      if (edge <= -minEdge) gating.reasons.push('edge');
+      if (trend <= -trendThreshold) gating.reasons.push('trend');
+      if (Math.abs(volZ) > maxVolZ) gating.reasons.push('vol_z');
+      if (realizedVol > maxVol) gating.reasons.push('volatility');
+      if (!gating.reasons.length) {
+        gating.reasons.push('hold');
+        gating.action = 0;
+      }
+    }
+  } else {
+    gating.action = 0;
+  }
+
+  gating.allowed = gating.action === desiredAction;
+  gating.primaryReason = gating.reasons[0] ?? null;
+  return gating;
 }
 
 let portfolio = null;
@@ -959,6 +1109,7 @@ function setActiveDataset(dataset, { resetNetwork = false, resetTrader = false }
   tradingStats.playlistSize = playlist.length;
   history = { actual: [], predicted: [], errors: [] };
   recentPredictions = [];
+  resetRiskState();
   portfolio = createPortfolio();
   stats = createStats();
   stats.ticker = dataset.symbol;
@@ -1032,7 +1183,20 @@ function createTradingStats() {
     losses: 0,
     winRate: 0,
     playlistPosition: playlistPosition(),
-    playlistSize: playlist.length
+    playlistSize: playlist.length,
+    regime: 0,
+    volBucket: 0,
+    volZ: 0,
+    realizedVol: 0,
+    minEdge: config.traderMinEdge,
+    trendThreshold: config.traderTrendThreshold,
+    volatilityCap: config.traderMaxRealizedVol,
+    volZCap: config.traderMaxVolZ,
+    targetVol: config.traderTargetVol,
+    maxExposure: config.traderMaxExposure,
+    cooldown: riskState.cooldown,
+    cooldownReason: riskState.lastStopReason ?? null,
+    gateReason: null
   };
 }
 
@@ -1271,9 +1435,10 @@ function attemptSell(price, fraction, date, edge, idx) {
   const proceeds = shares * price;
   const tradeCost = estimateTransactionCost(shares, price, idx, edge);
   const netProceeds = proceeds - tradeCost;
+  const prevAvgCost = portfolio.avgCost;
   portfolio.cash += netProceeds;
   portfolio.position -= shares;
-  const realizedGross = portfolio.avgCost > 0 ? (price - portfolio.avgCost) * shares : 0;
+  const realizedGross = prevAvgCost > 0 ? (price - prevAvgCost) * shares : 0;
   const realized = realizedGross - tradeCost;
   portfolio.realizedPnl += realized;
   if (portfolio.position <= 0) {
@@ -1285,6 +1450,9 @@ function attemptSell(price, fraction, date, edge, idx) {
   portfolio.totalVolume += shares;
   const holdingDays = updateHoldDurations(shares, idx);
   markToMarket(date, price);
+  const costBasis = prevAvgCost > 0 ? prevAvgCost * shares : 0;
+  const returnPct = costBasis > 0 ? realized / costBasis : 0;
+  registerStopout(returnPct, realized < 0 ? 'drawdown' : 'trim');
   recordTrade({
     date,
     side: 'SELL',
@@ -1385,7 +1553,10 @@ function buildTradingFeatures(sample, predictedPrice) {
   return { features, edge };
 }
 
-function updateTradingStats(decision, reward, edge) {
+function updateTradingStats(decision, reward, edge, gating) {
+  if (!tradingStats) {
+    tradingStats = createTradingStats();
+  }
   tradingStats.steps += 1;
   tradingStats.lastAction = tradingActionLabel(decision?.index ?? 0);
   const confidence = decision?.confidence ?? 0;
@@ -1400,23 +1571,72 @@ function updateTradingStats(decision, reward, edge) {
   tradingStats.learningRate = config.traderLearningRate;
   tradingStats.playlistPosition = playlistPosition();
   tradingStats.playlistSize = playlist.length;
+  tradingStats.minEdge = config.traderMinEdge;
+  tradingStats.trendThreshold = config.traderTrendThreshold;
+  tradingStats.volatilityCap = config.traderMaxRealizedVol;
+  tradingStats.volZCap = config.traderMaxVolZ;
+  tradingStats.targetVol = config.traderTargetVol;
+  tradingStats.maxExposure = config.traderMaxExposure;
+  tradingStats.cooldown = Math.max(0, riskState.cooldown);
+  tradingStats.cooldownReason = riskState.lastStopReason ?? null;
+  if (gating) {
+    if (Number.isFinite(gating.trend)) {
+      tradingStats.regime = gating.trend;
+    }
+    if (Number.isFinite(gating.volBucket)) {
+      tradingStats.volBucket = gating.volBucket;
+    }
+    if (Number.isFinite(gating.volZ)) {
+      tradingStats.volZ = gating.volZ;
+    }
+    if (Number.isFinite(gating.volatility)) {
+      tradingStats.realizedVol = gating.volatility;
+    }
+    if (Array.isArray(gating.reasons) && gating.reasons.length) {
+      tradingStats.gateReason = gating.reasons[0];
+    } else if (gating.primaryReason) {
+      tradingStats.gateReason = gating.primaryReason;
+    } else {
+      tradingStats.gateReason = null;
+    }
+  } else {
+    tradingStats.gateReason = null;
+  }
 }
 
 function applyTradingPolicy(sample, predictedPrice) {
   if (!portfolio || !sample || !Number.isFinite(sample.targetPrice)) return;
   const idx = sample.index ?? cursor;
   const { features, edge } = buildTradingFeatures(sample, predictedPrice);
-  const decision = trader.act(features, config.traderExploration);
+  const rawDecision = trader.act(features, config.traderExploration);
+  const gating = evaluatePositionGating(sample, edge, rawDecision.index);
+  const executedDecision = {
+    ...rawDecision,
+    originalIndex: rawDecision.index,
+    index: gating.action
+  };
   const price = sample.targetPrice;
   const prevEquity = portfolio.equity;
   let traded = false;
-  const minFraction = 0.05;
-  const maxFraction = 0.5;
-  const fraction = Math.min(maxFraction, minFraction + (maxFraction - minFraction) * Math.max(0, decision.confidence));
-  if (decision.index === 1) {
-    traded = attemptBuy(price, fraction, sample.date, edge, idx);
-  } else if (decision.index === 2) {
-    traded = attemptSell(price, fraction, sample.date, edge, idx);
+  let fraction = 0;
+  if (executedDecision.index === 1) {
+    fraction = computeTradeFraction(executedDecision.confidence, gating, price, 1);
+    if (fraction > 0) {
+      traded = attemptBuy(price, fraction, sample.date, edge, idx);
+    }
+    if (!traded) {
+      gating.reasons.push('sizing');
+      executedDecision.index = 0;
+    }
+  } else if (executedDecision.index === 2) {
+    fraction = computeTradeFraction(executedDecision.confidence, gating, price, 2);
+    if (fraction > 0) {
+      traded = attemptSell(price, fraction, sample.date, edge, idx);
+    }
+    if (!traded) {
+      gating.reasons.push('sizing');
+      executedDecision.index = 0;
+    }
   }
   if (!traded) {
     markToMarket(sample.date, price);
@@ -1424,8 +1644,19 @@ function applyTradingPolicy(sample, predictedPrice) {
   const equityChange = portfolio.equity - prevEquity;
   const normalizedReward = equityChange / Math.max(1, portfolio.initialCash);
   const scaledReward = Math.max(-5, Math.min(5, normalizedReward * config.traderRewardScale));
-  trader.train(decision, scaledReward);
-  updateTradingStats(decision, normalizedReward, edge);
+  trader.train(executedDecision, scaledReward);
+  gating.traded = traded;
+  gating.fraction = fraction;
+  gating.executedAction = executedDecision.index;
+  gating.originalAction = executedDecision.originalIndex;
+  updateTradingStats(executedDecision, normalizedReward, edge, gating);
+  if (riskState.cooldown > 0 && riskState.cooldown <= (gating.cooldown ?? riskState.cooldown)) {
+    riskState.cooldown = Math.max(0, riskState.cooldown - 1);
+    if (riskState.cooldown === 0) {
+      riskState.lastStopReason = null;
+      riskState.lastStopReturn = null;
+    }
+  }
 }
 
 function computeEquityMetrics(history) {
@@ -1687,7 +1918,20 @@ function postSnapshot() {
     trades: tradingStats.trades,
     winRate: tradingStats.winRate,
     playlistPosition: tradingStats.playlistPosition,
-    playlistSize: tradingStats.playlistSize
+    playlistSize: tradingStats.playlistSize,
+    regime: tradingStats.regime,
+    volBucket: tradingStats.volBucket,
+    volZ: tradingStats.volZ,
+    realizedVol: tradingStats.realizedVol,
+    minEdge: tradingStats.minEdge,
+    trendThreshold: tradingStats.trendThreshold,
+    volatilityCap: tradingStats.volatilityCap,
+    volZCap: tradingStats.volZCap,
+    targetVol: tradingStats.targetVol,
+    maxExposure: tradingStats.maxExposure,
+    cooldown: tradingStats.cooldown,
+    cooldownReason: tradingStats.cooldownReason,
+    gateReason: tradingStats.gateReason
   };
 
   const snapshot = {
@@ -1727,6 +1971,7 @@ function resetState(resume = false) {
   trader = null;
   tradingStats = null;
   activeDataset = null;
+  resetRiskState();
   rebuildTickerPlaylist();
   const initialized = advanceToNextDataset({ resetNetwork: true, resetTrader: true });
   if (!initialized) {
@@ -1763,6 +2008,39 @@ function applyConfig(newConfig) {
   config.traderRewardScale = Number.isFinite(config.traderRewardScale)
     ? Math.max(1, config.traderRewardScale)
     : 120;
+  config.traderBaseFraction = Number.isFinite(config.traderBaseFraction)
+    ? Math.max(0, Math.min(1, config.traderBaseFraction))
+    : 0.05;
+  config.traderMaxFraction = Number.isFinite(config.traderMaxFraction)
+    ? Math.max(config.traderBaseFraction, Math.min(1, config.traderMaxFraction))
+    : Math.max(config.traderBaseFraction, 0.5);
+  config.traderMinTradeFraction = Number.isFinite(config.traderMinTradeFraction)
+    ? Math.max(0, Math.min(1, config.traderMinTradeFraction))
+    : 0.01;
+  config.traderTargetVol = Number.isFinite(config.traderTargetVol)
+    ? Math.max(0, config.traderTargetVol)
+    : 0.25;
+  config.traderMaxExposure = Number.isFinite(config.traderMaxExposure)
+    ? Math.max(config.traderBaseFraction, Math.min(1.5, config.traderMaxExposure))
+    : 0.75;
+  config.traderMinEdge = Number.isFinite(config.traderMinEdge)
+    ? Math.max(0, config.traderMinEdge)
+    : 0.002;
+  config.traderTrendThreshold = Number.isFinite(config.traderTrendThreshold)
+    ? Math.max(-1, Math.min(1, config.traderTrendThreshold))
+    : 0.1;
+  config.traderMaxVolZ = Number.isFinite(config.traderMaxVolZ)
+    ? Math.max(0, config.traderMaxVolZ)
+    : 2.5;
+  config.traderMaxRealizedVol = Number.isFinite(config.traderMaxRealizedVol)
+    ? Math.max(0, config.traderMaxRealizedVol)
+    : 0.6;
+  config.traderCooldownBars = Number.isFinite(config.traderCooldownBars)
+    ? Math.max(0, Math.round(config.traderCooldownBars))
+    : 3;
+  config.traderStopoutReturn = Number.isFinite(config.traderStopoutReturn)
+    ? Math.min(0, config.traderStopoutReturn)
+    : -0.02;
   config.tickerSubsetMin = Math.max(1, Math.min((config.tickerSubsetMin | 0) || 1, marketUniverse.length));
   config.tickerSubsetMax = Math.max(config.tickerSubsetMin, Math.min((config.tickerSubsetMax | 0) || config.tickerSubsetMin, marketUniverse.length));
   config.costPerSideBps = Number.isFinite(config.costPerSideBps) ? Math.max(0, config.costPerSideBps) : 0.0005;
@@ -1793,6 +2071,12 @@ function applyConfig(newConfig) {
     }
     tradingStats.exploration = config.traderExploration;
     tradingStats.learningRate = config.traderLearningRate;
+    tradingStats.minEdge = config.traderMinEdge;
+    tradingStats.trendThreshold = config.traderTrendThreshold;
+    tradingStats.volatilityCap = config.traderMaxRealizedVol;
+    tradingStats.volZCap = config.traderMaxVolZ;
+    tradingStats.targetVol = config.traderTargetVol;
+    tradingStats.maxExposure = config.traderMaxExposure;
     if (stats) {
       stats.learningRate = config.learningRate;
       stats.noise = config.noise;
