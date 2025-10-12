@@ -90,9 +90,10 @@ See [`task_tracker.md`](./task_tracker.md) for the current backlog. Contribution
 
 Market NN Plus Ultra ships with a pluggable [`FeatureRegistry`](./market_nn_plus_ultra/data/feature_registry.py) that catalogues rich technical signals and engineered factors. Pipelines can cherry-pick subsets of indicators or extend the registry with custom research ideas. The default registry includes:
 
-* Momentum: RSI, MACD histogram and signal differentials.
-* Volatility & risk: Bollinger band width, annualised realised volatility, Average True Range.
+* Momentum: RSI, MACD histogram and signal differentials, multi-step price velocity.
+* Volatility & risk: Bollinger band width, annualised realised volatility, Average True Range, rolling skew/kurtosis.
 * Regime detection: Soft bull/bear probability estimates from rolling z-scores.
 * Volume analytics: Rolling z-score anomalies for volume-led confirmation.
+* Distribution & spectral cues: Log returns and FFT energy decomposition to expose multi-scale structure.
 
 The registry metadata powers automated documentation and enables future UIs to surface feature provenance, required dependencies, and semantic tags.

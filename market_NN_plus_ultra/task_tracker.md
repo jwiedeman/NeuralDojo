@@ -12,6 +12,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [ ] Auto-generate documentation from `FeatureRegistry.describe()` into Markdown.
 - [ ] Add alternative data connectors (on-chain metrics, macro calendars) into the registry.
 - [ ] Surface dependency errors with structured logging for experiment reproducibility.
+- [x] Seed registry with higher-moment statistics and spectral energy factors.
 
 ## 1. Deep Temporal Modelling
 - [ ] Implement TemporalFusionTransformer-style encoder with multi-horizon support.

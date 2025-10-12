@@ -3,10 +3,7 @@ experiment:
 
 data:
   database_path: data/market.db
-  indicators:
-    - rsi
-    - macd
-    - bbands_width
+  indicators: []
   asset_universe: []
 
 model:
@@ -16,7 +13,7 @@ model:
   n_heads: 8
   patch_size: 1
   conv_kernel: 7
-  conv_dilations: [1, 2, 4, 8, 16]
+  conv_dilations: [1, 2, 4, 8, 16, 32]
   dropout: 0.2
   ffn_expansion: 4
   forecast_horizon: 5
