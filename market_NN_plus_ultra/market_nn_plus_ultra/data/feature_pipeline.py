@@ -8,6 +8,8 @@ from typing import Iterable, Mapping
 import numpy as np
 import pandas as pd
 
+from .feature_registry import FeatureFn, FeatureSpec
+
 
 @dataclass(slots=True)
 class FeaturePipeline:
@@ -23,14 +25,19 @@ class FeaturePipeline:
     * Regime and volatility detectors.
     """
 
-    feature_fns: Mapping[str, callable]
+    feature_fns: Mapping[str, FeatureFn | FeatureSpec]
 
     def apply(self, panel: pd.DataFrame) -> pd.DataFrame:
         """Run all registered feature functions and merge outputs."""
 
         enriched = panel.copy()
-        for name, fn in self.feature_fns.items():
-            result = fn(enriched)
+        for name, entry in self.feature_fns.items():
+            spec = self._resolve(entry)
+            missing = [dep for dep in spec.depends_on if dep not in enriched.columns]
+            if missing:
+                # Skip gracefully when dependencies are not satisfied.
+                continue
+            result = spec.fn(enriched)
             if isinstance(result, pd.Series):
                 enriched[name] = result
             elif isinstance(result, pd.DataFrame):
@@ -42,23 +49,29 @@ class FeaturePipeline:
         enriched.sort_index(inplace=True)
         return enriched
 
+    @staticmethod
+    def _resolve(entry: FeatureFn | FeatureSpec) -> FeatureSpec:
+        if isinstance(entry, FeatureSpec):
+            return entry
+        return FeatureSpec(fn=entry)
+
+    def describe(self) -> dict[str, dict[str, Iterable[str]]]:
+        """Expose metadata about the underlying features."""
+
+        description: dict[str, dict[str, Iterable[str]]] = {}
+        for name, entry in self.feature_fns.items():
+            spec = self._resolve(entry)
+            description[name] = {
+                "tags": tuple(spec.tags),
+                "depends_on": tuple(spec.depends_on),
+            }
+        return description
+
     @classmethod
     def with_default_indicators(cls) -> "FeaturePipeline":
         """Return a pipeline seeded with common high-signal indicators."""
 
-        def rsi(df: pd.DataFrame, window: int = 14) -> pd.Series:
-            delta = df.groupby(level=0)["close"].diff()
-            gain = delta.clip(lower=0).rolling(window).mean()
-            loss = -delta.clip(upper=0).rolling(window).mean()
-            rs = gain / (loss + 1e-9)
-            return 100 - (100 / (1 + rs))
+        from .feature_registry import FeatureRegistry
 
-        def rolling_vol(df: pd.DataFrame, window: int = 20) -> pd.Series:
-            return df.groupby(level=0)["close"].pct_change().rolling(window).std() * np.sqrt(252)
-
-        return cls(
-            feature_fns={
-                "rsi": rsi,
-                "annualized_vol": rolling_vol,
-            },
-        )
+        registry = FeatureRegistry.default()
+        return registry.build_pipeline()
