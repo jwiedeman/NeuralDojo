@@ -88,6 +88,31 @@
   const delayEl = document.getElementById('delayMs');
   const delayValEl = document.getElementById('delayMsVal');
 
+  const headerEl = document.querySelector('header');
+  const fatalErrorEl = document.createElement('div');
+  fatalErrorEl.className = 'fatal-error';
+  fatalErrorEl.style.display = 'none';
+  fatalErrorEl.setAttribute('role', 'alert');
+  if (headerEl) {
+    headerEl.insertAdjacentElement('afterend', fatalErrorEl);
+  } else {
+    document.body.prepend(fatalErrorEl);
+  }
+
+  function showFatalError(message, error) {
+    if (error) {
+      console.error(message, error);
+    } else {
+      console.error(message);
+    }
+    fatalErrorEl.textContent = message;
+    fatalErrorEl.style.display = 'block';
+    fatalError = true;
+    startBtn.disabled = true;
+    pauseBtn.disabled = true;
+    resetBtn.disabled = true;
+  }
+
   const config = {
     learningRate: parseFloat(learningRateEl.value),
     hiddenUnits: parseInt(hiddenUnitsEl.value, 10),
@@ -97,6 +122,8 @@
   };
 
   let running = false;
+  let worker = null;
+  let fatalError = false;
 
   function formatNumber(value, digits = 2) {
     if (value == null || Number.isNaN(value)) return '—';
@@ -702,37 +729,68 @@
 
   function setRunningState(value) {
     running = value;
+    if (fatalError) {
+      startBtn.disabled = true;
+      pauseBtn.disabled = true;
+      return;
+    }
     startBtn.disabled = running;
     pauseBtn.disabled = !running;
   }
 
-  const worker = new Worker('worker.js');
-
-  worker.onmessage = ev => {
-    const msg = ev.data;
-    if (!msg) return;
-    if (msg.type === 'status') {
-      setRunningState(!!msg.running);
-    } else if (msg.type === 'snapshot') {
-      applySnapshot(msg.snapshot);
+  function initWorker() {
+    try {
+      const workerUrl = new URL('./worker.js', window.location.href);
+      const instance = new Worker(workerUrl, { type: 'classic' });
+      instance.onmessage = ev => {
+        const msg = ev.data;
+        if (!msg) return;
+        if (msg.type === 'status') {
+          setRunningState(!!msg.running);
+        } else if (msg.type === 'snapshot') {
+          applySnapshot(msg.snapshot);
+        }
+      };
+      instance.onerror = event => {
+        showFatalError('Background worker crashed — check the console for details.', event?.error || event?.message || event);
+        worker = null;
+      };
+      instance.onmessageerror = event => {
+        showFatalError('Received malformed data from the background worker.', event?.data ?? event);
+        worker = null;
+      };
+      return instance;
+    } catch (error) {
+      showFatalError('Unable to start the background worker. This experience cannot run.', error);
+      return null;
     }
-  };
+  }
+
+  worker = initWorker();
 
   function postConfig(update) {
     Object.assign(config, update);
-    worker.postMessage({ type: 'config', config: { ...config } });
+    if (worker) {
+      worker.postMessage({ type: 'config', config: { ...config } });
+    }
   }
 
   startBtn.addEventListener('click', () => {
-    worker.postMessage({ type: 'start' });
+    if (worker) {
+      worker.postMessage({ type: 'start' });
+    }
   });
 
   pauseBtn.addEventListener('click', () => {
-    worker.postMessage({ type: 'pause' });
+    if (worker) {
+      worker.postMessage({ type: 'pause' });
+    }
   });
 
   resetBtn.addEventListener('click', () => {
-    worker.postMessage({ type: 'reset' });
+    if (worker) {
+      worker.postMessage({ type: 'reset' });
+    }
   });
 
   UI.bindRangeControl(learningRateEl, {
