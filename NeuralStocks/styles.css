@@ -45,6 +45,9 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
 }
 
 .recent-list li {
@@ -176,6 +179,9 @@
 
 .forward-wrapper {
   margin-top: 12px;
+  max-height: 240px;
+  overflow: auto;
+  scrollbar-gutter: stable both-edges;
 }
 
 .forward-empty {
