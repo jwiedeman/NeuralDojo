@@ -31,10 +31,11 @@ market_NN_plus_ultra/
     ├── data/
     │   ├── __init__.py
     │   ├── sqlite_loader.py   # Utilities for extracting structured tensors from SQLite
-    │   └── feature_pipeline.py# Feature engineering & indicator computation
+    │   ├── feature_pipeline.py# Feature engineering & indicator computation
+    │   └── window_dataset.py  # Sliding-window dataset with z-score normalisation
     ├── models/
     │   ├── __init__.py
-    │   ├── temporal_transformer.py # Deep temporal architecture definition
+    │   ├── temporal_transformer.py # Hybrid transformer/state-space backbone
     │   └── losses.py          # Custom loss functions for risk-aware optimisation
     ├── training/
     │   ├── __init__.py
@@ -64,12 +65,22 @@ Each module comes with docstrings explaining expected behaviour so future contri
    * Extend `feature_pipeline.py` to compute additional technical features (e.g. Fourier transforms, macro factors, news sentiment embeddings).
 
 3. **Configure an experiment**:
-   * Copy `configs/default.yaml` and adapt for your data source, architecture depth, and training regime.
-   * `train.py` will parse the configuration, build the model, and start the training loop.
+   * Copy `configs/default.yaml` and adapt for your data source, architecture depth, window size, and trading horizon.
+   * Key knobs:
+     - `model.conv_dilations` and `model.depth` scale temporal coverage.
+     - `training.window_size` / `window_stride` control how much history flows into each batch.
+     - `optimizer.lr` / `weight_decay` tune the AdamW optimiser.
+   * `train.py` parses the YAML, builds dataclass configs, seeds RNGs, and launches the hybrid transformer trainer.
 
 4. **Iterate and evaluate**:
-   * Use `market_nn_plus_ultra.evaluation.metrics` to compute risk-adjusted scores.
-   * Feed results back into the task tracker to prioritise the next steps.
+   * Use `market_nn_plus_ultra.evaluation.metrics` to compute risk-adjusted scores on trade logs.
+   * Inspect checkpoints saved under `training.checkpoint_dir` and feed results back into the task tracker to prioritise the next steps.
+
+## Model Highlights
+
+* **Hybrid temporal backbone** — stacks multi-head attention, dilated temporal convolutions, and state-space mixers for long-term memory.
+* **Rich data preprocessing** — SQLite ingestion joins OHLCV, indicators, and on-the-fly engineered features with z-score normalisation.
+* **Risk-aware objectives** — differentiable Sharpe/drawdown penalties baked into the default loss encourage ROI-focussed behaviour.
 
 ## Next Steps
 

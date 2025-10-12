@@ -14,8 +14,11 @@ model:
   d_model: 512
   depth: 16
   n_heads: 8
-  dilation_rates: [1, 2, 4, 8, 16]
+  patch_size: 1
+  conv_kernel: 7
+  conv_dilations: [1, 2, 4, 8, 16]
   dropout: 0.2
+  ffn_expansion: 4
   forecast_horizon: 5
   output_size: 3
 
@@ -30,3 +33,6 @@ training:
   gradient_clip_val: 1.0
   mixed_precision: true
   checkpoint_dir: checkpoints/default
+  window_size: 512
+  window_stride: 8
+  target_column: close

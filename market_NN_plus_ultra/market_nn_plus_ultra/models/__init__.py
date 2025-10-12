@@ -1,6 +1,11 @@
 """Model architectures for Market NN Plus Ultra."""
 
-from .temporal_transformer import TemporalBackbone
-from .losses import RiskAwareLoss
+from .losses import RiskAwareLoss, default_risk_loss
+from .temporal_transformer import TemporalBackbone, TemporalBackboneConfig
 
-__all__ = ["TemporalBackbone", "RiskAwareLoss"]
+__all__ = [
+    "RiskAwareLoss",
+    "TemporalBackbone",
+    "TemporalBackboneConfig",
+    "default_risk_loss",
+]
