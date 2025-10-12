@@ -11,7 +11,7 @@
   <div id="app">
     <header>
       <div class="title">MARKET ARENA — HISTORICAL FORECAST LAB</div>
-      <div class="subtitle">We stream S&P 500 (SPY) closing prices and train a tiny neural forecaster live. Same network, rolling window inputs. Watch it learn to anticipate the next close from historical context.</div>
+      <div class="subtitle">We rotate a 2000 → 2025 multi-asset universe through a streaming forecaster and live trading desk. A compact network learns on rolling windows while the trader ingests its prediction alongside SMA/EMA stacks, RSI, MACD, and volatility regimes.</div>
     </header>
 
     <main class="split">
@@ -120,7 +120,7 @@
                 <div>Best MAE so far: <span id="bestMaeSecondary">—</span></div>
                 <div>Last reset: <span id="lastReset">—</span></div>
               </div>
-              <div class="dataset-note">Source: Stooq daily closes (2000 → 2025) rotated across a multi-asset ETF universe (SPY, QQQ, DIA, IWM, EFA, EEM, XLK, XLF, XLE, XLV) sampled 5–10 tickers per replay.</div>
+              <div class="dataset-note">Source: Stooq daily closes (2000 → 2025) rotated across a multi-asset ETF universe (SPY, QQQ, DIA, IWM, EFA, EEM, XLK, XLF, XLE, XLV) sampled 5–10 tickers per replay. The trading agent consumes the forecaster's prediction, actual close, moving-average distances, RSI slopes, MACD momentum, and realized-volatility trends.</div>
             </div>
 
             <div class="panel-card trading-card">
