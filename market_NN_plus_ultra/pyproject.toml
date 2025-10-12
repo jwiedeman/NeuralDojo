@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "market-nn-plus-ultra"
+version = "0.1.0"
+description = "Ultimate market trading agent research stack"
+readme = "README.md"
+authors = [
+    {name = "NeuralDojo Contributors"}
+]
+requires-python = ">=3.10"
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.25",
+    "sqlalchemy>=2.0",
+    "pytorch-lightning>=2.2",
+    "torch>=2.2",
+    "torchvision>=0.17",
+    "torchaudio>=2.2",
+    "pyyaml>=6.0",
+    "scikit-learn>=1.3",
+    "matplotlib>=3.7",
+    "ta>=0.11.0",
+    "einops>=0.7",
+    "wandb>=0.16"
+]
+
+[tool.setuptools]
+package-dir = {"" = "market_nn_plus_ultra"}
+packages = [
+    "market_nn_plus_ultra",
+    "market_nn_plus_ultra.data",
+    "market_nn_plus_ultra.models",
+    "market_nn_plus_ultra.training",
+    "market_nn_plus_ultra.evaluation",
+    "market_nn_plus_ultra.utils"
+]
