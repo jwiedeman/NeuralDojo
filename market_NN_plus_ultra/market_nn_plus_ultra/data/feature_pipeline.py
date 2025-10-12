@@ -1,77 +1,232 @@
-"""Feature engineering pipeline for transforming raw market data."""
+"""Feature engineering pipeline for Market NN Plus Ultra."""
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from typing import Callable, Dict, Iterable, List, MutableMapping, Optional
 
 import numpy as np
 import pandas as pd
+from ta.momentum import RSIIndicator
+from ta.trend import MACD
+from ta.volatility import BollingerBands
+from ta.volume import VolumeWeightedAveragePrice
 
-from .feature_registry import FeatureFn, FeatureSpec
+FeatureFunction = Callable[[pd.DataFrame], pd.Series | pd.DataFrame]
 
 
 @dataclass(slots=True)
-class FeaturePipeline:
-    """Applies technical indicators and advanced signals to price panels.
+class FeatureSpec:
+    """Metadata for a single engineered feature."""
 
-    The pipeline keeps a registry of feature functions. Each function receives a
-    pandas ``DataFrame`` and returns either a ``Series`` or a ``DataFrame`` that
-    will be joined back to the panel. Implementations can include:
+    name: str
+    function: FeatureFunction
+    depends_on: Iterable[str]
+    description: str = ""
+    tags: Optional[Iterable[str]] = None
 
-    * Classical indicators (RSI, MACD, Bollinger bands).
-    * Spectral/transformation features (wavelets, FFT magnitude bands).
-    * Learned embeddings (news sentiment, chain-of-thought policy hints).
-    * Regime and volatility detectors.
-    """
 
-    feature_fns: Mapping[str, FeatureFn | FeatureSpec]
+class FeatureRegistry:
+    """Registry of engineered market features."""
 
-    def apply(self, panel: pd.DataFrame) -> pd.DataFrame:
-        """Run all registered feature functions and merge outputs."""
+    def __init__(self) -> None:
+        self._registry: Dict[str, FeatureSpec] = {}
+        self._bootstrap_defaults()
 
-        enriched = panel.copy()
-        for name, entry in self.feature_fns.items():
-            spec = self._resolve(entry)
-            missing = [dep for dep in spec.depends_on if dep not in enriched.columns]
-            if missing:
-                # Skip gracefully when dependencies are not satisfied.
-                continue
-            result = spec.fn(enriched)
-            if isinstance(result, pd.Series):
-                enriched[name] = result
-            elif isinstance(result, pd.DataFrame):
-                for column in result.columns:
-                    enriched[f"{name}_{column}"] = result[column]
-            else:
-                raise TypeError(f"Feature '{name}' returned unsupported type {type(result)!r}")
-        enriched.replace([np.inf, -np.inf], np.nan, inplace=True)
-        enriched.sort_index(inplace=True)
-        return enriched
+    def _bootstrap_defaults(self) -> None:
+        self.register(
+            FeatureSpec(
+                name="rsi_14",
+                function=lambda df: RSIIndicator(close=df["close"], window=14).rsi(),
+                depends_on=["close"],
+                description="Relative Strength Index over 14 periods",
+                tags=["momentum"],
+            )
+        )
+        self.register(
+            FeatureSpec(
+                name="macd_hist",
+                function=lambda df: MACD(close=df["close"]).macd_diff(),
+                depends_on=["close"],
+                description="MACD histogram capturing trend accelerations",
+                tags=["trend"],
+            )
+        )
+        self.register(
+            FeatureSpec(
+                name="bollinger_band_width",
+                function=lambda df: BollingerBands(close=df["close"], window=20, window_dev=2.0).bollinger_wband(),
+                depends_on=["close"],
+                description="Relative Bollinger band width as a volatility proxy",
+                tags=["volatility"],
+            )
+        )
+        self.register(
+            FeatureSpec(
+                name="vwap_ratio",
+                function=lambda df: df["close"] / VolumeWeightedAveragePrice(
+                    high=df["high"], low=df["low"], close=df["close"], volume=df["volume"], window=20
+                ).volume_weighted_average_price(),
+                depends_on=["high", "low", "close", "volume"],
+                description="Price distance from VWAP",
+                tags=["volume", "intraday"],
+            )
+        )
+        self.register(
+            FeatureSpec(
+                name="log_return_1",
+                function=lambda df: np.log(df["close"]).diff(1),
+                depends_on=["close"],
+                description="One-step log return",
+                tags=["returns"],
+            )
+        )
+        self.register(
+            FeatureSpec(
+                name="log_return_5",
+                function=lambda df: np.log(df["close"]).diff(5),
+                depends_on=["close"],
+                description="Five-step log return",
+                tags=["returns", "multi_horizon"],
+            )
+        )
+        self.register(
+            FeatureSpec(
+                name="realised_vol_20",
+                function=lambda df: np.log(df["close"]).diff().rolling(20).std() * math.sqrt(252),
+                depends_on=["close"],
+                description="Annualised realised volatility over 20 periods",
+                tags=["volatility"],
+            )
+        )
+        self.register(
+            FeatureSpec(
+                name="volume_zscore",
+                function=lambda df: (df["volume"] - df["volume"].rolling(60).mean()) / df["volume"].rolling(60).std(),
+                depends_on=["volume"],
+                description="Rolling z-score of volume anomalies",
+                tags=["volume", "regime"],
+            )
+        )
+        self.register(
+            FeatureSpec(
+                name="regime_score",
+                function=lambda df: (df["close"] - df["close"].rolling(100).mean()) / df["close"].rolling(100).std(),
+                depends_on=["close"],
+                description="Soft bull/bear regime score",
+                tags=["regime"],
+            )
+        )
+        self.register(
+            FeatureSpec(
+                name="rolling_skew_30",
+                function=lambda df: df["close"].pct_change().rolling(30).skew(),
+                depends_on=["close"],
+                description="30-step skewness of returns",
+                tags=["higher_moment"],
+            )
+        )
+        self.register(
+            FeatureSpec(
+                name="rolling_kurtosis_30",
+                function=lambda df: df["close"].pct_change().rolling(30).kurt(),
+                depends_on=["close"],
+                description="30-step kurtosis of returns",
+                tags=["higher_moment"],
+            )
+        )
+        self.register(
+            FeatureSpec(
+                name="fft_energy_ratio",
+                function=lambda df: self._fft_energy_ratio(df["close"], window=128, top_k=5),
+                depends_on=["close"],
+                description="Ratio of high-frequency FFT energy to total energy over 128 steps",
+                tags=["spectral"],
+            )
+        )
+
+    def register(self, spec: FeatureSpec) -> None:
+        if spec.name in self._registry:
+            raise ValueError(f"Feature '{spec.name}' already registered")
+        self._registry[spec.name] = spec
+
+    def unregister(self, name: str) -> None:
+        self._registry.pop(name, None)
+
+    def describe(self) -> pd.DataFrame:
+        records = []
+        for spec in self._registry.values():
+            records.append(
+                {
+                    "name": spec.name,
+                    "depends_on": list(spec.depends_on),
+                    "description": spec.description,
+                    "tags": list(spec.tags or []),
+                }
+            )
+        return pd.DataFrame.from_records(records)
+
+    def build_pipeline(self, selected: Optional[Iterable[str]] = None) -> "FeaturePipeline":
+        if selected is None:
+            specs = list(self._registry.values())
+        else:
+            specs = [self._registry[name] for name in selected]
+        return FeaturePipeline(specs)
 
     @staticmethod
-    def _resolve(entry: FeatureFn | FeatureSpec) -> FeatureSpec:
-        if isinstance(entry, FeatureSpec):
-            return entry
-        return FeatureSpec(fn=entry)
+    def _fft_energy_ratio(close: pd.Series, window: int, top_k: int) -> pd.Series:
+        def _energy(segment: np.ndarray) -> float:
+            spectrum = np.abs(np.fft.rfft(segment - segment.mean()))
+            total = np.sum(spectrum)
+            if total == 0:
+                return 0.0
+            top = np.sum(np.sort(spectrum)[-top_k:])
+            return float(top / total)
 
-    def describe(self) -> dict[str, dict[str, Iterable[str]]]:
-        """Expose metadata about the underlying features."""
+        return close.rolling(window).apply(lambda x: _energy(np.asarray(x)), raw=False)
 
-        description: dict[str, dict[str, Iterable[str]]] = {}
-        for name, entry in self.feature_fns.items():
-            spec = self._resolve(entry)
-            description[name] = {
-                "tags": tuple(spec.tags),
-                "depends_on": tuple(spec.depends_on),
-            }
-        return description
 
-    @classmethod
-    def with_default_indicators(cls) -> "FeaturePipeline":
-        """Return a pipeline seeded with common high-signal indicators."""
+class FeaturePipeline:
+    """Execute a list of feature engineering steps on market panels."""
 
-        from .feature_registry import FeatureRegistry
+    def __init__(self, features: Iterable[FeatureSpec]) -> None:
+        self.features: List[FeatureSpec] = list(features)
 
-        registry = FeatureRegistry.default()
-        return registry.build_pipeline()
+    def transform(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Return a frame with engineered features appended."""
+
+        feature_columns: MutableMapping[str, pd.Series | pd.DataFrame] = {}
+        for spec in self.features:
+            missing = [col for col in spec.depends_on if col not in df.columns]
+            if missing:
+                continue
+            values = spec.function(df)
+            if isinstance(values, pd.DataFrame):
+                for column in values.columns:
+                    feature_columns[f"{spec.name}__{column}"] = values[column]
+            else:
+                feature_columns[spec.name] = values
+        if not feature_columns:
+            return df
+        feature_df = pd.concat(feature_columns, axis=1)
+        if isinstance(feature_df.columns, pd.MultiIndex):
+            feature_df.columns = [
+                "__".join([str(level) for level in col if str(level)])
+                for col in feature_df.columns.to_list()
+            ]
+        return pd.concat([df, feature_df], axis=1)
+
+    def transform_panel(self, panel: pd.DataFrame) -> pd.DataFrame:
+        """Apply the feature pipeline symbol by symbol to a multi-indexed panel."""
+
+        symbols = panel.index.get_level_values("symbol").unique()
+        enriched_frames: List[pd.DataFrame] = []
+        for symbol in symbols:
+            df = panel.xs(symbol, level="symbol").copy()
+            enriched = self.transform(df)
+            enriched["symbol"] = symbol
+            enriched_frames.append(enriched)
+        enriched_panel = pd.concat(enriched_frames)
+        return enriched_panel.reset_index().set_index(["timestamp", "symbol"]).sort_index()
+

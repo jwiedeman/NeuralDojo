@@ -1,96 +1,129 @@
-"""Utilities for loading market data from a SQLite database."""
+"""SQLite ingestion utilities for Market NN Plus Ultra.
+
+This module loads OHLCV series, optional indicator tables, and auxiliary
+features from a SQLite database. It exposes a high-level dataset helper that
+returns a tidy multi-indexed :class:`pandas.DataFrame` ready for feature
+engineering and model consumption.
+"""
 
 from __future__ import annotations
 
+import contextlib
+import sqlite3
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Mapping, Optional
 
+import numpy as np
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 
-from .feature_pipeline import FeaturePipeline
+
+@dataclass(slots=True)
+class SQLiteMarketSource:
+    """Connection metadata for a market SQLite database."""
+
+    path: str
+    read_only: bool = True
+    pragma_statements: Optional[Iterable[str]] = None
+
+    def connect(self) -> sqlite3.Connection:
+        """Return a SQLite connection with pragmas applied."""
+
+        uri = f"file:{self.path}?mode={'ro' if self.read_only else 'rwc'}"
+        conn = sqlite3.connect(uri, uri=True, detect_types=sqlite3.PARSE_DECLTYPES)
+        for pragma in self.pragma_statements or ("journal_mode=WAL", "synchronous=NORMAL"):
+            conn.execute(f"PRAGMA {pragma}")
+        return conn
+
+    def engine(self):
+        """Return a SQLAlchemy engine for vectorised queries."""
+
+        mode = "ro" if self.read_only else "rw"
+        return create_engine(f"sqlite+pysqlite:///{self.path}?mode={mode}")
 
 
 @dataclass(slots=True)
 class SQLiteMarketDataset:
-    """Loads asset time-series and indicators from a SQLite database.
+    """Load structured market data from a SQLite database.
 
-    The database is expected to expose the following tables:
-
-    * ``assets``: ``asset_id`` (int), ``symbol`` (str), ``sector`` (str, optional).
-    * ``series``: ``timestamp`` (int / str), ``asset_id`` (int), ``open``, ``high``, ``low``, ``close``, ``volume``.
-    * ``indicators``: ``timestamp`` (int / str), ``asset_id`` (int), ``name`` (str), ``value`` (float).
-    * ``meta`` (optional): global metadata such as currency or data source.
-
-    Additional tables such as ``trades`` and ``benchmarks`` can be introduced later for
-    reinforcement learning fine-tuning.
+    Parameters
+    ----------
+    source:
+        Database connection metadata.
+    symbol_universe:
+        Optional list of ticker symbols to filter.
+    indicators:
+        Mapping of indicator name to SQL query or table name.
+    resample_rule:
+        Optional pandas offset alias for resampling (e.g., ``'1H'``).
+    tz_convert:
+        Optional timezone to convert the ``timestamp`` column into.
     """
 
-    database_path: Path
-    indicators: Optional[Iterable[str]] = None
-    asset_universe: Optional[Iterable[str]] = None
-    feature_pipeline: Optional[FeaturePipeline] = None
+    source: SQLiteMarketSource
+    symbol_universe: Optional[Iterable[str]] = None
+    indicators: Optional[Mapping[str, str]] = None
+    resample_rule: Optional[str] = None
+    tz_convert: Optional[str] = None
 
-    def _engine(self):
-        return create_engine(f"sqlite:///{self.database_path}")
+    def load(self) -> pd.DataFrame:
+        """Return a multi-indexed frame with OHLCV and indicator columns."""
 
-    def load_assets(self) -> pd.DataFrame:
-        """Return the assets table with symbols and metadata."""
+        with contextlib.closing(self.source.connect()) as conn:
+            price_df = pd.read_sql_query("SELECT * FROM series", conn, parse_dates=["timestamp"])
+            if self.symbol_universe:
+                price_df = price_df[price_df["symbol"].isin(set(self.symbol_universe))]
 
-        query = "SELECT * FROM assets"
-        with self._engine().connect() as conn:
-            assets = pd.read_sql(text(query), conn)
-        if self.asset_universe:
-            assets = assets[assets["symbol"].isin(self.asset_universe)]
-        return assets.set_index("asset_id")
+            if self.tz_convert:
+                price_df["timestamp"] = price_df["timestamp"].dt.tz_localize("UTC").dt.tz_convert(self.tz_convert)
 
-    def load_prices(self) -> pd.DataFrame:
-        """Load OHLCV price history for the requested asset universe."""
+            price_df = price_df.set_index(["timestamp", "symbol"]).sort_index()
 
-        query = "SELECT * FROM series"
-        params: dict[str, object] = {}
-        if self.asset_universe:
-            placeholders = ",".join([":asset_" + str(i) for i, _ in enumerate(self.asset_universe)])
-            query += f" WHERE asset_id IN (SELECT asset_id FROM assets WHERE symbol IN ({placeholders}))"
-            params = {f"asset_{i}": symbol for i, symbol in enumerate(self.asset_universe)}
-        with self._engine().connect() as conn:
-            prices = pd.read_sql(text(query), conn, params=params, parse_dates=["timestamp"])
-        prices = prices.sort_values(["asset_id", "timestamp"])
-        return prices
+            indicator_frames: list[pd.DataFrame] = []
+            for name, table in (self.indicators or {}).items():
+                query = f"SELECT * FROM {table}" if " " not in table.lower() else table
+                ind_df = pd.read_sql_query(query, conn, parse_dates=["timestamp"])
+                ind_df = ind_df.set_index(["timestamp", "symbol"]).sort_index()
+                indicator_frames.append(ind_df.add_prefix(f"{name}__"))
 
-    def load_indicators(self) -> pd.DataFrame:
-        """Load indicator panel data filtered by names if provided."""
-
-        query = "SELECT * FROM indicators"
-        params: dict[str, object] = {}
-        if self.indicators:
-            placeholders = ",".join([":name_" + str(i) for i, _ in enumerate(self.indicators)])
-            query += f" WHERE name IN ({placeholders})"
-            params = {f"name_{i}": name for i, name in enumerate(self.indicators)}
-        with self._engine().connect() as conn:
-            indicators = pd.read_sql(text(query), conn, params=params, parse_dates=["timestamp"])
-        indicators = indicators.sort_values(["asset_id", "timestamp", "name"])
-        return indicators
-
-    def load_joined_panel(self) -> pd.DataFrame:
-        """Return a multi-indexed dataframe combining prices, indicators, and derived features."""
-
-        prices = self.load_prices()
-        indicators = self.load_indicators()
-        if not indicators.empty:
-            pivoted = indicators.pivot_table(
-                index=["timestamp", "asset_id"],
-                columns="name",
-                values="value",
-            )
-            merged = prices.merge(pivoted, on=["timestamp", "asset_id"], how="left")
+        if indicator_frames:
+            merged = pd.concat([price_df] + indicator_frames, axis=1)
         else:
-            merged = prices
+            merged = price_df
 
-        merged = merged.sort_values(["asset_id", "timestamp"]).set_index(["asset_id", "timestamp"])
+        if self.resample_rule:
+            merged = (
+                merged.groupby(level="symbol")
+                .apply(lambda df: df.droplevel("symbol").resample(self.resample_rule).agg("last"))
+                .drop(columns=["symbol"], errors="ignore")
+            )
+            merged.index.names = ["symbol", "timestamp"]
+            merged = merged.swaplevel().sort_index()
 
-        if self.feature_pipeline is not None:
-            merged = self.feature_pipeline.apply(merged)
-
+        merged = merged.dropna(how="all")
         return merged
+
+    def as_panel(self) -> pd.DataFrame:
+        """Return the dataset as a panel with contiguous timestamps per symbol."""
+
+        df = self.load()
+        symbols = df.index.get_level_values("symbol").unique()
+        frames = []
+        for sym in symbols:
+            sym_df = df.xs(sym, level="symbol").copy()
+            sym_df = sym_df.ffill().bfill()
+            sym_df["symbol"] = sym
+            frames.append(sym_df)
+        panel = pd.concat(frames)
+        panel.index.name = "timestamp"
+        return panel.reset_index().set_index(["timestamp", "symbol"]).sort_index()
+
+    def to_numpy(self) -> tuple[np.ndarray, np.ndarray, list[str]]:
+        """Return timestamps, data matrix, and feature names."""
+
+        panel = self.as_panel()
+        feature_cols = [c for c in panel.columns if c not in ("symbol",)]
+        timestamps = panel.index.get_level_values("timestamp").unique().to_numpy()
+        data = panel[feature_cols].to_numpy(dtype=np.float32)
+        return timestamps, data, feature_cols
+

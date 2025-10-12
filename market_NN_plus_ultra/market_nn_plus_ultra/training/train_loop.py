@@ -1,175 +1,184 @@
-"""Training loop orchestrator."""
+"""Lightning-powered training loop for Market NN Plus Ultra."""
 
 from __future__ import annotations
 
-from contextlib import nullcontext
+from dataclasses import asdict
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Any, Dict
 
+import pytorch_lightning as pl
 import torch
-from torch.utils.data import DataLoader, random_split
+import yaml
+from torch.utils.data import DataLoader
 
-from ..data import FeaturePipeline, SQLiteMarketDataset, SlidingWindowDataset, WindowConfig
-from ..models.losses import default_risk_loss
-from ..models.temporal_transformer import TemporalBackbone, TemporalBackboneConfig
-from .config import TrainingConfig
-
-
-def _collate(batch: Iterable[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, torch.Tensor]:
-    features, targets = zip(*batch)
-    return torch.stack(features), torch.stack(targets)
+from ..data import FeatureRegistry, SQLiteMarketDataset, SlidingWindowDataset
+from ..data.sqlite_loader import SQLiteMarketSource
+from ..models.temporal_transformer import TemporalBackbone, TemporalBackboneConfig, TemporalPolicyHead
+from ..models.losses import CompositeTradingLoss
+from .config import DataConfig, ExperimentConfig, ModelConfig, OptimizerConfig, TrainerConfig
 
 
-class Trainer:
-    """High-level trainer coordinating data, model, and optimisation."""
+class MarketLightningModule(pl.LightningModule):
+    """Lightning module combining the backbone and policy head."""
 
-    def __init__(self, config: TrainingConfig):
-        self.config = config
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.loss_fn = default_risk_loss()
-        self.amp_enabled = config.mixed_precision and self.device.type == "cuda"
-        self.scaler: Optional[torch.cuda.amp.GradScaler] = None
-        if self.amp_enabled:
-            self.scaler = torch.cuda.amp.GradScaler()
-
-        dataset = SQLiteMarketDataset(
-            database_path=config.data.database_path,
-            indicators=config.data.indicators,
-            asset_universe=config.data.asset_universe,
-            feature_pipeline=FeaturePipeline.with_default_indicators(),
-        )
-        panel = dataset.load_joined_panel().fillna(method="ffill").dropna()
-
-        window_config = WindowConfig(
-            window_size=config.window_size,
-            forecast_horizon=config.model.forecast_horizon,
-            stride=config.window_stride,
-            target_column=config.target_column,
-            normalise=True,
-        )
-        sliding_dataset = SlidingWindowDataset(panel, window_config)
-        self.target_idx = sliding_dataset.target_idx
-
-        n_total = len(sliding_dataset)
-        n_val = max(int(0.1 * n_total), 1)
-        n_train = max(n_total - n_val, 1)
-        self.train_dataset, self.val_dataset = random_split(sliding_dataset, [n_train, n_val])
-
-        feature_dim = len(sliding_dataset.feature_columns)
-        if config.model.input_size is None:
-            config.model.input_size = feature_dim
-
+    def __init__(self, model_config: ModelConfig, optimizer_config: OptimizerConfig) -> None:
+        super().__init__()
+        self.save_hyperparameters({"model": asdict(model_config), "optimizer": asdict(optimizer_config)})
         backbone_config = TemporalBackboneConfig(
-            input_size=config.model.input_size,
-            d_model=config.model.d_model,
-            depth=config.model.depth,
-            n_heads=config.model.n_heads,
-            patch_size=config.model.patch_size,
-            dropout=config.model.dropout,
-            conv_kernel=config.model.conv_kernel,
-            conv_dilations=config.model.conv_dilations,
-            ffn_expansion=config.model.ffn_expansion,
-            forecast_horizon=config.model.forecast_horizon,
-            output_size=config.model.output_size,
+            feature_dim=model_config.feature_dim,
+            model_dim=model_config.model_dim,
+            depth=model_config.depth,
+            heads=model_config.heads,
+            dropout=model_config.dropout,
+            conv_kernel_size=model_config.conv_kernel_size,
+            conv_dilations=model_config.conv_dilations,
+        )
+        self.backbone = TemporalBackbone(backbone_config)
+        self.head = TemporalPolicyHead(model_config.model_dim, model_config.horizon, model_config.output_dim)
+        self.loss_fn = CompositeTradingLoss()
+
+    def forward(self, features: torch.Tensor) -> torch.Tensor:
+        hidden = self.backbone(features)
+        return self.head(hidden)
+
+    def training_step(self, batch: Dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
+        preds = self(batch["features"])
+        targets = batch["targets"]
+        loss = self.loss_fn(preds, targets)
+        self.log("train/loss", loss, prog_bar=True)
+        return loss
+
+    def validation_step(self, batch: Dict[str, torch.Tensor], batch_idx: int) -> None:
+        preds = self(batch["features"])
+        loss = self.loss_fn(preds, batch["targets"])
+        self.log("val/loss", loss, prog_bar=True)
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.AdamW(
+            self.parameters(),
+            lr=self.hparams["optimizer"]["lr"],
+            weight_decay=self.hparams["optimizer"]["weight_decay"],
+            betas=tuple(self.hparams["optimizer"]["betas"]),
+        )
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=500)
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "step",
+            },
+        }
+
+
+class MarketDataModule(pl.LightningDataModule):
+    """DataModule that loads SQLite data and produces sliding windows."""
+
+    def __init__(self, data_config: DataConfig, trainer_config: TrainerConfig) -> None:
+        super().__init__()
+        self.data_config = data_config
+        self.trainer_config = trainer_config
+        self.registry = FeatureRegistry()
+        self.dataset: SlidingWindowDataset | None = None
+
+    def setup(self, stage: str | None = None) -> None:
+        source = SQLiteMarketSource(path=str(self.data_config.sqlite_path))
+        dataset = SQLiteMarketDataset(
+            source=source,
+            symbol_universe=self.data_config.symbol_universe,
+            indicators=self.data_config.indicators,
+            resample_rule=self.data_config.resample_rule,
+            tz_convert=self.data_config.tz_convert,
+        )
+        panel = dataset.as_panel()
+        pipeline = self.registry.build_pipeline(self.data_config.feature_set)
+        enriched = pipeline.transform_panel(panel)
+        if self.data_config.feature_set:
+            available = [f for f in self.data_config.feature_set if f in enriched.columns]
+        else:
+            available = [c for c in enriched.columns if c not in ("symbol",)]
+        self.dataset = SlidingWindowDataset(
+            panel=enriched,
+            feature_columns=available,
+            target_columns=self.data_config.target_columns,
+            window_size=self.data_config.window_size,
+            horizon=self.data_config.horizon,
+            stride=self.data_config.stride,
+            normalise=self.data_config.normalise,
         )
 
-        self.model = TemporalBackbone(backbone_config).to(self.device)
-
-        self.optimizer = torch.optim.AdamW(
-            self.model.parameters(),
-            lr=config.optimizer.lr,
-            weight_decay=config.optimizer.weight_decay,
-        )
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            self.optimizer, T_max=config.num_epochs, eta_min=config.optimizer.lr * 0.1
-        )
-
-        self.checkpoint_dir = config.checkpoint_dir
-        if self.checkpoint_dir is not None:
-            Path(self.checkpoint_dir).mkdir(parents=True, exist_ok=True)
-
-    def dataloaders(self) -> tuple[DataLoader, DataLoader]:
-        return (
-            DataLoader(
-                self.train_dataset,
-                batch_size=self.config.batch_size,
-                shuffle=True,
-                drop_last=True,
-                collate_fn=_collate,
-            ),
-            DataLoader(
-                self.val_dataset,
-                batch_size=self.config.batch_size,
-                shuffle=False,
-                drop_last=False,
-                collate_fn=_collate,
-            ),
+    def train_dataloader(self) -> DataLoader:
+        assert self.dataset is not None
+        return DataLoader(
+            self.dataset,
+            batch_size=self.trainer_config.batch_size,
+            shuffle=True,
+            num_workers=self.trainer_config.num_workers,
+            pin_memory=True,
         )
 
-    def _compute_loss(self, preds: torch.Tensor, targets: torch.Tensor, features: torch.Tensor) -> torch.Tensor:
-        last_close = features[:, -1, self.target_idx]
-        returns = (targets - last_close.unsqueeze(-1)) / (last_close.unsqueeze(-1).abs() + 1e-6)
-        actions = torch.stack(
-            [
-                torch.relu(returns),
-                torch.zeros_like(returns),
-                torch.relu(-returns),
-            ],
-            dim=-1,
+    def val_dataloader(self) -> DataLoader:
+        assert self.dataset is not None
+        return DataLoader(
+            self.dataset,
+            batch_size=self.trainer_config.batch_size,
+            shuffle=False,
+            num_workers=self.trainer_config.num_workers,
+            pin_memory=True,
         )
-        pnl = (actions * preds.softmax(dim=-1)).sum(dim=-1)
-        return self.loss_fn(preds, actions, pnl)
 
-    def train(self) -> None:
-        train_loader, val_loader = self.dataloaders()
-        amp_context = torch.cuda.amp.autocast if self.amp_enabled else nullcontext
 
-        for epoch in range(self.config.num_epochs):
-            self.model.train()
-            running_loss = 0.0
-            for features, targets in train_loader:
-                features = features.to(self.device)
-                targets = targets.to(self.device)
+def load_experiment_from_file(path: Path) -> ExperimentConfig:
+    with path.open("r") as fp:
+        raw = yaml.safe_load(fp)
+    data_section = dict(raw["data"])
+    data_section["sqlite_path"] = Path(data_section["sqlite_path"])
+    if data_section.get("symbol_universe") is not None:
+        data_section["symbol_universe"] = list(data_section["symbol_universe"])
+    if data_section.get("feature_set") is not None:
+        data_section["feature_set"] = list(data_section["feature_set"])
+    data_cfg = DataConfig(**data_section)
 
-                self.optimizer.zero_grad(set_to_none=True)
-                with amp_context():
-                    preds = self.model(features)
-                    loss = self._compute_loss(preds, targets, features)
+    model_section = dict(raw["model"])
+    model_section["conv_dilations"] = tuple(model_section.get("conv_dilations", (1, 2, 4, 8, 16, 32)))
+    model_cfg = ModelConfig(**model_section)
+    optimizer_cfg = OptimizerConfig(**raw.get("optimizer", {}))
+    trainer_section = dict(raw.get("trainer", {}))
+    if "checkpoint_dir" in trainer_section:
+        trainer_section["checkpoint_dir"] = Path(trainer_section["checkpoint_dir"])
+    trainer_cfg = TrainerConfig(**trainer_section)
+    return ExperimentConfig(
+        seed=raw.get("seed", 42),
+        data=data_cfg,
+        model=model_cfg,
+        optimizer=optimizer_cfg,
+        trainer=trainer_cfg,
+        wandb_project=raw.get("wandb_project"),
+        notes=raw.get("notes"),
+    )
 
-                if self.scaler is not None and self.scaler.is_enabled():
-                    self.scaler.scale(loss).backward()
-                    self.scaler.unscale_(self.optimizer)
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config.gradient_clip_val)
-                    self.scaler.step(self.optimizer)
-                    self.scaler.update()
-                else:
-                    loss.backward()
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config.gradient_clip_val)
-                    self.optimizer.step()
 
-                running_loss += loss.item() * features.size(0)
+def instantiate_modules(config: ExperimentConfig) -> tuple[MarketLightningModule, MarketDataModule]:
+    pl.seed_everything(config.seed)
+    lightning_module = MarketLightningModule(config.model, config.optimizer)
+    data_module = MarketDataModule(config.data, config.trainer)
+    return lightning_module, data_module
 
-            self.scheduler.step()
 
-            val_loss = self.evaluate(val_loader)
-            avg_loss = running_loss / len(self.train_dataset)
-            print(f"Epoch {epoch+1}/{self.config.num_epochs} - train_loss={avg_loss:.4f} - val_loss={val_loss:.4f}")
+def run_training(config: ExperimentConfig) -> dict[str, Any]:
+    module, data_module = instantiate_modules(config)
+    trainer = pl.Trainer(
+        accelerator=config.trainer.accelerator,
+        devices=config.trainer.devices,
+        max_epochs=config.trainer.max_epochs,
+        gradient_clip_val=config.trainer.gradient_clip_val,
+        accumulate_grad_batches=config.trainer.accumulate_grad_batches,
+        precision=config.trainer.precision,
+        log_every_n_steps=config.trainer.log_every_n_steps,
+        default_root_dir=str(config.trainer.checkpoint_dir),
+    )
+    trainer.fit(module, datamodule=data_module)
+    return {
+        "best_model_path": str(trainer.checkpoint_callback.best_model_path) if trainer.checkpoint_callback else None,
+        "logged_metrics": trainer.logged_metrics,
+    }
 
-            if self.checkpoint_dir is not None:
-                ckpt_path = Path(self.checkpoint_dir) / f"epoch_{epoch+1:03d}.pt"
-                torch.save({"model_state": self.model.state_dict()}, ckpt_path)
-
-    @torch.no_grad()
-    def evaluate(self, loader: DataLoader) -> float:
-        self.model.eval()
-        total_loss = 0.0
-        total_items = 0
-        for features, targets in loader:
-            features = features.to(self.device)
-            targets = targets.to(self.device)
-            with torch.cuda.amp.autocast(enabled=self.amp_enabled):
-                preds = self.model(features)
-            loss = self._compute_loss(preds, targets, features)
-            total_loss += loss.item() * features.size(0)
-            total_items += features.size(0)
-        return total_loss / max(total_items, 1)
