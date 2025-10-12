@@ -3,7 +3,9 @@
 importScripts('market_history.js', 'spy_daily.js');
 
 const earliestDateStr = '2000-01-01';
+const latestDateLimit = '2025-12-31';
 const todayStr = new Date().toISOString().slice(0, 10);
+const latestAllowedDateStr = todayStr <= latestDateLimit ? todayStr : latestDateLimit;
 
 function coerceNumber(value) {
   const num = Number(value);
@@ -19,7 +21,7 @@ function sanitizeSeries(entry) {
     const dateStr = row?.date || row?.Date || row?.d;
     const closeVal = coerceNumber(row?.close ?? row?.Close ?? row?.c);
     if (!dateStr || !closeVal) continue;
-    if (dateStr < earliestDateStr || dateStr > todayStr) continue;
+    if (dateStr < earliestDateStr || dateStr > latestAllowedDateStr) continue;
     dedup.set(dateStr, closeVal);
   }
   const ordered = Array.from(dedup.entries()).sort((a, b) => a[0].localeCompare(b[0]));
@@ -46,8 +48,10 @@ if (!marketUniverse.length) {
 let prices = new Float32Array(0);
 let dates = [];
 let totalPoints = 0;
-let mean = 0;
-let std = 1;
+let datasetMean = 0;
+let datasetStd = 1;
+let runningMeanSeries = new Float32Array(0);
+let runningStdSeries = new Float32Array(0);
 
 function computeSMA(values, period) {
   const result = new Float32Array(values.length);
@@ -480,24 +484,43 @@ function updateHoldDurations(sharesSold, sellIndex) {
   return null;
 }
 
-function updateDatasetMoments() {
-  if (!totalPoints) {
-    mean = 0;
-    std = 1;
+function computeNormalizationSeries() {
+  const length = prices.length;
+  if (!length) {
+    datasetMean = 0;
+    datasetStd = 1;
+    runningMeanSeries = new Float32Array(0);
+    runningStdSeries = new Float32Array(0);
     return;
   }
-  let sum = 0;
-  for (let i = 0; i < prices.length; i++) {
-    sum += prices[i];
+  runningMeanSeries = new Float32Array(length);
+  runningStdSeries = new Float32Array(length);
+  let mean = 0;
+  let m2 = 0;
+  for (let i = 0; i < length; i++) {
+    const value = prices[i];
+    const delta = value - mean;
+    mean += delta / (i + 1);
+    const delta2 = value - mean;
+    if (i > 0) {
+      m2 += delta * delta2;
+      const variance = Math.max(m2 / i, 1e-12);
+      runningStdSeries[i] = Math.sqrt(variance);
+    } else {
+      runningStdSeries[i] = Math.max(Math.abs(value) * 1e-3, 1e-3);
+    }
+    runningMeanSeries[i] = mean;
   }
-  mean = sum / prices.length;
-  let variance = 0;
-  for (let i = 0; i < prices.length; i++) {
-    const diff = prices[i] - mean;
-    variance += diff * diff;
+  datasetMean = runningMeanSeries[length - 1] ?? mean;
+  if (length > 1) {
+    const variance = Math.max(m2 / (length - 1), 1e-12);
+    datasetStd = Math.sqrt(variance);
+  } else {
+    datasetStd = runningStdSeries[0] ?? 1;
   }
-  variance = variance / prices.length;
-  std = Math.max(Math.sqrt(variance), 1e-6);
+  if (!Number.isFinite(datasetStd) || datasetStd <= 0) {
+    datasetStd = 1;
+  }
 }
 
 function refreshTechnicalSeries() {
@@ -527,16 +550,48 @@ function refreshTechnicalSeries() {
   monthOneHotSeries = computeCalendarOneHot(dates, calendarMonthCount, 'month');
 }
 
-function normalize(price) {
+function clampIndex(idx) {
+  if (!Number.isFinite(idx) || !runningMeanSeries.length) {
+    return runningMeanSeries.length ? runningMeanSeries.length - 1 : 0;
+  }
+  if (idx <= 0) return 0;
+  const maxIdx = runningMeanSeries.length - 1;
+  if (idx >= maxIdx) return maxIdx;
+  return Math.floor(idx);
+}
+
+function datasetStatsAt(idx) {
+  if (!runningMeanSeries.length) {
+    return {
+      mean: datasetMean,
+      std: datasetStd > 0 ? datasetStd : 1
+    };
+  }
+  const safeIdx = clampIndex(idx);
+  const mean = runningMeanSeries[safeIdx] ?? datasetMean;
+  let std = runningStdSeries[safeIdx];
+  if (!Number.isFinite(std) || std <= 0) {
+    std = datasetStd;
+  }
+  if (!Number.isFinite(std) || std <= 0) {
+    std = 1;
+  }
+  return { mean, std };
+}
+
+function normalize(price, idx) {
+  if (!Number.isFinite(price)) return 0;
+  const { mean, std } = datasetStatsAt(idx);
   return (price - mean) / std;
 }
 
-function denormalize(value) {
+function denormalize(value, idx) {
+  const { mean, std } = datasetStatsAt(idx);
   return value * std + mean;
 }
 
-function normalizeOrZero(value) {
-  return Number.isFinite(value) ? normalize(value) : 0;
+function normalizeOrZero(value, idx) {
+  return Number.isFinite(value) ? normalize(value, idx) : 0;
 }
 
 class PriceNet {
@@ -1082,7 +1137,7 @@ function setActiveDataset(dataset, { resetNetwork = false, resetTrader = false }
     dates[i] = point.date;
   }
   totalPoints = length;
-  updateDatasetMoments();
+  computeNormalizationSeries();
   refreshTechnicalSeries();
   const maxWindow = Math.max(4, Math.min(config.windowSize | 0 || 24, Math.max(4, totalPoints - 1)));
   if (maxWindow !== config.windowSize) {
@@ -1273,7 +1328,7 @@ function sampleAt(index) {
   const features = new Float32Array(config.windowSize);
   const start = index - config.windowSize;
   for (let i = 0; i < config.windowSize; i++) {
-    let value = normalize(prices[start + i]);
+    let value = normalize(prices[start + i], start + i);
     if (config.noise > 0) {
       value += (Math.random() * 2 - 1) * config.noise;
     }
@@ -1282,7 +1337,7 @@ function sampleAt(index) {
   const targetPrice = prices[index];
   return {
     features,
-    targetNorm: normalize(targetPrice),
+    targetNorm: normalize(targetPrice, index),
     targetPrice,
     date: dates[index],
     index
@@ -1476,16 +1531,18 @@ function buildTradingFeatures(sample, predictedPrice) {
   const features = new Float32Array(createTraderInputSize());
   features.set(sample.features);
   const price = sample.targetPrice;
+  const statsIdx = sample.index ?? cursor;
   const safePredicted = Number.isFinite(predictedPrice) ? predictedPrice : price;
-  const predictedNorm = Number.isFinite(safePredicted) ? normalize(safePredicted) : 0;
+  const predictedNorm = Number.isFinite(safePredicted) ? normalize(safePredicted, statsIdx) : 0;
   let offset = config.windowSize;
   features[offset++] = predictedNorm;
   const edge = Number.isFinite(safePredicted) && price > 0
     ? (safePredicted - price) / price
     : 0;
   features[offset++] = edge;
-  features[offset++] = normalizeOrZero(price);
-  const logMean = mean > 0 ? Math.log(mean) : 0;
+  features[offset++] = normalizeOrZero(price, statsIdx);
+  const stats = datasetStatsAt(statsIdx);
+  const logMean = stats.mean > 0 ? Math.log(stats.mean) : 0;
   const logPrice = Number.isFinite(price) && price > 0 ? Math.log(price) - logMean : 0;
   const logPredicted = Number.isFinite(safePredicted) && safePredicted > 0
     ? Math.log(safePredicted) - logMean
@@ -1494,14 +1551,14 @@ function buildTradingFeatures(sample, predictedPrice) {
   features[offset++] = Math.max(-10, Math.min(10, logPredicted));
   const edgeMagnitude = Math.abs(edge) * 100;
   features[offset++] = Math.max(0, Math.min(5, edgeMagnitude));
-  const idx = sample.index ?? cursor;
+  const idx = statsIdx;
   for (let i = 0; i < smaSeries.length; i++) {
     const value = smaSeries[i][idx];
-    features[offset++] = normalizeOrZero(Number.isFinite(value) ? value : sample.targetPrice);
+    features[offset++] = normalizeOrZero(Number.isFinite(value) ? value : sample.targetPrice, idx);
   }
   for (let i = 0; i < emaSeries.length; i++) {
     const value = emaSeries[i][idx];
-    features[offset++] = normalizeOrZero(Number.isFinite(value) ? value : sample.targetPrice);
+    features[offset++] = normalizeOrZero(Number.isFinite(value) ? value : sample.targetPrice, idx);
   }
   for (let i = 0; i < rsiSeries.length; i++) {
     const value = rsiSeries[i][idx];
@@ -1511,9 +1568,10 @@ function buildTradingFeatures(sample, predictedPrice) {
   const macdVal = macdSeries.macd[idx];
   const signalVal = macdSeries.signal[idx];
   const histVal = macdSeries.histogram[idx];
-  features[offset++] = Number.isFinite(macdVal) ? macdVal / std : 0;
-  features[offset++] = Number.isFinite(signalVal) ? signalVal / std : 0;
-  features[offset++] = Number.isFinite(histVal) ? histVal / std : 0;
+  const safeStd = stats.std > 0 ? stats.std : datasetStd;
+  features[offset++] = Number.isFinite(macdVal) ? macdVal / safeStd : 0;
+  features[offset++] = Number.isFinite(signalVal) ? signalVal / safeStd : 0;
+  features[offset++] = Number.isFinite(histVal) ? histVal / safeStd : 0;
   for (let i = 0; i < returnSeries.length; i++) {
     const value = returnSeries[i][idx];
     const clamped = Number.isFinite(value) ? Math.max(-3, Math.min(3, value)) : 0;
@@ -1841,7 +1899,7 @@ function stepOnce() {
   }
   const sample = sampleAt(cursor);
   const { error, output } = net.trainSample(sample.features, sample.targetNorm);
-  const predictedPrice = denormalize(output);
+  const predictedPrice = denormalize(output, sample.index);
   const diff = predictedPrice - sample.targetPrice;
   const absError = Math.abs(diff);
 
