@@ -13,6 +13,19 @@ function coerceNumber(value) {
   return Number.isFinite(num) ? num : null;
 }
 
+function coerceFinite(value, fallback = 0) {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+const weightLimit = 1e3;
+
+function clampWeight(value) {
+  if (!Number.isFinite(value)) return 0;
+  if (value > weightLimit) return weightLimit;
+  if (value < -weightLimit) return -weightLimit;
+  return value;
+}
+
 function sanitizeSeries(entry) {
   const symbol = entry?.symbol || entry?.ticker || 'UNKNOWN';
   const name = entry?.name || symbol;
@@ -612,10 +625,10 @@ class PriceNet {
     this.w2 = new Float32Array(this.hiddenUnits * this.horizon);
     this.b2 = new Float32Array(this.horizon);
     for (let i = 0; i < this.w1.length; i++) {
-      this.w1[i] = (Math.random() * 2 - 1) * scale1;
+      this.w1[i] = clampWeight((Math.random() * 2 - 1) * scale1);
     }
     for (let i = 0; i < this.w2.length; i++) {
-      this.w2[i] = (Math.random() * 2 - 1) * scale2;
+      this.w2[i] = clampWeight((Math.random() * 2 - 1) * scale2);
     }
     this.b1.fill(0);
     this.b2.fill(0);
@@ -628,21 +641,36 @@ class PriceNet {
   forward(features) {
     const hidden = new Float32Array(this.hiddenUnits);
     for (let h = 0; h < this.hiddenUnits; h++) {
-      let sum = this.b1[h];
+      const biasIdx = h;
+      const bias = coerceFinite(this.b1[biasIdx]);
+      if (bias !== this.b1[biasIdx]) this.b1[biasIdx] = bias;
+      let sum = bias;
       const offset = h * this.inputSize;
       for (let i = 0; i < this.inputSize; i++) {
-        sum += this.w1[offset + i] * features[i];
+        const weightIdx = offset + i;
+        const weight = coerceFinite(this.w1[weightIdx]);
+        if (weight !== this.w1[weightIdx]) this.w1[weightIdx] = weight;
+        const feature = coerceFinite(features[i]);
+        sum += weight * feature;
       }
-      hidden[h] = Math.tanh(sum);
+      const activated = Math.tanh(coerceFinite(sum));
+      hidden[h] = coerceFinite(activated);
     }
     const output = new Float32Array(this.horizon);
     for (let o = 0; o < this.horizon; o++) {
-      let sum = this.b2[o];
+      const biasIdx = o;
+      const bias = coerceFinite(this.b2[biasIdx]);
+      if (bias !== this.b2[biasIdx]) this.b2[biasIdx] = bias;
+      let sum = bias;
       const offset = o * this.hiddenUnits;
       for (let h = 0; h < this.hiddenUnits; h++) {
-        sum += this.w2[offset + h] * hidden[h];
+        const weightIdx = offset + h;
+        const weight = coerceFinite(this.w2[weightIdx]);
+        if (weight !== this.w2[weightIdx]) this.w2[weightIdx] = weight;
+        const hiddenVal = coerceFinite(hidden[h]);
+        sum += weight * hiddenVal;
       }
-      output[o] = sum;
+      output[o] = coerceFinite(sum);
     }
     return { hidden, output };
   }
@@ -653,42 +681,85 @@ class PriceNet {
     const lr = this.learningRate;
 
     for (let o = 0; o < this.horizon; o++) {
-      const target = targets[o] ?? 0;
-      errors[o] = output[o] - target;
+      const target = coerceFinite(targets[o]);
+      const prediction = coerceFinite(output[o]);
+      errors[o] = prediction - target;
     }
 
     const gradHidden = new Float32Array(this.hiddenUnits);
     for (let o = 0; o < this.horizon; o++) {
-      const error = errors[o];
+      const error = coerceFinite(errors[o]);
+      if (!Number.isFinite(error)) continue;
       const offset = o * this.hiddenUnits;
       for (let h = 0; h < this.hiddenUnits; h++) {
-        gradHidden[h] += error * this.w2[offset + h];
+        const weightIdx = offset + h;
+        const weight = coerceFinite(this.w2[weightIdx]);
+        if (weight !== this.w2[weightIdx]) this.w2[weightIdx] = weight;
+        gradHidden[h] += error * weight;
       }
     }
 
     for (let o = 0; o < this.horizon; o++) {
-      const error = errors[o];
+      const error = coerceFinite(errors[o]);
+      if (!Number.isFinite(error)) continue;
       const offset = o * this.hiddenUnits;
       for (let h = 0; h < this.hiddenUnits; h++) {
-        this.w2[offset + h] -= lr * error * hidden[h];
+        const hiddenVal = coerceFinite(hidden[h]);
+        const update = lr * error * hiddenVal;
+        if (!Number.isFinite(update)) continue;
+        const weightIdx = offset + h;
+        const weight = coerceFinite(this.w2[weightIdx]);
+        const next = clampWeight(weight - update);
+        this.w2[weightIdx] = next;
       }
-      this.b2[o] -= lr * error;
+      const bias = coerceFinite(this.b2[o]);
+      const biasUpdate = lr * error;
+      if (Number.isFinite(biasUpdate)) {
+        this.b2[o] = clampWeight(bias - biasUpdate);
+      } else {
+        this.b2[o] = clampWeight(bias);
+      }
     }
 
     for (let h = 0; h < this.hiddenUnits; h++) {
-      const grad = gradHidden[h] * (1 - hidden[h] * hidden[h]);
+      const hiddenVal = coerceFinite(hidden[h]);
+      const gradContribution = coerceFinite(gradHidden[h]);
+      const grad = gradContribution * (1 - hiddenVal * hiddenVal);
+      if (!Number.isFinite(grad)) continue;
       const offset = h * this.inputSize;
       for (let i = 0; i < this.inputSize; i++) {
-        this.w1[offset + i] -= lr * grad * features[i];
+        const feature = coerceFinite(features[i]);
+        const update = lr * grad * feature;
+        if (!Number.isFinite(update)) continue;
+        const weightIdx = offset + i;
+        const weight = coerceFinite(this.w1[weightIdx]);
+        const next = clampWeight(weight - update);
+        this.w1[weightIdx] = next;
       }
-      this.b1[h] -= lr * grad;
+      const bias = coerceFinite(this.b1[h]);
+      const biasUpdate = lr * grad;
+      if (Number.isFinite(biasUpdate)) {
+        this.b1[h] = clampWeight(bias - biasUpdate);
+      } else {
+        this.b1[h] = clampWeight(bias);
+      }
     }
 
     let mse = 0;
+    let count = 0;
     for (let o = 0; o < this.horizon; o++) {
-      mse += errors[o] * errors[o];
+      const error = coerceFinite(errors[o]);
+      if (!Number.isFinite(error)) continue;
+      mse += error * error;
+      count += 1;
     }
-    mse /= this.horizon;
+    if (count > 0) {
+      mse /= count;
+    }
+
+    for (let o = 0; o < output.length; o++) {
+      output[o] = coerceFinite(output[o]);
+    }
 
     return { errors, output, loss: mse };
   }
@@ -2031,13 +2102,28 @@ function stepOnce() {
   }
   const sample = sampleAt(cursor);
   const { output: predictedNorms } = net.trainSample(sample.features, sample.targetNorms);
+  for (let i = 0; i < predictedNorms.length; i++) {
+    predictedNorms[i] = coerceFinite(predictedNorms[i]);
+  }
   const predictedPrices = new Float32Array(forecastHorizon);
   for (let i = 0; i < forecastHorizon; i++) {
-    predictedPrices[i] = denormalize(predictedNorms[i] ?? predictedNorms[0] ?? 0, sample.index + i);
+    const norm = predictedNorms[i] ?? predictedNorms[0] ?? 0;
+    let price = denormalize(norm, sample.index + i);
+    if (!Number.isFinite(price)) {
+      price = sample.targetPrices[i] ?? sample.targetPrice;
+    }
+    predictedPrices[i] = coerceFinite(price, sample.targetPrices[i] ?? sample.targetPrice);
   }
-  const predictedPrice = predictedPrices[0];
-  const diff = predictedPrice - sample.targetPrice;
-  const absError = Math.abs(diff);
+  const targetPrice = coerceFinite(sample.targetPrice);
+  let predictedPrice = predictedPrices[0];
+  if (!Number.isFinite(predictedPrice)) {
+    predictedPrice = targetPrice;
+  }
+  const diff = predictedPrice - targetPrice;
+  let absError = Math.abs(diff);
+  if (!Number.isFinite(absError)) {
+    absError = 0;
+  }
   const direction = diff > 0 ? 'over' : diff < 0 ? 'under' : 'even';
 
   stats.steps += 1;
@@ -2046,7 +2132,7 @@ function stepOnce() {
   const sqError = diff * diff;
   stats.mse += (sqError - stats.mse) / stats.steps;
   stats.bestMae = Math.min(stats.bestMae, stats.mae);
-  stats.lastActual = sample.targetPrice;
+  stats.lastActual = targetPrice;
   stats.lastPredicted = predictedPrice;
   stats.lastAbsError = absError;
   stats.learningRate = config.learningRate;
@@ -2055,12 +2141,12 @@ function stepOnce() {
   stats.hiddenUnits = config.hiddenUnits;
   stats.windowCoverage = windowCoverage();
 
-  pushHistory(sample.targetPrice, predictedPrice, absError);
+  pushHistory(targetPrice, predictedPrice, absError);
   pushRecent({
     label: sample.date,
     ticker: activeDataset?.symbol ?? '—',
     date: sample.date,
-    actual: sample.targetPrice,
+    actual: targetPrice,
     predicted: predictedPrice,
     error: diff,
     absError,
