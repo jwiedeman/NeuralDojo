@@ -2020,9 +2020,9 @@ function stepOnce() {
     completeCycle();
     if (!advanceToNextDataset({ resetNetwork: false, resetTrader: false })) {
       // If we can't advance (e.g. playlist exhausted or dataset unavailable),
-      // rebuild the full environment and resume so the forecaster doesn't
-      // stall with cleared weights.
-      resetState(true);
+      // rebuild the full environment while preserving model weights so the
+      // forecaster keeps learning across rotations.
+      resetState({ resume: true, preserveModels: true });
       return;
     }
   }
@@ -2246,23 +2246,46 @@ function postSnapshot() {
   self.postMessage({ type: 'snapshot', snapshot });
 }
 
-function resetState(resume = false) {
+function resetState(options = {}) {
+  let resume = false;
+  let preserveModels = false;
+  if (typeof options === 'boolean') {
+    resume = options;
+  } else if (options && typeof options === 'object') {
+    ({ resume = false, preserveModels = false } = options);
+  }
+
   const wasRunning = running;
   if (wasRunning) setRunning(false);
-  net = null;
+
+  const preservedNet = preserveModels ? net : null;
+  const preservedTrader = preserveModels ? trader : null;
+  const preservedTradingStats = preserveModels ? tradingStats : null;
+
+  if (!preserveModels) {
+    net = null;
+    trader = null;
+    tradingStats = null;
+    loops = 0;
+  } else {
+    net = preservedNet;
+    trader = preservedTrader;
+    tradingStats = preservedTradingStats;
+  }
+
   history = { actual: [], predicted: [], errors: [] };
   recentPredictions = [];
   latestForecast = null;
-  loops = 0;
   cursor = 0;
   stats = null;
   portfolio = null;
-  trader = null;
-  tradingStats = null;
   activeDataset = null;
   resetRiskState();
   rebuildTickerPlaylist();
-  const initialized = advanceToNextDataset({ resetNetwork: true, resetTrader: true });
+  const initialized = advanceToNextDataset({
+    resetNetwork: !preserveModels,
+    resetTrader: !preserveModels
+  });
   if (!initialized) {
     stats = createStats();
   }
