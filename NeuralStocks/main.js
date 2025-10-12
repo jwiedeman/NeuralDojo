@@ -68,6 +68,10 @@
   const tradingCumulativeReturnEl = document.getElementById('tradingCumulativeReturn');
   const tradingTradeCountEl = document.getElementById('tradingTradeCount');
   const tradingWinRateEl = document.getElementById('tradingWinRate');
+  const tradingRegimeEl = document.getElementById('tradingRegime');
+  const tradingVolatilityEl = document.getElementById('tradingVolatility');
+  const tradingRiskEl = document.getElementById('tradingRisk');
+  const tradingThresholdEl = document.getElementById('tradingThreshold');
 
   const startBtn = document.getElementById('startBtn');
   const pauseBtn = document.getElementById('pauseBtn');
@@ -129,6 +133,13 @@
     const abs = Math.abs(value).toFixed(digits);
     const sign = value > 0 ? '+' : value < 0 ? '−' : '';
     return `${sign}${abs}`;
+  }
+
+  function prettifyReason(reason) {
+    if (!reason) return null;
+    const normalized = String(reason).replace(/_/g, ' ').trim();
+    if (!normalized) return null;
+    return normalized.replace(/\b\w/g, char => char.toUpperCase());
   }
 
   function drawPriceChart(actual, predicted) {
@@ -504,11 +515,18 @@
       tradingCumulativeReturnEl.textContent = '—';
       tradingTradeCountEl.textContent = '—';
       tradingWinRateEl.textContent = '—';
+      if (tradingRegimeEl) tradingRegimeEl.textContent = '—';
+      if (tradingVolatilityEl) tradingVolatilityEl.textContent = '—';
+      if (tradingRiskEl) tradingRiskEl.textContent = '—';
+      if (tradingThresholdEl) tradingThresholdEl.textContent = '—';
       applyPolicyClass(tradingLastRewardEl, null);
       applyPolicyClass(tradingAvgRewardEl, null);
       applyPolicyClass(tradingEdgeEl, null);
       applyPolicyClass(tradingLastCycleEl, null);
       applyPolicyClass(tradingBestCycleEl, null);
+      applyPolicyClass(tradingRegimeEl, null);
+      applyPolicyClass(tradingVolatilityEl, null);
+      applyPolicyClass(tradingRiskEl, null);
       return;
     }
 
@@ -541,9 +559,88 @@
       ? formatPercent(trading.cumulativeReturn, 2)
       : '—';
     tradingTradeCountEl.textContent = formatInteger(trading.trades ?? 0);
-    tradingWinRateEl.textContent = Number.isFinite(trading.winRate)
+    tradingWinRateEl.textContent = haveSamples && Number.isFinite(trading.winRate)
       ? formatPercent(trading.winRate, 2)
       : '—';
+    if (tradingRegimeEl) {
+      if (haveSamples && Number.isFinite(trading.regime)) {
+        const trend = trading.regime;
+        const label = trend > 0.1 ? 'Bull' : trend < -0.1 ? 'Bear' : 'Flat';
+        tradingRegimeEl.textContent = `${label} (${formatSigned(trend, 2)})`;
+        applyPolicyClass(tradingRegimeEl, trend);
+      } else {
+        tradingRegimeEl.textContent = '—';
+        applyPolicyClass(tradingRegimeEl, null);
+      }
+    }
+    if (tradingVolatilityEl) {
+      if (haveSamples && (Number.isFinite(trading.realizedVol) || Number.isFinite(trading.volZ))) {
+        const volParts = [];
+        if (Number.isFinite(trading.realizedVol)) {
+          volParts.push(`σ=${formatPercent(trading.realizedVol, 2)}`);
+        }
+        if (Number.isFinite(trading.volZ)) {
+          volParts.push(`z=${formatSigned(trading.volZ, 2)}`);
+        }
+        const bucketLabel = trading.volBucket > 0 ? 'High' : trading.volBucket < 0 ? 'Low' : 'Normal';
+        volParts.push(bucketLabel);
+        tradingVolatilityEl.textContent = volParts.join(' · ');
+        applyPolicyClass(tradingVolatilityEl, -trading.volBucket);
+      } else {
+        tradingVolatilityEl.textContent = '—';
+        applyPolicyClass(tradingVolatilityEl, null);
+      }
+    }
+    if (tradingRiskEl) {
+      if (haveSamples) {
+        const parts = [];
+        const cooldown = Math.max(0, Math.round(trading.cooldown ?? 0));
+        if (cooldown > 0) {
+          const reasonText = prettifyReason(trading.cooldownReason);
+          const reason = reasonText ? ` (${reasonText})` : '';
+          parts.push(`Cooldown ${cooldown} bars${reason}`);
+        } else {
+          parts.push('Active');
+        }
+        if (cooldown <= 0 && trading.gateReason) {
+          const gateText = prettifyReason(trading.gateReason);
+          if (gateText) {
+            parts.push(`Gate: ${gateText}`);
+          }
+        }
+        if (Number.isFinite(trading.maxExposure)) {
+          parts.push(`Max exp ${formatPercent(trading.maxExposure, 1)}`);
+        }
+        if (Number.isFinite(trading.targetVol)) {
+          parts.push(`Target σ ${formatPercent(trading.targetVol, 1)}`);
+        }
+        tradingRiskEl.textContent = parts.join(' · ');
+        applyPolicyClass(tradingRiskEl, cooldown > 0 ? -1 : 1);
+      } else {
+        tradingRiskEl.textContent = '—';
+        applyPolicyClass(tradingRiskEl, null);
+      }
+    }
+    if (tradingThresholdEl) {
+      if (haveSamples) {
+        const thresholds = [];
+        if (Number.isFinite(trading.minEdge)) {
+          thresholds.push(`edge ≥ ${formatPercent(trading.minEdge, 2)}`);
+        }
+        if (Number.isFinite(trading.trendThreshold)) {
+          thresholds.push(`trend ≥ ${formatSigned(trading.trendThreshold, 2)}`);
+        }
+        if (Number.isFinite(trading.volatilityCap)) {
+          thresholds.push(`σ ≤ ${formatPercent(trading.volatilityCap, 1)}`);
+        }
+        if (Number.isFinite(trading.volZCap)) {
+          thresholds.push(`|z| ≤ ${formatNumber(trading.volZCap, 2)}`);
+        }
+        tradingThresholdEl.textContent = thresholds.join(' · ');
+      } else {
+        tradingThresholdEl.textContent = '—';
+      }
+    }
     applyPolicyClass(tradingLastRewardEl, haveSamples ? trading.lastReward : null);
     applyPolicyClass(tradingAvgRewardEl, haveSamples ? trading.avgReward : null);
     applyPolicyClass(tradingEdgeEl, Number.isFinite(trading.lastEdge) ? trading.lastEdge : null);
