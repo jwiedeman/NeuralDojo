@@ -17,12 +17,107 @@ const variance = totalPoints
   : 0;
 const std = Math.max(Math.sqrt(variance), 1e-6);
 
+function computeSMA(values, period) {
+  const result = new Float32Array(values.length);
+  let sum = 0;
+  for (let i = 0; i < values.length; i++) {
+    sum += values[i];
+    if (i >= period) {
+      sum -= values[i - period];
+    }
+    if (i >= period - 1) {
+      result[i] = sum / period;
+    } else {
+      result[i] = values[i];
+    }
+  }
+  return result;
+}
+
+function computeEMA(values, period) {
+  const result = new Float32Array(values.length);
+  if (!values.length) return result;
+  const multiplier = 2 / (period + 1);
+  let ema = values[0];
+  result[0] = ema;
+  for (let i = 1; i < values.length; i++) {
+    const value = values[i];
+    ema = (value - ema) * multiplier + ema;
+    result[i] = ema;
+  }
+  return result;
+}
+
+function computeRSI(values, period) {
+  const result = new Float32Array(values.length);
+  if (values.length === 0) return result;
+  let gainSum = 0;
+  let lossSum = 0;
+  result[0] = 50;
+  for (let i = 1; i < values.length; i++) {
+    const change = values[i] - values[i - 1];
+    const gain = Math.max(change, 0);
+    const loss = Math.max(-change, 0);
+    if (i < period) {
+      gainSum += gain;
+      lossSum += loss;
+      result[i] = 50;
+    } else if (i === period) {
+      gainSum = (gainSum + gain) / period;
+      lossSum = (lossSum + loss) / period;
+    } else {
+      gainSum = ((period - 1) * gainSum + gain) / period;
+      lossSum = ((period - 1) * lossSum + loss) / period;
+    }
+    if (i >= period) {
+      if (lossSum === 0) {
+        result[i] = gainSum === 0 ? 50 : 100;
+      } else if (gainSum === 0) {
+        result[i] = 0;
+      } else {
+        const rs = gainSum / lossSum;
+        result[i] = 100 - 100 / (1 + rs);
+      }
+    }
+  }
+  return result;
+}
+
+function computeMACDSeries(values, fastPeriod, slowPeriod, signalPeriod) {
+  const fast = computeEMA(values, fastPeriod);
+  const slow = computeEMA(values, slowPeriod);
+  const macd = new Float32Array(values.length);
+  for (let i = 0; i < values.length; i++) {
+    macd[i] = fast[i] - slow[i];
+  }
+  const signal = computeEMA(macd, signalPeriod);
+  const histogram = new Float32Array(values.length);
+  for (let i = 0; i < values.length; i++) {
+    histogram[i] = macd[i] - signal[i];
+  }
+  return { macd, signal, histogram };
+}
+
+const smaPeriods = [5, 10, 20];
+const emaPeriods = [5, 10, 20];
+const rsiPeriods = [14];
+const macdConfig = { fast: 12, slow: 26, signal: 9 };
+
+const smaSeries = smaPeriods.map(period => computeSMA(prices, period));
+const emaSeries = emaPeriods.map(period => computeEMA(prices, period));
+const rsiSeries = rsiPeriods.map(period => computeRSI(prices, period));
+const macdSeries = computeMACDSeries(prices, macdConfig.fast, macdConfig.slow, macdConfig.signal);
+
 function normalize(price) {
   return (price - mean) / std;
 }
 
 function denormalize(value) {
   return value * std + mean;
+}
+
+function normalizeOrZero(value) {
+  return Number.isFinite(value) ? normalize(value) : 0;
 }
 
 class PriceNet {
@@ -101,9 +196,10 @@ class PriceNet {
 }
 
 class RLTrader {
-  constructor(inputSize, hiddenUnits, learningRate) {
+  constructor(inputSize, hiddenUnits1, hiddenUnits2, learningRate) {
     this.inputSize = inputSize;
-    this.hiddenUnits = hiddenUnits;
+    this.hiddenUnits1 = hiddenUnits1;
+    this.hiddenUnits2 = hiddenUnits2;
     this.actionCount = 3; // hold, buy, sell
     this.learningRate = learningRate;
     this.initWeights();
@@ -111,19 +207,26 @@ class RLTrader {
 
   initWeights() {
     const scale1 = 1 / Math.sqrt(this.inputSize);
-    const scale2 = 1 / Math.sqrt(this.hiddenUnits);
-    this.w1 = new Float32Array(this.hiddenUnits * this.inputSize);
-    this.b1 = new Float32Array(this.hiddenUnits);
-    this.w2 = new Float32Array(this.actionCount * this.hiddenUnits);
-    this.b2 = new Float32Array(this.actionCount);
+    const scale2 = 1 / Math.sqrt(Math.max(this.hiddenUnits1, 1));
+    const scale3 = 1 / Math.sqrt(Math.max(this.hiddenUnits2, 1));
+    this.w1 = new Float32Array(this.hiddenUnits1 * this.inputSize);
+    this.b1 = new Float32Array(this.hiddenUnits1);
+    this.w2 = new Float32Array(this.hiddenUnits2 * this.hiddenUnits1);
+    this.b2 = new Float32Array(this.hiddenUnits2);
+    this.w3 = new Float32Array(this.actionCount * this.hiddenUnits2);
+    this.b3 = new Float32Array(this.actionCount);
     for (let i = 0; i < this.w1.length; i++) {
       this.w1[i] = (Math.random() * 2 - 1) * scale1;
     }
     for (let i = 0; i < this.w2.length; i++) {
       this.w2[i] = (Math.random() * 2 - 1) * scale2;
     }
+    for (let i = 0; i < this.w3.length; i++) {
+      this.w3[i] = (Math.random() * 2 - 1) * scale3;
+    }
     this.b1.fill(0);
     this.b2.fill(0);
+    this.b3.fill(0);
   }
 
   setLearningRate(lr) {
@@ -131,22 +234,32 @@ class RLTrader {
   }
 
   forward(features) {
-    const hidden = new Float32Array(this.hiddenUnits);
-    for (let h = 0; h < this.hiddenUnits; h++) {
+    const hidden1 = new Float32Array(this.hiddenUnits1);
+    for (let h = 0; h < this.hiddenUnits1; h++) {
       let sum = this.b1[h];
       const offset = h * this.inputSize;
       for (let i = 0; i < this.inputSize; i++) {
         sum += this.w1[offset + i] * features[i];
       }
-      hidden[h] = Math.tanh(sum);
+      hidden1[h] = Math.tanh(sum);
+    }
+
+    const hidden2 = new Float32Array(this.hiddenUnits2);
+    for (let h = 0; h < this.hiddenUnits2; h++) {
+      let sum = this.b2[h];
+      const offset = h * this.hiddenUnits1;
+      for (let i = 0; i < this.hiddenUnits1; i++) {
+        sum += this.w2[offset + i] * hidden1[i];
+      }
+      hidden2[h] = Math.tanh(sum);
     }
 
     const logits = new Float32Array(this.actionCount);
     for (let a = 0; a < this.actionCount; a++) {
-      let sum = this.b2[a];
-      const offset = a * this.hiddenUnits;
-      for (let h = 0; h < this.hiddenUnits; h++) {
-        sum += this.w2[offset + h] * hidden[h];
+      let sum = this.b3[a];
+      const offset = a * this.hiddenUnits2;
+      for (let h = 0; h < this.hiddenUnits2; h++) {
+        sum += this.w3[offset + h] * hidden2[h];
       }
       logits[a] = sum;
     }
@@ -168,11 +281,11 @@ class RLTrader {
       probs.fill(uniform);
     }
 
-    return { hidden, probs, logits };
+    return { hidden1, hidden2, probs, logits };
   }
 
   act(features, exploration = 0) {
-    const { hidden, probs, logits } = this.forward(features);
+    const { hidden1, hidden2, probs, logits } = this.forward(features);
     let actionIndex = this.sampleFromDistribution(probs);
     if (Math.random() < exploration) {
       actionIndex = Math.floor(Math.random() * this.actionCount);
@@ -183,7 +296,8 @@ class RLTrader {
       confidence,
       probs,
       logits,
-      hidden,
+      hidden1,
+      hidden2,
       features
     };
   }
@@ -201,9 +315,9 @@ class RLTrader {
   }
 
   train(decision, reward) {
-    if (!decision || !decision.features || !decision.hidden || !decision.probs) return;
+    if (!decision || !decision.features || !decision.hidden1 || !decision.hidden2 || !decision.probs) return;
     const lr = this.learningRate;
-    const { features, hidden, probs, index: actionIndex } = decision;
+    const { features, hidden1, hidden2, probs, index: actionIndex } = decision;
     const gradLogits = new Float32Array(this.actionCount);
     for (let a = 0; a < this.actionCount; a++) {
       let value = probs[a];
@@ -215,25 +329,44 @@ class RLTrader {
 
     for (let a = 0; a < this.actionCount; a++) {
       const grad = gradLogits[a];
-      this.b2[a] -= lr * grad;
-      const offset = a * this.hiddenUnits;
-      for (let h = 0; h < this.hiddenUnits; h++) {
-        this.w2[offset + h] -= lr * grad * hidden[h];
+      this.b3[a] -= lr * grad;
+      const offset = a * this.hiddenUnits2;
+      for (let h = 0; h < this.hiddenUnits2; h++) {
+        this.w3[offset + h] -= lr * grad * hidden2[h];
       }
     }
 
-    const gradHidden = new Float32Array(this.hiddenUnits);
-    for (let h = 0; h < this.hiddenUnits; h++) {
+    const gradHidden2 = new Float32Array(this.hiddenUnits2);
+    for (let h = 0; h < this.hiddenUnits2; h++) {
       let sum = 0;
       for (let a = 0; a < this.actionCount; a++) {
-        const offset = a * this.hiddenUnits + h;
-        sum += gradLogits[a] * this.w2[offset];
+        const offset = a * this.hiddenUnits2 + h;
+        sum += gradLogits[a] * this.w3[offset];
       }
-      gradHidden[h] = sum * (1 - hidden[h] * hidden[h]);
+      gradHidden2[h] = sum * (1 - hidden2[h] * hidden2[h]);
     }
 
-    for (let h = 0; h < this.hiddenUnits; h++) {
-      const grad = gradHidden[h];
+    const gradHidden1 = new Float32Array(this.hiddenUnits1);
+    for (let h = 0; h < this.hiddenUnits1; h++) {
+      let sum = 0;
+      for (let a = 0; a < this.hiddenUnits2; a++) {
+        const offset = a * this.hiddenUnits1 + h;
+        sum += gradHidden2[a] * this.w2[offset];
+      }
+      gradHidden1[h] = sum * (1 - hidden1[h] * hidden1[h]);
+    }
+
+    for (let h = 0; h < this.hiddenUnits2; h++) {
+      const grad = gradHidden2[h];
+      const offset = h * this.hiddenUnits1;
+      for (let i = 0; i < this.hiddenUnits1; i++) {
+        this.w2[offset + i] -= lr * grad * hidden1[i];
+      }
+      this.b2[h] -= lr * grad;
+    }
+
+    for (let h = 0; h < this.hiddenUnits1; h++) {
+      const grad = gradHidden1[h];
       const offset = h * this.inputSize;
       for (let i = 0; i < this.inputSize; i++) {
         this.w1[offset + i] -= lr * grad * features[i];
@@ -254,6 +387,7 @@ const config = {
   delayMs: 100,
   traderLearningRate: 0.01,
   traderHiddenUnits: 24,
+  traderHiddenUnits2: 24,
   traderExploration: 0.05,
   traderRewardScale: 120
 };
@@ -294,12 +428,23 @@ function createPortfolio() {
 
 let portfolio = createPortfolio();
 
+const tradingExtraFeatureCount = 3
+  + smaPeriods.length
+  + emaPeriods.length
+  + rsiPeriods.length
+  + 3; // macd, signal, histogram
+
 function createTraderInputSize() {
-  return config.windowSize + 2;
+  return config.windowSize + tradingExtraFeatureCount;
 }
 
 function createTrader() {
-  return new RLTrader(createTraderInputSize(), config.traderHiddenUnits, config.traderLearningRate);
+  return new RLTrader(
+    createTraderInputSize(),
+    config.traderHiddenUnits,
+    config.traderHiddenUnits2,
+    config.traderLearningRate
+  );
 }
 
 function createTradingStats() {
@@ -396,7 +541,8 @@ function sampleAt(index) {
     features,
     targetNorm: normalize(targetPrice),
     targetPrice,
-    date: dates[index]
+    date: dates[index],
+    index
   };
 }
 
@@ -528,11 +674,33 @@ function buildTradingFeatures(sample, predictedPrice) {
   const features = new Float32Array(createTraderInputSize());
   features.set(sample.features);
   const predictedNorm = Number.isFinite(predictedPrice) ? normalize(predictedPrice) : 0;
-  features[config.windowSize] = predictedNorm;
+  let offset = config.windowSize;
+  features[offset++] = predictedNorm;
   const edge = Number.isFinite(predictedPrice) && sample.targetPrice > 0
     ? (predictedPrice - sample.targetPrice) / sample.targetPrice
     : 0;
-  features[config.windowSize + 1] = edge;
+  features[offset++] = edge;
+  features[offset++] = normalizeOrZero(sample.targetPrice);
+  const idx = sample.index ?? cursor;
+  for (let i = 0; i < smaSeries.length; i++) {
+    const value = smaSeries[i][idx];
+    features[offset++] = normalizeOrZero(Number.isFinite(value) ? value : sample.targetPrice);
+  }
+  for (let i = 0; i < emaSeries.length; i++) {
+    const value = emaSeries[i][idx];
+    features[offset++] = normalizeOrZero(Number.isFinite(value) ? value : sample.targetPrice);
+  }
+  for (let i = 0; i < rsiSeries.length; i++) {
+    const value = rsiSeries[i][idx];
+    const normalizedRsi = Number.isFinite(value) ? (value - 50) / 50 : 0;
+    features[offset++] = Math.max(-2, Math.min(2, normalizedRsi));
+  }
+  const macdVal = macdSeries.macd[idx];
+  const signalVal = macdSeries.signal[idx];
+  const histVal = macdSeries.histogram[idx];
+  features[offset++] = Number.isFinite(macdVal) ? macdVal / std : 0;
+  features[offset++] = Number.isFinite(signalVal) ? signalVal / std : 0;
+  features[offset++] = Number.isFinite(histVal) ? histVal / std : 0;
   return { features, edge };
 }
 
@@ -708,7 +876,8 @@ function applyConfig(newConfig) {
   const requiresReset = (
     (newConfig.hiddenUnits != null && newConfig.hiddenUnits !== config.hiddenUnits) ||
     (newConfig.windowSize != null && newConfig.windowSize !== config.windowSize) ||
-    (newConfig.traderHiddenUnits != null && newConfig.traderHiddenUnits !== config.traderHiddenUnits)
+    (newConfig.traderHiddenUnits != null && newConfig.traderHiddenUnits !== config.traderHiddenUnits) ||
+    (newConfig.traderHiddenUnits2 != null && newConfig.traderHiddenUnits2 !== config.traderHiddenUnits2)
   );
   Object.assign(config, newConfig);
   config.windowSize = Math.max(4, Math.min(config.windowSize, Math.max(4, totalPoints - 1)));
@@ -718,6 +887,7 @@ function applyConfig(newConfig) {
   config.delayMs = Math.max(0, config.delayMs | 0);
   config.traderLearningRate = Math.max(1e-4, Number.isFinite(config.traderLearningRate) ? config.traderLearningRate : 0.01);
   config.traderHiddenUnits = Math.max(2, Number.isFinite(config.traderHiddenUnits) ? (config.traderHiddenUnits | 0) : 24);
+  config.traderHiddenUnits2 = Math.max(2, Number.isFinite(config.traderHiddenUnits2) ? (config.traderHiddenUnits2 | 0) : 24);
   config.traderExploration = Math.min(1, Math.max(0, Number.isFinite(config.traderExploration) ? config.traderExploration : 0.05));
   config.traderRewardScale = Number.isFinite(config.traderRewardScale)
     ? Math.max(1, config.traderRewardScale)
