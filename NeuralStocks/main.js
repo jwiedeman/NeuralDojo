@@ -27,6 +27,10 @@
   const loopCountEl = document.getElementById('loopCount');
   const bestMaeSecondaryEl = document.getElementById('bestMaeSecondary');
   const lastResetEl = document.getElementById('lastReset');
+  const instrumentLabelEl = document.getElementById('instrumentLabel');
+  const datasetDateRangeEl = document.getElementById('datasetDateRange');
+  const datasetPlaylistEl = document.getElementById('datasetPlaylist');
+  const datasetUniverseEl = document.getElementById('datasetUniverse');
   const recentListEl = document.getElementById('recentList');
   const weightsRawEl = document.getElementById('weightsRaw');
   const portfolioEquityEl = document.getElementById('portfolioEquity');
@@ -35,6 +39,11 @@
   const portfolioAvgCostEl = document.getElementById('portfolioAvgCost');
   const portfolioUnrealizedEl = document.getElementById('portfolioUnrealized');
   const portfolioReturnEl = document.getElementById('portfolioReturn');
+  const portfolioRealizedEl = document.getElementById('portfolioRealized');
+  const portfolioDrawdownEl = document.getElementById('portfolioDrawdown');
+  const portfolioSharpeEl = document.getElementById('portfolioSharpe');
+  const portfolioTradeCountEl = document.getElementById('portfolioTradeCount');
+  const portfolioWinRateEl = document.getElementById('portfolioWinRate');
   const tradeLogEl = document.getElementById('tradeLog');
   const tradingLastActionEl = document.getElementById('tradingLastAction');
   const tradingConfidenceEl = document.getElementById('tradingConfidence');
@@ -42,6 +51,13 @@
   const tradingLastRewardEl = document.getElementById('tradingLastReward');
   const tradingAvgRewardEl = document.getElementById('tradingAvgReward');
   const tradingExplorationEl = document.getElementById('tradingExploration');
+  const tradingCycleCountEl = document.getElementById('tradingCycleCount');
+  const tradingLastCycleEl = document.getElementById('tradingLastCycle');
+  const tradingBestCycleEl = document.getElementById('tradingBestCycle');
+  const tradingLifetimeRewardEl = document.getElementById('tradingLifetimeReward');
+  const tradingCumulativeReturnEl = document.getElementById('tradingCumulativeReturn');
+  const tradingTradeCountEl = document.getElementById('tradingTradeCount');
+  const tradingWinRateEl = document.getElementById('tradingWinRate');
 
   const startBtn = document.getElementById('startBtn');
   const pauseBtn = document.getElementById('pauseBtn');
@@ -91,6 +107,11 @@
     return `${Number(value).toLocaleString(undefined, {
       maximumFractionDigits: 0
     })} sh`;
+  }
+
+  function formatInteger(value) {
+    if (!Number.isFinite(value)) return '—';
+    return Number(value).toLocaleString();
   }
 
   function formatSigned(value, digits = 3) {
@@ -341,6 +362,11 @@
       portfolioAvgCostEl.textContent = '—';
       portfolioUnrealizedEl.textContent = '—';
       portfolioReturnEl.textContent = '—';
+      portfolioRealizedEl.textContent = '—';
+      portfolioDrawdownEl.textContent = '—';
+      portfolioSharpeEl.textContent = '—';
+      portfolioTradeCountEl.textContent = '—';
+      portfolioWinRateEl.textContent = '—';
       updateTradeLog([]);
       updateTradingSummary(null);
       return;
@@ -352,6 +378,15 @@
     portfolioAvgCostEl.textContent = formatCurrency(portfolio.avgCost);
     portfolioUnrealizedEl.textContent = formatCurrency(portfolio.unrealizedPnl);
     portfolioReturnEl.textContent = formatPercent(portfolio.totalReturn);
+    portfolioRealizedEl.textContent = formatCurrency(portfolio.realizedPnl);
+    portfolioDrawdownEl.textContent = Number.isFinite(portfolio.maxDrawdown)
+      ? formatPercent(portfolio.maxDrawdown, 2)
+      : '—';
+    portfolioSharpeEl.textContent = Number.isFinite(portfolio.sharpe)
+      ? formatNumber(portfolio.sharpe, 2)
+      : '—';
+    portfolioTradeCountEl.textContent = formatInteger(portfolio.tradeCount ?? 0);
+    portfolioWinRateEl.textContent = formatPercent(portfolio.winRate, 2);
     updateTradeLog(portfolio.trades);
   }
 
@@ -371,9 +406,18 @@
       tradingLastRewardEl.textContent = '—';
       tradingAvgRewardEl.textContent = '—';
       tradingExplorationEl.textContent = '—';
+      tradingCycleCountEl.textContent = '—';
+      tradingLastCycleEl.textContent = '—';
+      tradingBestCycleEl.textContent = '—';
+      tradingLifetimeRewardEl.textContent = '—';
+      tradingCumulativeReturnEl.textContent = '—';
+      tradingTradeCountEl.textContent = '—';
+      tradingWinRateEl.textContent = '—';
       applyPolicyClass(tradingLastRewardEl, null);
       applyPolicyClass(tradingAvgRewardEl, null);
       applyPolicyClass(tradingEdgeEl, null);
+      applyPolicyClass(tradingLastCycleEl, null);
+      applyPolicyClass(tradingBestCycleEl, null);
       return;
     }
 
@@ -394,9 +438,26 @@
     tradingExplorationEl.textContent = Number.isFinite(trading.exploration)
       ? formatPercent(trading.exploration, 1)
       : '—';
+    tradingCycleCountEl.textContent = formatInteger(trading.cycleCount ?? 0);
+    tradingLastCycleEl.textContent = Number.isFinite(trading.lastCycleReturn)
+      ? formatPercent(trading.lastCycleReturn, 2)
+      : '—';
+    tradingBestCycleEl.textContent = Number.isFinite(trading.bestCycleReturn)
+      ? formatPercent(trading.bestCycleReturn, 2)
+      : '—';
+    tradingLifetimeRewardEl.textContent = formatSigned(trading.lifetimeReward, 4);
+    tradingCumulativeReturnEl.textContent = Number.isFinite(trading.cumulativeReturn)
+      ? formatPercent(trading.cumulativeReturn, 2)
+      : '—';
+    tradingTradeCountEl.textContent = formatInteger(trading.trades ?? 0);
+    tradingWinRateEl.textContent = Number.isFinite(trading.winRate)
+      ? formatPercent(trading.winRate, 2)
+      : '—';
     applyPolicyClass(tradingLastRewardEl, haveSamples ? trading.lastReward : null);
     applyPolicyClass(tradingAvgRewardEl, haveSamples ? trading.avgReward : null);
     applyPolicyClass(tradingEdgeEl, Number.isFinite(trading.lastEdge) ? trading.lastEdge : null);
+    applyPolicyClass(tradingLastCycleEl, Number.isFinite(trading.lastCycleReturn) ? trading.lastCycleReturn : null);
+    applyPolicyClass(tradingBestCycleEl, Number.isFinite(trading.bestCycleReturn) ? trading.bestCycleReturn : null);
   }
 
   function applySnapshot(snapshot) {
@@ -415,17 +476,37 @@
     datasetProgressEl.textContent = stats?.progressPct != null ? `${formatNumber(stats.progressPct, 1)}%` : '—';
     windowSizeLabelEl.textContent = stats?.windowSize ?? '—';
     hiddenUnitsLabelEl.textContent = stats?.hiddenUnits ?? '—';
-    stepCountEl.textContent = stats?.steps ?? 0;
+    stepCountEl.textContent = formatInteger(stats?.steps);
     maeEl.textContent = formatNumber(stats?.mae, 4);
     rmseEl.textContent = formatNumber(stats?.rmse, 4);
     bestMaeEl.textContent = formatNumber(stats?.bestMae, 4);
     lrLabelEl.textContent = formatNumber(stats?.learningRate, 3);
     noiseLabelEl.textContent = formatNumber(stats?.noise, 3);
-    pointsStreamedEl.textContent = stats?.pointsSeen ?? 0;
+    pointsStreamedEl.textContent = formatInteger(stats?.pointsSeen);
     windowCoverageEl.textContent = stats?.windowCoverage ?? '—';
-    loopCountEl.textContent = stats?.loops ?? 0;
+    loopCountEl.textContent = formatInteger(stats?.loops);
     bestMaeSecondaryEl.textContent = formatNumber(stats?.bestMae, 4);
     lastResetEl.textContent = stats?.lastReset ?? '—';
+    if (instrumentLabelEl) {
+      const ticker = stats?.ticker;
+      const instrumentName = stats?.instrumentName;
+      if (ticker && instrumentName) {
+        instrumentLabelEl.textContent = `${ticker} — ${instrumentName}`;
+      } else if (instrumentName) {
+        instrumentLabelEl.textContent = instrumentName;
+      } else if (ticker) {
+        instrumentLabelEl.textContent = ticker;
+      } else {
+        instrumentLabelEl.textContent = '—';
+      }
+    }
+    if (datasetDateRangeEl) datasetDateRangeEl.textContent = stats?.dateRange ?? '—';
+    if (datasetPlaylistEl) {
+      const position = stats?.playlistPosition ?? 0;
+      const size = stats?.playlistSize ?? 0;
+      datasetPlaylistEl.textContent = size > 0 ? `${position}/${size}` : '—';
+    }
+    if (datasetUniverseEl) datasetUniverseEl.textContent = formatInteger(stats?.availableTickers);
 
     updatePortfolioCard(snapshot.portfolio);
     updateTradingSummary(snapshot.trading);

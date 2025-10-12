@@ -110,14 +110,17 @@
             <div class="panel-card data-card">
               <div class="panel-sub">Dataset feed</div>
               <div class="stats stats-tight">
-                <div>Instrument: <span>SPY (S&P 500 ETF)</span></div>
+                <div>Instrument: <span id="instrumentLabel">—</span></div>
+                <div>Date range: <span id="datasetDateRange">—</span></div>
+                <div>Rotation playlist: <span id="datasetPlaylist">—</span></div>
+                <div>Universe size: <span id="datasetUniverse">—</span></div>
                 <div>Points streamed: <span id="pointsStreamed">0</span></div>
                 <div>Window coverage: <span id="windowCoverage">—</span></div>
                 <div>Replay loops: <span id="loopCount">0</span></div>
                 <div>Best MAE so far: <span id="bestMaeSecondary">—</span></div>
                 <div>Last reset: <span id="lastReset">—</span></div>
               </div>
-              <div class="dataset-note">Source: Stooq daily SPY closes (most recent 360 trading sessions).</div>
+              <div class="dataset-note">Source: Stooq daily closes (2000 → present) rotated across multiple ETFs (SPY, QQQ, DIA, IWM, EFA, EEM, XLK, XLF, XLE, XLV).</div>
             </div>
 
             <div class="panel-card trading-card">
@@ -128,13 +131,25 @@
                 <div>Open position: <span id="portfolioPosition">—</span></div>
                 <div>Average cost: <span id="portfolioAvgCost">—</span></div>
                 <div>Unrealized P/L: <span id="portfolioUnrealized">—</span></div>
+                <div>Realized P/L: <span id="portfolioRealized">—</span></div>
                 <div>Total return: <span id="portfolioReturn">—</span></div>
+                <div>Max drawdown: <span id="portfolioDrawdown">—</span></div>
+                <div>Sharpe ratio: <span id="portfolioSharpe">—</span></div>
+                <div>Trades executed: <span id="portfolioTradeCount">—</span></div>
+                <div>Win rate: <span id="portfolioWinRate">—</span></div>
                 <div>Policy last action: <span id="tradingLastAction" class="policy-metric">—</span></div>
                 <div>Policy confidence: <span id="tradingConfidence" class="policy-metric">—</span></div>
                 <div>Signal edge: <span id="tradingEdge" class="policy-metric">—</span></div>
                 <div>Latest reward: <span id="tradingLastReward" class="policy-metric">—</span></div>
                 <div>Avg reward: <span id="tradingAvgReward" class="policy-metric">—</span></div>
                 <div>Exploration rate: <span id="tradingExploration" class="policy-metric">—</span></div>
+                <div>Completed cycles: <span id="tradingCycleCount" class="policy-metric">—</span></div>
+                <div>Last cycle return: <span id="tradingLastCycle" class="policy-metric">—</span></div>
+                <div>Best cycle return: <span id="tradingBestCycle" class="policy-metric">—</span></div>
+                <div>Lifetime reward: <span id="tradingLifetimeReward" class="policy-metric">—</span></div>
+                <div>Cumulative return: <span id="tradingCumulativeReturn" class="policy-metric">—</span></div>
+                <div>Trades placed: <span id="tradingTradeCount" class="policy-metric">—</span></div>
+                <div>Win rate: <span id="tradingWinRate" class="policy-metric">—</span></div>
               </div>
               <div class="panel-sub secondary">Recent orders</div>
               <ul id="tradeLog" class="trade-log"></ul>
