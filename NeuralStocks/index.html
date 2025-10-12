@@ -101,170 +101,179 @@
       <section class="pane right training-pane">
         <div class="panel-header">TIME-SERIES TRAINING LAB</div>
         <div class="training-layout">
-          <div class="training-column column-setup">
-            <div class="panel-card intro-card">
-              <div class="explain">
-                <strong>Sequence-in, price-out.</strong> We feed a sliding window of recent closes into a compact tanh MLP and update it after every prediction. No tricks: just stochastic gradient descent nudging the same network forward in time.
-              </div>
-              <blockquote>
-                "Markets are a mathematical collective hallucination." — Inspired by Benoit Mandelbrot
-              </blockquote>
+          <div class="panel-card intro-card">
+            <div class="explain">
+              <strong>Sequence-in, price-out.</strong> We feed a sliding window of recent closes into a compact tanh MLP and update it after every prediction. No tricks: just stochastic gradient descent nudging the same network forward in time.
+            </div>
+            <blockquote>
+              "Markets are a mathematical collective hallucination." — Inspired by Benoit Mandelbrot
+            </blockquote>
+          </div>
+
+          <div class="panel-card controls-card">
+            <div class="controls row">
+              <button id="startBtn">START</button>
+              <button id="pauseBtn" disabled>PAUSE</button>
+              <button id="resetBtn">RESET NETWORK</button>
             </div>
 
-            <div class="panel-card controls-card">
-              <div class="controls row">
-                <button id="startBtn">START</button>
-                <button id="pauseBtn" disabled>PAUSE</button>
-                <button id="resetBtn">RESET NETWORK</button>
+            <div class="grid-2 compact-grid">
+              <div>
+                <div class="label">Learning rate (α)</div>
+                <input type="range" id="learningRate" min="0.005" max="0.200" step="0.005" value="0.050" />
+                <div class="val" id="learningRateVal">0.050</div>
               </div>
+              <div>
+                <div class="label">Hidden units</div>
+                <input type="range" id="hiddenUnits" min="4" max="48" step="1" value="18" />
+                <div class="val" id="hiddenUnitsVal">18</div>
+              </div>
+            </div>
 
-              <div class="grid-2 compact-grid">
-                <div>
-                  <div class="label">Learning rate (α)</div>
-                  <input type="range" id="learningRate" min="0.005" max="0.200" step="0.005" value="0.050" />
-                  <div class="val" id="learningRateVal">0.050</div>
-                </div>
-                <div>
-                  <div class="label">Hidden units</div>
-                  <input type="range" id="hiddenUnits" min="4" max="48" step="1" value="18" />
-                  <div class="val" id="hiddenUnitsVal">18</div>
-                </div>
+            <div class="grid-2 compact-grid">
+              <div>
+                <div class="label">Lookback window</div>
+                <input type="range" id="windowSize" min="8" max="48" step="1" value="24" />
+                <div class="val" id="windowSizeVal">24</div>
               </div>
+              <div>
+                <div class="label">Feature noise</div>
+                <input type="range" id="noise" min="0.000" max="0.050" step="0.001" value="0.010" />
+                <div class="val" id="noiseVal">0.010</div>
+              </div>
+            </div>
 
-              <div class="grid-2 compact-grid">
-                <div>
-                  <div class="label">Lookback window</div>
-                  <input type="range" id="windowSize" min="8" max="48" step="1" value="24" />
-                  <div class="val" id="windowSizeVal">24</div>
-                </div>
-                <div>
-                  <div class="label">Feature noise</div>
-                  <input type="range" id="noise" min="0.000" max="0.050" step="0.001" value="0.010" />
-                  <div class="val" id="noiseVal">0.010</div>
-                </div>
+            <div class="grid-2 compact-grid">
+              <div>
+                <div class="label">Step delay (ms)</div>
+                <input type="range" id="delayMs" min="0" max="300" step="20" value="100" />
+                <div class="val" id="delayMsVal">100</div>
               </div>
-
-              <div class="grid-2 compact-grid">
-                <div>
-                  <div class="label">Step delay (ms)</div>
-                  <input type="range" id="delayMs" min="0" max="300" step="20" value="100" />
-                  <div class="val" id="delayMsVal">100</div>
-                </div>
-                <div class="hint-block">Zero delay = fastest possible training. Raise it to watch learning unfold slowly.</div>
-              </div>
+              <div class="hint-block">Zero delay = fastest possible training. Raise it to watch learning unfold slowly.</div>
             </div>
           </div>
 
-          <div class="training-column column-metrics">
-            <div class="panel-card results-card">
-              <div class="panel-sub">Recent forecasts</div>
-              <ul id="recentList" class="recent-list"></ul>
-              <div class="panel-sub secondary">Forward projection</div>
-              <div class="forward-wrapper">
-                <div id="forwardEmpty" class="forward-empty">Waiting for the next prediction window…</div>
-                <table class="forward-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Date</th>
-                      <th>Forecast</th>
-                      <th>Actual</th>
-                      <th>Δ</th>
-                      <th>Δ%</th>
-                    </tr>
-                  </thead>
-                  <tbody id="forwardTableBody"></tbody>
-                </table>
-              </div>
-            </div>
-
-            <div class="panel-card data-card">
-              <div class="panel-sub">Dataset feed</div>
-              <div class="stats stats-tight">
-                <div>Instrument: <span id="instrumentLabel">—</span></div>
-                <div>Date range: <span id="datasetDateRange">—</span></div>
-                <div>Rotation playlist: <span id="datasetPlaylist">—</span></div>
-                <div>Universe size: <span id="datasetUniverse">—</span></div>
-                <div>Points streamed: <span id="pointsStreamed">0</span></div>
-                <div>Window coverage: <span id="windowCoverage">—</span></div>
-                <div>Replay loops: <span id="loopCount">0</span></div>
-                <div>Best MAE so far: <span id="bestMaeSecondary">—</span></div>
-                <div>Last reset: <span id="lastReset">—</span></div>
-              </div>
-              <div class="dataset-note">Source: Stooq daily closes (2000 → 2025) rotated across a multi-asset ETF universe (SPY, QQQ, DIA, IWM, EFA, EEM, XLK, XLF, XLE, XLV) sampled 5–10 tickers per replay. The trading agent consumes the forecaster's prediction, actual close, moving-average distances, RSI slopes, MACD momentum, and realized-volatility trends.</div>
-            </div>
-
-            <div class="panel-card trading-card">
-              <div class="panel-sub">Autonomous trading desk</div>
-              <div class="stats stats-tight trading-stats">
-                <div>Equity value: <span id="portfolioEquity">—</span></div>
-                <div>Cash on hand: <span id="portfolioCash">—</span></div>
-                <div>Open position: <span id="portfolioPosition">—</span></div>
-                <div>Average cost: <span id="portfolioAvgCost">—</span></div>
-                <div>Unrealized P/L: <span id="portfolioUnrealized">—</span></div>
-                <div>Realized P/L: <span id="portfolioRealized">—</span></div>
-                <div>Total return: <span id="portfolioReturn">—</span></div>
-                <div>Max drawdown: <span id="portfolioDrawdown">—</span></div>
-                <div>Sharpe ratio: <span id="portfolioSharpe">—</span></div>
-                <div>Sortino ratio: <span id="portfolioSortino">—</span></div>
-                <div>Calmar ratio: <span id="portfolioCalmar">—</span></div>
-                <div>Net CAGR: <span id="portfolioCagr">—</span></div>
-                <div>Downside deviation: <span id="portfolioDownside">—</span></div>
-                <div>Turnover: <span id="portfolioTurnover">—</span></div>
-                <div>Avg win / loss: <span id="portfolioAvgWinLoss">—</span></div>
-                <div>Avg hold (days): <span id="portfolioAvgHold">—</span></div>
-                <div>Cost drag: <span id="portfolioCostDrag">—</span></div>
-                <div>Capacity cost/share: <span id="portfolioCapacity">—</span></div>
-                <div>Trades executed: <span id="portfolioTradeCount">—</span></div>
-                <div>Win rate: <span id="portfolioWinRate">—</span></div>
-                <div>Total costs paid: <span id="portfolioCostsPaid">—</span></div>
-                <div>Policy last action: <span id="tradingLastAction" class="policy-metric">—</span></div>
-                <div>Policy confidence: <span id="tradingConfidence" class="policy-metric">—</span></div>
-                <div>Signal edge: <span id="tradingEdge" class="policy-metric">—</span></div>
-                <div>Latest reward: <span id="tradingLastReward" class="policy-metric">—</span></div>
-                <div>Avg reward: <span id="tradingAvgReward" class="policy-metric">—</span></div>
-                <div>Exploration rate: <span id="tradingExploration" class="policy-metric">—</span></div>
-                <div>Completed cycles: <span id="tradingCycleCount" class="policy-metric">—</span></div>
-                <div>Last cycle return: <span id="tradingLastCycle" class="policy-metric">—</span></div>
-                <div>Best cycle return: <span id="tradingBestCycle" class="policy-metric">—</span></div>
-                <div>Lifetime reward: <span id="tradingLifetimeReward" class="policy-metric">—</span></div>
-                <div>Cumulative return: <span id="tradingCumulativeReturn" class="policy-metric">—</span></div>
-                <div>Trades placed: <span id="tradingTradeCount" class="policy-metric">—</span></div>
-                <div>Win rate: <span id="tradingWinRate" class="policy-metric">—</span></div>
-                <div>Trend regime: <span id="tradingRegime" class="policy-metric">—</span></div>
-                <div>Volatility regime: <span id="tradingVolatility" class="policy-metric">—</span></div>
-                <div>Risk controls: <span id="tradingRisk" class="policy-metric">—</span></div>
-                <div>Edge guardrails: <span id="tradingThreshold" class="policy-metric">—</span></div>
-              </div>
-              <div class="panel-sub secondary">Recent orders</div>
-              <ul id="tradeLog" class="trade-log"></ul>
-              <div class="chart-hint">The agent sizes orders from its forecasts, averaging into strength and trimming into weakness.</div>
+          <div class="panel-card results-card">
+            <div class="panel-sub">Recent forecasts</div>
+            <ul id="recentList" class="recent-list"></ul>
+            <div class="panel-sub secondary">Forward projection</div>
+            <div class="forward-wrapper">
+              <div id="forwardEmpty" class="forward-empty">Waiting for the next prediction window…</div>
+              <table class="forward-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Date</th>
+                    <th>Forecast</th>
+                    <th>Actual</th>
+                    <th>Δ</th>
+                    <th>Δ%</th>
+                  </tr>
+                </thead>
+                <tbody id="forwardTableBody"></tbody>
+              </table>
             </div>
           </div>
 
-          <div class="training-column column-visuals">
-            <div class="panel-card tab-card">
-              <div class="panel-sub">Model internals</div>
-              <div class="tab-buttons">
-                <button class="tab-button active" data-tab="weights">Feature weights</button>
-                <button class="tab-button" data-tab="output">Hidden → output</button>
-                <button class="tab-button" data-tab="raw">Raw parameters</button>
+          <div class="panel-card data-card">
+            <div class="panel-sub">Dataset feed</div>
+            <div class="stats stats-tight">
+              <div>Instrument: <span id="instrumentLabel">—</span></div>
+              <div>Date range: <span id="datasetDateRange">—</span></div>
+              <div>Rotation playlist: <span id="datasetPlaylist">—</span></div>
+              <div>Universe size: <span id="datasetUniverse">—</span></div>
+              <div>Points streamed: <span id="pointsStreamed">0</span></div>
+              <div>Window coverage: <span id="windowCoverage">—</span></div>
+              <div>Replay loops: <span id="loopCount">0</span></div>
+              <div>Best MAE so far: <span id="bestMaeSecondary">—</span></div>
+              <div>Last reset: <span id="lastReset">—</span></div>
+            </div>
+            <div class="dataset-note">Source: Stooq daily closes (2000 → 2025) rotated across a multi-asset ETF universe (SPY, QQQ, DIA, IWM, EFA, EEM, XLK, XLF, XLE, XLV) sampled 5–10 tickers per replay. The trading agent consumes the forecaster's prediction, actual close, moving-average distances, RSI slopes, MACD momentum, and realized-volatility trends.</div>
+          </div>
+
+          <div class="panel-card trading-card full-span">
+            <div class="panel-sub">Autonomous trading desk</div>
+            <div class="stats stats-tight trading-stats">
+              <div>Equity value: <span id="portfolioEquity">—</span></div>
+              <div>Cash on hand: <span id="portfolioCash">—</span></div>
+              <div>Open position: <span id="portfolioPosition">—</span></div>
+              <div>Average cost: <span id="portfolioAvgCost">—</span></div>
+              <div>Unrealized P/L: <span id="portfolioUnrealized">—</span></div>
+              <div>Realized P/L: <span id="portfolioRealized">—</span></div>
+              <div>Total return: <span id="portfolioReturn">—</span></div>
+              <div>Max drawdown: <span id="portfolioDrawdown">—</span></div>
+              <div>Sharpe ratio: <span id="portfolioSharpe">—</span></div>
+              <div>Sortino ratio: <span id="portfolioSortino">—</span></div>
+              <div>Calmar ratio: <span id="portfolioCalmar">—</span></div>
+              <div>Net CAGR: <span id="portfolioCagr">—</span></div>
+              <div>Downside deviation: <span id="portfolioDownside">—</span></div>
+              <div>Turnover: <span id="portfolioTurnover">—</span></div>
+              <div>Avg win / loss: <span id="portfolioAvgWinLoss">—</span></div>
+              <div>Avg hold (days): <span id="portfolioAvgHold">—</span></div>
+              <div>Cost drag: <span id="portfolioCostDrag">—</span></div>
+              <div>Capacity cost/share: <span id="portfolioCapacity">—</span></div>
+              <div>Trades executed: <span id="portfolioTradeCount">—</span></div>
+              <div>Win rate: <span id="portfolioWinRate">—</span></div>
+              <div>Total costs paid: <span id="portfolioCostsPaid">—</span></div>
+              <div>Policy last action: <span id="tradingLastAction" class="policy-metric">—</span></div>
+              <div>Policy confidence: <span id="tradingConfidence" class="policy-metric">—</span></div>
+              <div>Signal edge: <span id="tradingEdge" class="policy-metric">—</span></div>
+              <div>Latest reward: <span id="tradingLastReward" class="policy-metric">—</span></div>
+              <div>Avg reward: <span id="tradingAvgReward" class="policy-metric">—</span></div>
+              <div>Exploration rate: <span id="tradingExploration" class="policy-metric">—</span></div>
+              <div>Completed cycles: <span id="tradingCycleCount" class="policy-metric">—</span></div>
+              <div>Last cycle return: <span id="tradingLastCycle" class="policy-metric">—</span></div>
+              <div>Best cycle return: <span id="tradingBestCycle" class="policy-metric">—</span></div>
+              <div>Lifetime reward: <span id="tradingLifetimeReward" class="policy-metric">—</span></div>
+              <div>Cumulative return: <span id="tradingCumulativeReturn" class="policy-metric">—</span></div>
+              <div>Trades placed: <span id="tradingTradeCount" class="policy-metric">—</span></div>
+              <div>Win rate: <span id="tradingWinRate" class="policy-metric">—</span></div>
+              <div>Trend regime: <span id="tradingRegime" class="policy-metric">—</span></div>
+              <div>Volatility regime: <span id="tradingVolatility" class="policy-metric">—</span></div>
+              <div>Risk controls: <span id="tradingRisk" class="policy-metric">—</span></div>
+              <div>Edge guardrails: <span id="tradingThreshold" class="policy-metric">—</span></div>
+            </div>
+            <div class="panel-sub secondary">Recent orders</div>
+            <ul id="tradeLog" class="trade-log"></ul>
+            <div class="chart-hint">The agent sizes orders from its forecasts, averaging into strength and trimming into weakness.</div>
+          </div>
+
+          <div class="panel-card tab-card full-span">
+            <div class="panel-sub">Model internals</div>
+            <div class="tab-buttons model-tabs">
+              <button class="tab-button active" data-tab="forecaster-input">Forecaster · Input → Hidden</button>
+              <button class="tab-button" data-tab="forecaster-output">Forecaster · Hidden → Output</button>
+              <button class="tab-button" data-tab="trader-input">Trader · Input → Hidden 1</button>
+              <button class="tab-button" data-tab="trader-hidden">Trader · Hidden 1 → Hidden 2</button>
+              <button class="tab-button" data-tab="trader-output">Trader · Hidden 2 → Actions</button>
+              <button class="tab-button" data-tab="raw">Raw parameters</button>
+            </div>
+            <div class="tab-panels">
+              <div class="tab-panel active" data-tab="forecaster-input">
+                <canvas id="weightsCanvas" width="520" height="220"></canvas>
+                <div class="chart-hint">Rows: hidden neurons · Columns: lookback steps. Orange = positive influence · Teal = negative.</div>
               </div>
-              <div class="tab-panels">
-                <div class="tab-panel active" data-tab="weights">
-                  <canvas id="weightsCanvas" width="520" height="220"></canvas>
-                  <div class="chart-hint">Rows: hidden neurons · Columns: lookback steps. Orange = positive influence · Teal = negative.</div>
-                </div>
-                <div class="tab-panel" data-tab="output">
-                  <canvas id="outputCanvas" width="520" height="120"></canvas>
-                  <div class="chart-hint">Contribution of each hidden neuron on the final price prediction.</div>
-                </div>
-                <div class="tab-panel" data-tab="raw">
-                  <details class="weights-raw">
-                    <summary>Inspect raw weight tensors</summary>
-                    <pre id="weightsRaw">—</pre>
-                  </details>
-                </div>
+              <div class="tab-panel" data-tab="forecaster-output">
+                <canvas id="outputCanvas" width="520" height="140"></canvas>
+                <div class="chart-hint">Contribution of each hidden neuron on the final price prediction.</div>
+              </div>
+              <div class="tab-panel" data-tab="trader-input">
+                <canvas id="traderInputCanvas" width="520" height="220"></canvas>
+                <div class="chart-hint">Trader layer 1 weights — rows: hidden neurons · columns: feature inputs.</div>
+              </div>
+              <div class="tab-panel" data-tab="trader-hidden">
+                <canvas id="traderHiddenCanvas" width="520" height="220"></canvas>
+                <div class="chart-hint">Trader layer 2 weights — how hidden layer 1 feeds the policy core.</div>
+              </div>
+              <div class="tab-panel" data-tab="trader-output">
+                <canvas id="traderOutputCanvas" width="520" height="140"></canvas>
+                <div class="chart-hint">Trader output logits — rows: actions (hold/buy/sell) · columns: hidden activations.</div>
+              </div>
+              <div class="tab-panel" data-tab="raw">
+                <details class="weights-raw">
+                  <summary>Inspect raw weight tensors</summary>
+                  <pre id="weightsRaw">—</pre>
+                </details>
               </div>
             </div>
           </div>

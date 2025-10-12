@@ -2108,19 +2108,53 @@ function postSnapshot() {
   const rmse = Math.sqrt(Math.max(stats.mse ?? 0, 0));
   const bestMae = stats.bestMae === Infinity ? null : stats.bestMae;
 
-  const weightsSnapshot = net
-    ? {
-        inputWeights: Array.from(net.w1),
-        outputWeights: Array.from(net.w2),
-        hiddenUnits: net.hiddenUnits,
-        inputSize: net.inputSize
-      }
-    : {
-        inputWeights: [],
-        outputWeights: [],
-        hiddenUnits: config.hiddenUnits,
-        inputSize: config.windowSize
-      };
+  const weightsSnapshot = {
+    forecaster: net
+      ? {
+          inputWeights: Array.from(net.w1),
+          outputWeights: Array.from(net.w2),
+          biases: {
+            b1: Array.from(net.b1),
+            b2: Array.from(net.b2)
+          },
+          hiddenUnits: net.hiddenUnits,
+          inputSize: net.inputSize,
+          horizon: net.horizon
+        }
+      : {
+          inputWeights: [],
+          outputWeights: [],
+          biases: { b1: [], b2: [] },
+          hiddenUnits: config.hiddenUnits,
+          inputSize: config.windowSize,
+          horizon: forecastHorizon
+        },
+    trader: trader
+      ? {
+          inputWeights: Array.from(trader.w1),
+          hiddenWeights: Array.from(trader.w2),
+          outputWeights: Array.from(trader.w3),
+          biases: {
+            b1: Array.from(trader.b1),
+            b2: Array.from(trader.b2),
+            b3: Array.from(trader.b3)
+          },
+          inputSize: trader.inputSize,
+          hiddenUnits1: trader.hiddenUnits1,
+          hiddenUnits2: trader.hiddenUnits2,
+          actionCount: trader.actionCount
+        }
+      : {
+          inputWeights: [],
+          hiddenWeights: [],
+          outputWeights: [],
+          biases: { b1: [], b2: [], b3: [] },
+          inputSize: createTraderInputSize(),
+          hiddenUnits1: config.traderHiddenUnits,
+          hiddenUnits2: config.traderHiddenUnits2,
+          actionCount: 3
+        }
+  };
 
   if (!tradingStats) {
     tradingStats = createTradingStats();
