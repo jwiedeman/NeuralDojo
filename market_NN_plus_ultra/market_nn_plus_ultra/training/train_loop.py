@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Optional
 
 import torch
 from torch.utils.data import DataLoader, random_split
@@ -27,6 +27,10 @@ class Trainer:
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.loss_fn = default_risk_loss()
+        self.amp_enabled = config.mixed_precision and self.device.type == "cuda"
+        self.scaler: Optional[torch.cuda.amp.GradScaler] = None
+        if self.amp_enabled:
+            self.scaler = torch.cuda.amp.GradScaler()
 
         dataset = SQLiteMarketDataset(
             database_path=config.data.database_path,
@@ -118,7 +122,7 @@ class Trainer:
 
     def train(self) -> None:
         train_loader, val_loader = self.dataloaders()
-        amp_context = torch.cuda.amp.autocast if (self.config.mixed_precision and self.device.type == "cuda") else nullcontext
+        amp_context = torch.cuda.amp.autocast if self.amp_enabled else nullcontext
 
         for epoch in range(self.config.num_epochs):
             self.model.train()
@@ -132,9 +136,16 @@ class Trainer:
                     preds = self.model(features)
                     loss = self._compute_loss(preds, targets, features)
 
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config.gradient_clip_val)
-                self.optimizer.step()
+                if self.scaler is not None and self.scaler.is_enabled():
+                    self.scaler.scale(loss).backward()
+                    self.scaler.unscale_(self.optimizer)
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config.gradient_clip_val)
+                    self.scaler.step(self.optimizer)
+                    self.scaler.update()
+                else:
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config.gradient_clip_val)
+                    self.optimizer.step()
 
                 running_loss += loss.item() * features.size(0)
 
@@ -156,7 +167,8 @@ class Trainer:
         for features, targets in loader:
             features = features.to(self.device)
             targets = targets.to(self.device)
-            preds = self.model(features)
+            with torch.cuda.amp.autocast(enabled=self.amp_enabled):
+                preds = self.model(features)
             loss = self._compute_loss(preds, targets, features)
             total_loss += loss.item() * features.size(0)
             total_items += features.size(0)
