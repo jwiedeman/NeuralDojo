@@ -113,7 +113,7 @@ For a deeper discussion of the data flow, modular boundaries, and suggested exte
 
 ## Next Steps
 
-See [`task_tracker.md`](./task_tracker.md) for the current backlog. Contributions should keep the "ultimate trader" vision in mind: exploit rich features, stay modular, and pursue ROI relentlessly.
+See [`task_tracker.md`](./task_tracker.md) for the current backlog and [`docs/research_agenda.md`](./docs/research_agenda.md) for a narrative roadmap that ties milestones together. Contributions should keep the "ultimate trader" vision in mind: exploit rich features, stay modular, and pursue ROI relentlessly.
 
 ## Feature Registry
 

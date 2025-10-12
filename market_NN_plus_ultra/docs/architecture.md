@@ -4,15 +4,40 @@ This document captures the current system design for the "ultimate" trader.
 
 ## Data Interfaces
 
-* **SQLite contract** – `assets`, `series`, `indicators`, `trades`, and
-  `benchmarks` tables. The training pipeline currently consumes the first three
-  while reserving room to integrate order simulation feedback in later stages.
-* **Feature pipeline** – Extensible registry-driven transforms that enrich the
-  price panel with technical, statistical, and spectral signals. New features
-  are declared via `FeatureSpec` objects that describe dependencies, tags, and
-  documentation metadata.
-* **Window dataset** – Converts the multi-indexed panel into overlapping
-  windows. Normalisation is performed per-feature to stabilise optimisation.
+The system is designed around an opinionated but extensible SQLite contract. A
+single database file can power both batch research and live inference jobs.
+
+### Tables & Relationships
+
+| Table        | Purpose                                                                                   |
+|--------------|-------------------------------------------------------------------------------------------|
+| `assets`     | Static metadata (`asset_id`, `symbol`, `sector`, `currency`). Serves as the entity spine.  |
+| `series`     | Primary OHLCV candles keyed by (`timestamp`, `asset_id`).                                  |
+| `indicators` | Long-form engineered indicators with (`name`, `value`). Can be sparsely populated.         |
+| `trades`     | (Planned) Executed trade logs for reinforcement learning and evaluation feedback.          |
+| `benchmarks` | (Planned) Reference indices for relative performance measurement.                          |
+
+The loader merges these tables into a panel with a hierarchical index
+`(asset_id, timestamp)` before optional enrichment via the feature pipeline.
+
+### Feature Pipeline
+
+The feature pipeline attaches additional signals by executing functions declared
+in the `FeatureRegistry`. Each `FeatureSpec` records metadata (tags,
+dependencies, descriptions) so that:
+
+1. Experiments can select subsets of features with a single config knob.
+2. Documentation can be auto-generated from the registry metadata.
+3. Missing dependencies are surfaced gracefully with structured logging.
+
+### Window Dataset
+
+The `SlidingWindowDataset` slices the enriched panel into overlapping windows.
+Key behaviours:
+
+* Optional z-score normalisation fit across the training corpus.
+* Multi-step forecast horizons aligned with the trainer's objective.
+* Configurable stride, enabling curriculum schedules over context length.
 
 ## Model Stack
 
