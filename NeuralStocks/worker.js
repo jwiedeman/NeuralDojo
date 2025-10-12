@@ -1,21 +1,53 @@
-// SPY daily closes courtesy of Stooq (360 most recent sessions captured into spy_daily.js).
-importScripts('spy_daily.js');
+// Historical closes courtesy of Stooq. We load a multi-instrument universe captured in market_history.js
+// and fall back to the legacy spy_daily.js stream if needed.
+importScripts('market_history.js', 'spy_daily.js');
 
-const rawData = Array.isArray(self.SPY_DAILY) ? self.SPY_DAILY : [];
-const dataset = rawData.map(entry => ({
-  date: entry.date,
-  close: Number(entry.close)
-})).filter(entry => Number.isFinite(entry.close));
+const earliestDateStr = '2000-01-01';
+const todayStr = new Date().toISOString().slice(0, 10);
 
-const prices = dataset.map(d => d.close);
-const dates = dataset.map(d => d.date);
-const totalPoints = prices.length;
+function coerceNumber(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
 
-const mean = totalPoints ? prices.reduce((sum, v) => sum + v, 0) / totalPoints : 0;
-const variance = totalPoints
-  ? prices.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / totalPoints
-  : 0;
-const std = Math.max(Math.sqrt(variance), 1e-6);
+function sanitizeSeries(entry) {
+  const symbol = entry?.symbol || entry?.ticker || 'UNKNOWN';
+  const name = entry?.name || symbol;
+  const rawSeries = Array.isArray(entry?.series) ? entry.series : Array.isArray(entry) ? entry : [];
+  const dedup = new Map();
+  for (const row of rawSeries) {
+    const dateStr = row?.date || row?.Date || row?.d;
+    const closeVal = coerceNumber(row?.close ?? row?.Close ?? row?.c);
+    if (!dateStr || !closeVal) continue;
+    if (dateStr < earliestDateStr || dateStr > todayStr) continue;
+    dedup.set(dateStr, closeVal);
+  }
+  const ordered = Array.from(dedup.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  const series = ordered.map(([date, close]) => ({ date, close }));
+  return { symbol, name, series };
+}
+
+const fallbackUniverse = Array.isArray(self.SPY_DAILY)
+  ? [{ symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', series: self.SPY_DAILY }]
+  : [];
+
+const rawUniverse = Array.isArray(self.MARKET_HISTORY) && self.MARKET_HISTORY.length
+  ? self.MARKET_HISTORY
+  : fallbackUniverse;
+
+const marketUniverse = rawUniverse
+  .map(sanitizeSeries)
+  .filter(entry => Array.isArray(entry.series) && entry.series.length > 260);
+
+if (!marketUniverse.length) {
+  throw new Error('No market data available');
+}
+
+let prices = new Float32Array(0);
+let dates = [];
+let totalPoints = 0;
+let mean = 0;
+let std = 1;
 
 function computeSMA(values, period) {
   const result = new Float32Array(values.length);
@@ -98,15 +130,60 @@ function computeMACDSeries(values, fastPeriod, slowPeriod, signalPeriod) {
   return { macd, signal, histogram };
 }
 
-const smaPeriods = [5, 10, 20];
-const emaPeriods = [5, 10, 20];
-const rsiPeriods = [14];
+const smaPeriods = [5, 10, 20, 50, 100, 200];
+const emaPeriods = [5, 10, 20, 50, 100, 200];
+const rsiPeriods = [6, 14, 28];
 const macdConfig = { fast: 12, slow: 26, signal: 9 };
+const returnPeriods = [1, 5, 10, 20];
 
-const smaSeries = smaPeriods.map(period => computeSMA(prices, period));
-const emaSeries = emaPeriods.map(period => computeEMA(prices, period));
-const rsiSeries = rsiPeriods.map(period => computeRSI(prices, period));
-const macdSeries = computeMACDSeries(prices, macdConfig.fast, macdConfig.slow, macdConfig.signal);
+let smaSeries = [];
+let emaSeries = [];
+let rsiSeries = [];
+let macdSeries = { macd: new Float32Array(0), signal: new Float32Array(0), histogram: new Float32Array(0) };
+let returnSeries = [];
+
+function computeReturnSeries(values, period) {
+  const result = new Float32Array(values.length);
+  for (let i = 0; i < values.length; i++) {
+    if (i >= period) {
+      const prev = values[i - period];
+      if (prev !== 0) {
+        result[i] = (values[i] - prev) / prev;
+        continue;
+      }
+    }
+    result[i] = 0;
+  }
+  return result;
+}
+
+function updateDatasetMoments() {
+  if (!totalPoints) {
+    mean = 0;
+    std = 1;
+    return;
+  }
+  let sum = 0;
+  for (let i = 0; i < prices.length; i++) {
+    sum += prices[i];
+  }
+  mean = sum / prices.length;
+  let variance = 0;
+  for (let i = 0; i < prices.length; i++) {
+    const diff = prices[i] - mean;
+    variance += diff * diff;
+  }
+  variance = variance / prices.length;
+  std = Math.max(Math.sqrt(variance), 1e-6);
+}
+
+function refreshTechnicalSeries() {
+  smaSeries = smaPeriods.map(period => computeSMA(prices, period));
+  emaSeries = emaPeriods.map(period => computeEMA(prices, period));
+  rsiSeries = rsiPeriods.map(period => computeRSI(prices, period));
+  macdSeries = computeMACDSeries(prices, macdConfig.fast, macdConfig.slow, macdConfig.signal);
+  returnSeries = returnPeriods.map(period => computeReturnSeries(prices, period));
+}
 
 function normalize(price) {
   return (price - mean) / std;
@@ -389,13 +466,15 @@ const config = {
   traderHiddenUnits: 24,
   traderHiddenUnits2: 24,
   traderExploration: 0.05,
-  traderRewardScale: 120
+  traderRewardScale: 120,
+  tickerSubsetMin: 5,
+  tickerSubsetMax: 10
 };
 
-let net = new PriceNet(config.windowSize, config.hiddenUnits, config.learningRate);
+let net = null;
 let running = false;
 let timer = null;
-let cursor = Math.min(totalPoints, config.windowSize);
+let cursor = 0;
 let loops = 0;
 let history = {
   actual: [],
@@ -426,16 +505,122 @@ function createPortfolio() {
   };
 }
 
-let portfolio = createPortfolio();
+let portfolio = null;
 
-const tradingExtraFeatureCount = 3
-  + smaPeriods.length
-  + emaPeriods.length
-  + rsiPeriods.length
-  + 3; // macd, signal, histogram
+let trader = null;
+let tradingStats = null;
+let stats = null;
+let activeDataset = null;
+let playlist = [];
+let activePlaylistIndex = -1;
+
+function shuffle(array) {
+  const copy = array.slice();
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function randomInt(min, max) {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return min || 0;
+  if (max < min) [min, max] = [max, min];
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function playlistPosition() {
+  return activePlaylistIndex >= 0 ? activePlaylistIndex + 1 : 0;
+}
+
+function rebuildTickerPlaylist() {
+  if (!marketUniverse.length) {
+    playlist = [];
+    activePlaylistIndex = -1;
+    return;
+  }
+  const min = Math.max(1, Math.min((config.tickerSubsetMin | 0) || 1, marketUniverse.length));
+  const maxCandidate = Math.max(min, Math.min((config.tickerSubsetMax | 0) || min, marketUniverse.length));
+  const sampleSize = Math.max(min, Math.min(maxCandidate, randomInt(min, maxCandidate)));
+  playlist = shuffle(marketUniverse).slice(0, sampleSize);
+  activePlaylistIndex = -1;
+}
+
+function advanceToNextDataset(options = {}) {
+  if (!playlist.length || activePlaylistIndex >= playlist.length - 1) {
+    rebuildTickerPlaylist();
+  }
+  if (!playlist.length) {
+    return false;
+  }
+  activePlaylistIndex += 1;
+  const dataset = playlist[activePlaylistIndex];
+  return setActiveDataset(dataset, options);
+}
+
+function setActiveDataset(dataset, { resetNetwork = false, resetTrader = false } = {}) {
+  if (!dataset || !Array.isArray(dataset.series) || !dataset.series.length) {
+    return false;
+  }
+  activeDataset = dataset;
+  const length = dataset.series.length;
+  prices = new Float32Array(length);
+  dates = new Array(length);
+  for (let i = 0; i < length; i++) {
+    const point = dataset.series[i];
+    prices[i] = Number(point.close);
+    dates[i] = point.date;
+  }
+  totalPoints = length;
+  updateDatasetMoments();
+  refreshTechnicalSeries();
+  const maxWindow = Math.max(4, Math.min(config.windowSize | 0 || 24, Math.max(4, totalPoints - 1)));
+  if (maxWindow !== config.windowSize) {
+    config.windowSize = maxWindow;
+  }
+  cursor = Math.max(config.windowSize, Math.min(totalPoints - 1, config.windowSize));
+  if (!net || resetNetwork || net.inputSize !== config.windowSize || net.hiddenUnits !== config.hiddenUnits) {
+    net = new PriceNet(config.windowSize, config.hiddenUnits, config.learningRate);
+  } else {
+    net.setLearningRate(config.learningRate);
+  }
+  const expectedTraderInput = createTraderInputSize();
+  if (!trader || resetTrader || trader.inputSize !== expectedTraderInput) {
+    trader = createTrader();
+    tradingStats = createTradingStats();
+  }
+  if (!tradingStats) {
+    tradingStats = createTradingStats();
+  }
+  trader.setLearningRate(config.traderLearningRate);
+  tradingStats.exploration = config.traderExploration;
+  tradingStats.learningRate = config.traderLearningRate;
+  tradingStats.playlistPosition = playlistPosition();
+  tradingStats.playlistSize = playlist.length;
+  history = { actual: [], predicted: [], errors: [] };
+  recentPredictions = [];
+  portfolio = createPortfolio();
+  stats = createStats();
+  stats.ticker = dataset.symbol;
+  stats.instrumentName = dataset.name;
+  stats.playlistPosition = playlistPosition();
+  stats.playlistSize = playlist.length;
+  stats.availableTickers = marketUniverse.length;
+  const firstDate = dataset.series[0]?.date;
+  const lastDate = dataset.series[dataset.series.length - 1]?.date;
+  stats.dateRange = firstDate && lastDate ? `${firstDate} → ${lastDate}` : '—';
+  stats.windowCoverage = windowCoverage();
+  stats.lastReset = formatClock();
+  stats.loops = loops;
+  return true;
+}
+
+function tradingFeatureCount() {
+  return 3 + smaPeriods.length + emaPeriods.length + rsiPeriods.length + 3 + returnPeriods.length;
+}
 
 function createTraderInputSize() {
-  return config.windowSize + tradingExtraFeatureCount;
+  return config.windowSize + tradingFeatureCount();
 }
 
 function createTrader() {
@@ -452,16 +637,24 @@ function createTradingStats() {
     steps: 0,
     avgReward: 0,
     lastReward: 0,
+    lifetimeReward: 0,
     lastAction: 'HOLD',
     lastConfidence: 0,
     lastEdge: 0,
     exploration: config.traderExploration,
-    learningRate: config.traderLearningRate
+    learningRate: config.traderLearningRate,
+    cycleCount: 0,
+    lastCycleReturn: 0,
+    bestCycleReturn: 0,
+    cumulativeReturn: 0,
+    trades: 0,
+    wins: 0,
+    losses: 0,
+    winRate: 0,
+    playlistPosition: playlistPosition(),
+    playlistSize: playlist.length
   };
 }
-
-let trader = createTrader();
-let tradingStats = createTradingStats();
 
 function formatClock() {
   const now = new Date();
@@ -485,11 +678,17 @@ function createStats() {
     hiddenUnits: config.hiddenUnits,
     progressPct: 0,
     windowCoverage: windowCoverage(),
-    lastReset: formatClock()
+    lastReset: '—',
+    ticker: activeDataset?.symbol ?? '—',
+    instrumentName: activeDataset?.name ?? '—',
+    playlistPosition: playlistPosition(),
+    playlistSize: playlist.length,
+    availableTickers: marketUniverse.length,
+    dateRange: activeDataset?.series?.length
+      ? `${activeDataset.series[0].date} → ${activeDataset.series[activeDataset.series.length - 1].date}`
+      : '—'
   };
 }
-
-let stats = createStats();
 
 function windowCoverage() {
   if (!totalPoints) return '—';
@@ -602,6 +801,15 @@ function recordTrade({ date, side, shares, price, edgePct, pnl }) {
   if (portfolio.trades.length > portfolioConfig.tradeHistoryLimit) {
     portfolio.trades.pop();
   }
+  if (tradingStats) {
+    tradingStats.trades = (tradingStats.trades || 0) + 1;
+    if (Number.isFinite(pnl) && pnl !== 0) {
+      if (pnl > 0) tradingStats.wins += 1;
+      else if (pnl < 0) tradingStats.losses += 1;
+    }
+    const total = Math.max(1, tradingStats.trades);
+    tradingStats.winRate = Math.max(0, Math.min(1, tradingStats.wins / total));
+  }
 }
 
 function attemptBuy(price, fraction, date, edge) {
@@ -701,6 +909,11 @@ function buildTradingFeatures(sample, predictedPrice) {
   features[offset++] = Number.isFinite(macdVal) ? macdVal / std : 0;
   features[offset++] = Number.isFinite(signalVal) ? signalVal / std : 0;
   features[offset++] = Number.isFinite(histVal) ? histVal / std : 0;
+  for (let i = 0; i < returnSeries.length; i++) {
+    const value = returnSeries[i][idx];
+    const clamped = Number.isFinite(value) ? Math.max(-3, Math.min(3, value)) : 0;
+    features[offset++] = clamped;
+  }
   return { features, edge };
 }
 
@@ -714,8 +927,11 @@ function updateTradingStats(decision, reward, edge) {
   tradingStats.lastReward = safeReward;
   const step = tradingStats.steps;
   tradingStats.avgReward += (safeReward - tradingStats.avgReward) / step;
+  tradingStats.lifetimeReward += safeReward;
   tradingStats.exploration = config.traderExploration;
   tradingStats.learningRate = config.traderLearningRate;
+  tradingStats.playlistPosition = playlistPosition();
+  tradingStats.playlistSize = playlist.length;
 }
 
 function applyTradingPolicy(sample, predictedPrice) {
@@ -743,8 +959,47 @@ function applyTradingPolicy(sample, predictedPrice) {
   updateTradingStats(decision, normalizedReward, edge);
 }
 
+function computeEquityMetrics(history) {
+  if (!Array.isArray(history) || history.length === 0) {
+    return { maxDrawdown: 0, sharpe: 0 };
+  }
+  let peak = null;
+  let maxDrawdown = 0;
+  const returns = [];
+  for (let i = 0; i < history.length; i++) {
+    const equity = Number(history[i]?.equity);
+    if (!Number.isFinite(equity)) continue;
+    if (peak == null || equity > peak) {
+      peak = equity;
+    }
+    if (peak > 0) {
+      const drawdown = (equity - peak) / peak;
+      if (drawdown < maxDrawdown) {
+        maxDrawdown = drawdown;
+      }
+    }
+    if (i > 0) {
+      const prev = Number(history[i - 1]?.equity);
+      if (Number.isFinite(prev) && prev > 0) {
+        returns.push((equity - prev) / prev);
+      }
+    }
+  }
+  let sharpe = 0;
+  if (returns.length > 1) {
+    const meanRet = returns.reduce((sum, v) => sum + v, 0) / returns.length;
+    const variance = returns.reduce((sum, v) => sum + Math.pow(v - meanRet, 2), 0) / (returns.length - 1);
+    const volatility = Math.sqrt(Math.max(variance, 0));
+    if (volatility > 0) {
+      sharpe = (meanRet / volatility) * Math.sqrt(252);
+    }
+  }
+  return { maxDrawdown, sharpe };
+}
+
 function createPortfolioSnapshot() {
   if (!portfolio) return null;
+  const metrics = computeEquityMetrics(portfolio.equityHistory);
   return {
     equity: portfolio.equity,
     cash: portfolio.cash,
@@ -755,19 +1010,50 @@ function createPortfolioSnapshot() {
     totalReturn: portfolio.totalReturn,
     lastPrice: portfolio.lastPrice,
     trades: portfolio.trades.map(trade => ({ ...trade })),
-    equityHistory: portfolio.equityHistory.slice()
+    equityHistory: portfolio.equityHistory.slice(),
+    maxDrawdown: metrics.maxDrawdown,
+    sharpe: metrics.sharpe,
+    tradeCount: tradingStats?.trades ?? portfolio.trades.length,
+    winRate: tradingStats?.winRate ?? 0
   };
 }
 
+function completeCycle() {
+  if (!tradingStats) {
+    tradingStats = createTradingStats();
+  }
+  if (portfolio) {
+    const finalReturn = Number.isFinite(portfolio.totalReturn) ? portfolio.totalReturn : 0;
+    tradingStats.cycleCount += 1;
+    tradingStats.lastCycleReturn = finalReturn;
+    tradingStats.cumulativeReturn += finalReturn;
+    if (tradingStats.cycleCount === 1) {
+      tradingStats.bestCycleReturn = finalReturn;
+    } else {
+      tradingStats.bestCycleReturn = Math.max(tradingStats.bestCycleReturn, finalReturn);
+    }
+  }
+  loops += 1;
+  if (stats) {
+    stats.loops = loops;
+  }
+}
+
 function stepOnce() {
+  if ((!activeDataset || !totalPoints) && !advanceToNextDataset({ resetNetwork: true, resetTrader: true })) {
+    setRunning(false);
+    return;
+  }
   if (totalPoints <= config.windowSize) {
     setRunning(false);
     return;
   }
   if (cursor >= totalPoints) {
-    cursor = config.windowSize;
-    loops += 1;
-    stats.loops = loops;
+    completeCycle();
+    if (!advanceToNextDataset({ resetNetwork: false, resetTrader: false })) {
+      setRunning(false);
+      return;
+    }
   }
   const sample = sampleAt(cursor);
   const { error, output } = net.trainSample(sample.features, sample.targetNorm);
@@ -801,20 +1087,67 @@ function stepOnce() {
   applyTradingPolicy(sample, predictedPrice);
 
   cursor += 1;
-  if (cursor >= totalPoints) {
-    cursor = config.windowSize;
-    loops += 1;
-    stats.loops = loops;
-  }
-
   const progressDenom = Math.max(1, totalPoints - config.windowSize);
   const relativeCursor = Math.max(0, cursor - config.windowSize);
-  stats.progressPct = progressDenom <= 0 ? 0 : (relativeCursor / progressDenom) * 100;
+  stats.progressPct = progressDenom <= 0 ? 0 : Math.min(100, (relativeCursor / progressDenom) * 100);
 
   postSnapshot();
 }
 
 function postSnapshot() {
+  if (!stats) {
+    stats = createStats();
+  }
+  stats.ticker = activeDataset?.symbol ?? stats.ticker ?? '—';
+  stats.instrumentName = activeDataset?.name ?? stats.instrumentName ?? '—';
+  stats.playlistPosition = playlistPosition();
+  stats.playlistSize = playlist.length;
+  stats.availableTickers = marketUniverse.length;
+  stats.windowCoverage = windowCoverage();
+
+  const rmse = Math.sqrt(Math.max(stats.mse ?? 0, 0));
+  const bestMae = stats.bestMae === Infinity ? null : stats.bestMae;
+
+  const weightsSnapshot = net
+    ? {
+        inputWeights: Array.from(net.w1),
+        outputWeights: Array.from(net.w2),
+        hiddenUnits: net.hiddenUnits,
+        inputSize: net.inputSize
+      }
+    : {
+        inputWeights: [],
+        outputWeights: [],
+        hiddenUnits: config.hiddenUnits,
+        inputSize: config.windowSize
+      };
+
+  if (!tradingStats) {
+    tradingStats = createTradingStats();
+  }
+  tradingStats.playlistPosition = playlistPosition();
+  tradingStats.playlistSize = playlist.length;
+
+  const tradingSummary = {
+    steps: tradingStats.steps,
+    avgReward: tradingStats.avgReward,
+    lastReward: tradingStats.lastReward,
+    lastAction: tradingStats.lastAction,
+    lastConfidence: tradingStats.lastConfidence,
+    lastEdge: tradingStats.lastEdge,
+    exploration: tradingStats.exploration,
+    learningRate: tradingStats.learningRate,
+    cycleCount: tradingStats.cycleCount,
+    lastCycleReturn: tradingStats.lastCycleReturn,
+    bestCycleReturn: tradingStats.bestCycleReturn,
+    lifetimeReward: tradingStats.lifetimeReward,
+    cumulativeReturn: tradingStats.cumulativeReturn,
+    trades: tradingStats.trades,
+    winRate: tradingStats.winRate,
+    playlistPosition: tradingStats.playlistPosition,
+    playlistSize: tradingStats.playlistSize
+  };
+
   const snapshot = {
     history: {
       actual: history.actual.slice(),
@@ -823,15 +1156,10 @@ function postSnapshot() {
     },
     stats: {
       ...stats,
-      rmse: Math.sqrt(Math.max(stats.mse, 0)),
-      bestMae: stats.bestMae === Infinity ? null : stats.bestMae
+      rmse,
+      bestMae
     },
-    weights: {
-      inputWeights: Array.from(net.w1),
-      outputWeights: Array.from(net.w2),
-      hiddenUnits: net.hiddenUnits,
-      inputSize: net.inputSize
-    },
+    weights: weightsSnapshot,
     recentPredictions: recentPredictions.map(item => ({
       label: item.label,
       actual: item.actual,
@@ -839,16 +1167,7 @@ function postSnapshot() {
       error: item.error
     })),
     portfolio: createPortfolioSnapshot(),
-    trading: {
-      steps: tradingStats.steps,
-      avgReward: tradingStats.avgReward,
-      lastReward: tradingStats.lastReward,
-      lastAction: tradingStats.lastAction,
-      lastConfidence: tradingStats.lastConfidence,
-      lastEdge: tradingStats.lastEdge,
-      exploration: tradingStats.exploration,
-      learningRate: tradingStats.learningRate
-    }
+    trading: tradingSummary
   };
   self.postMessage({ type: 'snapshot', snapshot });
 }
@@ -856,16 +1175,24 @@ function postSnapshot() {
 function resetState(resume = false) {
   const wasRunning = running;
   if (wasRunning) setRunning(false);
-  net = new PriceNet(config.windowSize, config.hiddenUnits, config.learningRate);
+  net = null;
   history = { actual: [], predicted: [], errors: [] };
   recentPredictions = [];
   loops = 0;
-  cursor = Math.min(totalPoints, config.windowSize);
-  stats = createStats();
-  stats.lastReset = formatClock();
-  portfolio = createPortfolio();
-  trader = createTrader();
-  tradingStats = createTradingStats();
+  cursor = 0;
+  stats = null;
+  portfolio = null;
+  trader = null;
+  tradingStats = null;
+  activeDataset = null;
+  rebuildTickerPlaylist();
+  const initialized = advanceToNextDataset({ resetNetwork: true, resetTrader: true });
+  if (!initialized) {
+    stats = createStats();
+  }
+  if (stats) {
+    stats.lastReset = formatClock();
+  }
   postSnapshot();
   if (resume || wasRunning) {
     setRunning(true);
@@ -873,14 +1200,16 @@ function resetState(resume = false) {
 }
 
 function applyConfig(newConfig) {
-  const requiresReset = (
-    (newConfig.hiddenUnits != null && newConfig.hiddenUnits !== config.hiddenUnits) ||
-    (newConfig.windowSize != null && newConfig.windowSize !== config.windowSize) ||
-    (newConfig.traderHiddenUnits != null && newConfig.traderHiddenUnits !== config.traderHiddenUnits) ||
-    (newConfig.traderHiddenUnits2 != null && newConfig.traderHiddenUnits2 !== config.traderHiddenUnits2)
-  );
+  const prevHiddenUnits = config.hiddenUnits;
+  const prevWindowSize = config.windowSize;
+  const prevTraderHU1 = config.traderHiddenUnits;
+  const prevTraderHU2 = config.traderHiddenUnits2;
+  const prevTickerSubsetMin = config.tickerSubsetMin;
+  const prevTickerSubsetMax = config.tickerSubsetMax;
+
   Object.assign(config, newConfig);
-  config.windowSize = Math.max(4, Math.min(config.windowSize, Math.max(4, totalPoints - 1)));
+
+  config.windowSize = Math.max(4, Math.min(config.windowSize, Math.max(4, totalPoints - 1 || config.windowSize)));
   config.hiddenUnits = Math.max(2, config.hiddenUnits | 0);
   config.learningRate = Math.max(1e-4, config.learningRate);
   config.noise = Math.max(0, config.noise);
@@ -892,17 +1221,37 @@ function applyConfig(newConfig) {
   config.traderRewardScale = Number.isFinite(config.traderRewardScale)
     ? Math.max(1, config.traderRewardScale)
     : 120;
+  config.tickerSubsetMin = Math.max(1, Math.min((config.tickerSubsetMin | 0) || 1, marketUniverse.length));
+  config.tickerSubsetMax = Math.max(config.tickerSubsetMin, Math.min((config.tickerSubsetMax | 0) || config.tickerSubsetMin, marketUniverse.length));
+
+  const requiresReset = (
+    config.hiddenUnits !== prevHiddenUnits ||
+    config.windowSize !== prevWindowSize ||
+    config.traderHiddenUnits !== prevTraderHU1 ||
+    config.traderHiddenUnits2 !== prevTraderHU2 ||
+    config.tickerSubsetMin !== prevTickerSubsetMin ||
+    config.tickerSubsetMax !== prevTickerSubsetMax
+  );
 
   if (!requiresReset) {
-    net.setLearningRate(config.learningRate);
-    trader.setLearningRate(config.traderLearningRate);
+    if (net) {
+      net.setLearningRate(config.learningRate);
+    }
+    if (trader) {
+      trader.setLearningRate(config.traderLearningRate);
+    }
+    if (!tradingStats) {
+      tradingStats = createTradingStats();
+    }
     tradingStats.exploration = config.traderExploration;
     tradingStats.learningRate = config.traderLearningRate;
-    stats.learningRate = config.learningRate;
-    stats.noise = config.noise;
-    stats.windowSize = config.windowSize;
-    stats.hiddenUnits = config.hiddenUnits;
-    stats.windowCoverage = windowCoverage();
+    if (stats) {
+      stats.learningRate = config.learningRate;
+      stats.noise = config.noise;
+      stats.windowSize = config.windowSize;
+      stats.hiddenUnits = config.hiddenUnits;
+      stats.windowCoverage = windowCoverage();
+    }
     postSnapshot();
   } else {
     resetState();
@@ -922,5 +1271,5 @@ self.addEventListener('message', ev => {
   }
 });
 
-// Emit an initial snapshot so the UI can render immediately.
-postSnapshot();
+// Prime the environment so the UI can render immediately.
+resetState(false);
