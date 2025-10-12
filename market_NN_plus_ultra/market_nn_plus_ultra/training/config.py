@@ -22,12 +22,15 @@ class DataConfig:
 
 @dataclass(slots=True)
 class ModelConfig:
-    input_size: int
+    input_size: Optional[int] = None
     d_model: int = 512
     depth: int = 16
     n_heads: int = 8
-    dilation_rates: tuple[int, ...] = (1, 2, 4, 8, 16)
+    patch_size: int = 1
+    conv_kernel: int = 5
+    conv_dilations: tuple[int, ...] = (1, 2, 4, 8, 16)
     dropout: float = 0.2
+    ffn_expansion: int = 4
     forecast_horizon: int = 5
     output_size: int = 3
 
@@ -49,6 +52,10 @@ class TrainingConfig:
     gradient_clip_val: float = 1.0
     mixed_precision: bool = True
     checkpoint_dir: Optional[Path] = None
+    window_size: int = 256
+    window_stride: int = 8
+    target_column: str = "close"
+    experiment_seed: int = 42
 
     def __post_init__(self) -> None:
         if isinstance(self.data.database_path, (str, Path)):
