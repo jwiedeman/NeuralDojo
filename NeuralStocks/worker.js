@@ -2019,7 +2019,10 @@ function stepOnce() {
   if (cursor > maxIndex) {
     completeCycle();
     if (!advanceToNextDataset({ resetNetwork: false, resetTrader: false })) {
-      setRunning(false);
+      // If we can't advance (e.g. playlist exhausted or dataset unavailable),
+      // rebuild the full environment and resume so the forecaster doesn't
+      // stall with cleared weights.
+      resetState(true);
       return;
     }
   }
