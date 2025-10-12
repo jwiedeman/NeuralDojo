@@ -123,6 +123,30 @@ let history = {
 };
 let recentPredictions = [];
 
+const portfolioConfig = {
+  initialCash: 100000,
+  tradeHistoryLimit: 18,
+  equityHistoryLimit: historyLimit
+};
+
+function createPortfolio() {
+  return {
+    initialCash: portfolioConfig.initialCash,
+    cash: portfolioConfig.initialCash,
+    position: 0,
+    avgCost: 0,
+    equity: portfolioConfig.initialCash,
+    realizedPnl: 0,
+    unrealizedPnl: 0,
+    totalReturn: 0,
+    lastPrice: null,
+    trades: [],
+    equityHistory: []
+  };
+}
+
+let portfolio = createPortfolio();
+
 function formatClock() {
   const now = new Date();
   return now.toLocaleTimeString([], { hour12: false });
@@ -223,6 +247,143 @@ function pushRecent(entry) {
   }
 }
 
+function markToMarket(date, price) {
+  if (!portfolio || !Number.isFinite(price)) return;
+  const equity = portfolio.cash + portfolio.position * price;
+  const unrealized = portfolio.position > 0 ? (price - portfolio.avgCost) * portfolio.position : 0;
+  portfolio.unrealizedPnl = unrealized;
+  portfolio.equity = equity;
+  portfolio.totalReturn = portfolio.initialCash > 0
+    ? (equity - portfolio.initialCash) / portfolio.initialCash
+    : 0;
+  portfolio.lastPrice = price;
+  portfolio.equityHistory.push({
+    date,
+    equity,
+    price,
+    position: portfolio.position
+  });
+  if (portfolio.equityHistory.length > portfolioConfig.equityHistoryLimit) {
+    portfolio.equityHistory.shift();
+  }
+}
+
+function recordTrade({ date, side, shares, price, edgePct, pnl }) {
+  if (!portfolio) return;
+  const entry = {
+    date,
+    side,
+    shares,
+    price,
+    edgePct,
+    pnl,
+    equityAfter: portfolio.equity,
+    cashAfter: portfolio.cash,
+    positionAfter: portfolio.position
+  };
+  portfolio.trades.unshift(entry);
+  if (portfolio.trades.length > portfolioConfig.tradeHistoryLimit) {
+    portfolio.trades.pop();
+  }
+}
+
+function attemptBuy(price, fraction, date, edge) {
+  if (!portfolio || !Number.isFinite(price) || price <= 0) {
+    markToMarket(date, price);
+    return false;
+  }
+  const budget = Math.min(portfolio.cash, portfolio.equity * fraction);
+  const shares = Math.floor(budget / price);
+  if (shares <= 0) {
+    markToMarket(date, price);
+    return false;
+  }
+  const cost = shares * price;
+  const existingValue = portfolio.avgCost * portfolio.position;
+  portfolio.cash -= cost;
+  portfolio.position += shares;
+  portfolio.avgCost = portfolio.position > 0 ? (existingValue + cost) / portfolio.position : 0;
+  markToMarket(date, price);
+  recordTrade({
+    date,
+    side: 'BUY',
+    shares,
+    price,
+    edgePct: edge * 100,
+    pnl: 0
+  });
+  return true;
+}
+
+function attemptSell(price, fraction, date, edge) {
+  if (!portfolio || portfolio.position <= 0 || !Number.isFinite(price) || price <= 0) {
+    markToMarket(date, price);
+    return false;
+  }
+  const desiredShares = Math.max(1, Math.floor(portfolio.position * fraction));
+  const shares = Math.min(desiredShares, portfolio.position);
+  if (shares <= 0) {
+    markToMarket(date, price);
+    return false;
+  }
+  const proceeds = shares * price;
+  portfolio.cash += proceeds;
+  portfolio.position -= shares;
+  const realized = portfolio.avgCost > 0 ? (price - portfolio.avgCost) * shares : 0;
+  portfolio.realizedPnl += realized;
+  if (portfolio.position <= 0) {
+    portfolio.position = 0;
+    portfolio.avgCost = 0;
+  }
+  markToMarket(date, price);
+  recordTrade({
+    date,
+    side: 'SELL',
+    shares,
+    price,
+    edgePct: edge * 100,
+    pnl: realized
+  });
+  return true;
+}
+
+function applyTradingPolicy(sample, predictedPrice) {
+  if (!portfolio || !sample || !Number.isFinite(sample.targetPrice)) return;
+  const price = sample.targetPrice;
+  const edge = Number.isFinite(predictedPrice) && price > 0
+    ? (predictedPrice - price) / price
+    : 0;
+  const threshold = 0.0015;
+  const absEdge = Math.abs(edge);
+  const intensity = Math.min(1, Math.max(0, (absEdge - threshold) / 0.02));
+  const fraction = 0.05 + intensity * 0.45;
+  let traded = false;
+  if (edge > threshold) {
+    traded = attemptBuy(price, fraction, sample.date, edge);
+  } else if (edge < -threshold) {
+    traded = attemptSell(price, fraction, sample.date, edge);
+  }
+  if (!traded) {
+    markToMarket(sample.date, price);
+  }
+}
+
+function createPortfolioSnapshot() {
+  if (!portfolio) return null;
+  return {
+    equity: portfolio.equity,
+    cash: portfolio.cash,
+    position: portfolio.position,
+    avgCost: portfolio.avgCost,
+    unrealizedPnl: portfolio.unrealizedPnl,
+    realizedPnl: portfolio.realizedPnl,
+    totalReturn: portfolio.totalReturn,
+    lastPrice: portfolio.lastPrice,
+    trades: portfolio.trades.map(trade => ({ ...trade })),
+    equityHistory: portfolio.equityHistory.slice()
+  };
+}
+
 function stepOnce() {
   if (totalPoints <= config.windowSize) {
     setRunning(false);
@@ -262,6 +423,8 @@ function stepOnce() {
     error: diff
   });
 
+  applyTradingPolicy(sample, predictedPrice);
+
   cursor += 1;
   if (cursor >= totalPoints) {
     cursor = config.windowSize;
@@ -299,7 +462,8 @@ function postSnapshot() {
       actual: item.actual,
       predicted: item.predicted,
       error: item.error
-    }))
+    })),
+    portfolio: createPortfolioSnapshot()
   };
   self.postMessage({ type: 'snapshot', snapshot });
 }
@@ -314,6 +478,7 @@ function resetState(resume = false) {
   cursor = Math.min(totalPoints, config.windowSize);
   stats = createStats();
   stats.lastReset = formatClock();
+  portfolio = createPortfolio();
   postSnapshot();
   if (resume || wasRunning) {
     setRunning(true);

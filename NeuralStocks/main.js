@@ -29,6 +29,13 @@
   const lastResetEl = document.getElementById('lastReset');
   const recentListEl = document.getElementById('recentList');
   const weightsRawEl = document.getElementById('weightsRaw');
+  const portfolioEquityEl = document.getElementById('portfolioEquity');
+  const portfolioCashEl = document.getElementById('portfolioCash');
+  const portfolioPositionEl = document.getElementById('portfolioPosition');
+  const portfolioAvgCostEl = document.getElementById('portfolioAvgCost');
+  const portfolioUnrealizedEl = document.getElementById('portfolioUnrealized');
+  const portfolioReturnEl = document.getElementById('portfolioReturn');
+  const tradeLogEl = document.getElementById('tradeLog');
 
   const startBtn = document.getElementById('startBtn');
   const pauseBtn = document.getElementById('pauseBtn');
@@ -58,6 +65,26 @@
   function formatNumber(value, digits = 2) {
     if (value == null || Number.isNaN(value)) return '—';
     return Number(value).toFixed(digits);
+  }
+
+  function formatCurrency(value) {
+    if (!Number.isFinite(value)) return '—';
+    return `$${Number(value).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })}`;
+  }
+
+  function formatPercent(value, digits = 2) {
+    if (!Number.isFinite(value)) return '—';
+    return `${(value * 100).toFixed(digits)}%`;
+  }
+
+  function formatShares(value) {
+    if (!Number.isFinite(value)) return '—';
+    return `${Number(value).toLocaleString(undefined, {
+      maximumFractionDigits: 0
+    })} sh`;
   }
 
   function formatSigned(value, digits = 3) {
@@ -252,6 +279,75 @@
     weightsRawEl.textContent = parts.join('\n\n');
   }
 
+  function updateTradeLog(trades) {
+    tradeLogEl.innerHTML = '';
+    if (!trades?.length) {
+      const placeholder = document.createElement('li');
+      placeholder.textContent = 'No trades placed yet — the agent is still scouting the tape.';
+      tradeLogEl.appendChild(placeholder);
+      return;
+    }
+
+    trades.forEach(trade => {
+      const li = document.createElement('li');
+
+      const dateSpan = document.createElement('span');
+      dateSpan.textContent = trade.date || '—';
+
+      const sideSpan = document.createElement('span');
+      sideSpan.textContent = trade.side;
+      sideSpan.classList.add('side', trade.side?.toLowerCase?.() || '');
+
+      const sizeSpan = document.createElement('span');
+      const shares = Number(trade.shares ?? 0);
+      sizeSpan.textContent = `${shares.toLocaleString(undefined, { maximumFractionDigits: 0 })} @ ${formatNumber(trade.price, 2)}`;
+
+      const metaSpan = document.createElement('span');
+      const edgeText = Number.isFinite(trade.edgePct)
+        ? `edge ${formatSigned(trade.edgePct, 2)}%`
+        : null;
+      const pnlText = Number.isFinite(trade.pnl)
+        ? `P/L ${formatCurrency(trade.pnl)}`
+        : null;
+      const metaParts = [];
+      if (edgeText) metaParts.push(edgeText);
+      if (pnlText) metaParts.push(pnlText);
+      metaSpan.textContent = metaParts.join(' · ');
+      if (Number.isFinite(trade.pnl)) {
+        metaSpan.classList.add('pnl');
+        if (trade.pnl > 0) metaSpan.classList.add('gain');
+        else if (trade.pnl < 0) metaSpan.classList.add('loss');
+      }
+
+      li.appendChild(dateSpan);
+      li.appendChild(sideSpan);
+      li.appendChild(sizeSpan);
+      li.appendChild(metaSpan);
+      tradeLogEl.appendChild(li);
+    });
+  }
+
+  function updatePortfolioCard(portfolio) {
+    if (!portfolio) {
+      portfolioEquityEl.textContent = '—';
+      portfolioCashEl.textContent = '—';
+      portfolioPositionEl.textContent = '—';
+      portfolioAvgCostEl.textContent = '—';
+      portfolioUnrealizedEl.textContent = '—';
+      portfolioReturnEl.textContent = '—';
+      updateTradeLog([]);
+      return;
+    }
+
+    portfolioEquityEl.textContent = formatCurrency(portfolio.equity);
+    portfolioCashEl.textContent = formatCurrency(portfolio.cash);
+    portfolioPositionEl.textContent = formatShares(portfolio.position);
+    portfolioAvgCostEl.textContent = formatCurrency(portfolio.avgCost);
+    portfolioUnrealizedEl.textContent = formatCurrency(portfolio.unrealizedPnl);
+    portfolioReturnEl.textContent = formatPercent(portfolio.totalReturn);
+    updateTradeLog(portfolio.trades);
+  }
+
   function applySnapshot(snapshot) {
     if (!snapshot) return;
     const { history, stats, weights } = snapshot;
@@ -279,6 +375,8 @@
     loopCountEl.textContent = stats?.loops ?? 0;
     bestMaeSecondaryEl.textContent = formatNumber(stats?.bestMae, 4);
     lastResetEl.textContent = stats?.lastReset ?? '—';
+
+    updatePortfolioCard(snapshot.portfolio);
   }
 
   function setRunningState(value) {
