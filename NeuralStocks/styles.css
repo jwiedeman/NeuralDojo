@@ -101,3 +101,46 @@
 .hud span {
   font-variant-numeric: tabular-nums;
 }
+
+.trade-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trade-log li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(3, auto);
+  gap: 8px;
+  align-items: baseline;
+  border-bottom: 1px dotted var(--border);
+  padding-bottom: 4px;
+  font-size: 12px;
+}
+
+.trade-log li span {
+  font-variant-numeric: tabular-nums;
+}
+
+.trade-log li .side {
+  font-weight: 600;
+}
+
+.trade-log li .side.buy {
+  color: var(--market-up);
+}
+
+.trade-log li .side.sell {
+  color: var(--market-down);
+}
+
+.trade-log li .pnl.gain {
+  color: var(--market-up);
+}
+
+.trade-log li .pnl.loss {
+  color: var(--market-down);
+}

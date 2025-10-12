@@ -119,6 +119,21 @@
               </div>
               <div class="dataset-note">Source: Stooq daily SPY closes (most recent 360 trading sessions).</div>
             </div>
+
+            <div class="panel-card trading-card">
+              <div class="panel-sub">Autonomous trading desk</div>
+              <div class="stats stats-tight trading-stats">
+                <div>Equity value: <span id="portfolioEquity">—</span></div>
+                <div>Cash on hand: <span id="portfolioCash">—</span></div>
+                <div>Open position: <span id="portfolioPosition">—</span></div>
+                <div>Average cost: <span id="portfolioAvgCost">—</span></div>
+                <div>Unrealized P/L: <span id="portfolioUnrealized">—</span></div>
+                <div>Total return: <span id="portfolioReturn">—</span></div>
+              </div>
+              <div class="panel-sub secondary">Recent orders</div>
+              <ul id="tradeLog" class="trade-log"></ul>
+              <div class="chart-hint">The agent sizes orders from its forecasts, averaging into strength and trimming into weakness.</div>
+            </div>
           </div>
 
           <div class="training-column column-visuals">
