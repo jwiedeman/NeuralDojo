@@ -144,3 +144,11 @@
 .trade-log li .pnl.loss {
   color: var(--market-down);
 }
+
+.trading-stats .policy-metric.gain {
+  color: var(--market-up);
+}
+
+.trading-stats .policy-metric.loss {
+  color: var(--market-down);
+}

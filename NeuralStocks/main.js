@@ -36,6 +36,12 @@
   const portfolioUnrealizedEl = document.getElementById('portfolioUnrealized');
   const portfolioReturnEl = document.getElementById('portfolioReturn');
   const tradeLogEl = document.getElementById('tradeLog');
+  const tradingLastActionEl = document.getElementById('tradingLastAction');
+  const tradingConfidenceEl = document.getElementById('tradingConfidence');
+  const tradingEdgeEl = document.getElementById('tradingEdge');
+  const tradingLastRewardEl = document.getElementById('tradingLastReward');
+  const tradingAvgRewardEl = document.getElementById('tradingAvgReward');
+  const tradingExplorationEl = document.getElementById('tradingExploration');
 
   const startBtn = document.getElementById('startBtn');
   const pauseBtn = document.getElementById('pauseBtn');
@@ -283,7 +289,7 @@
     tradeLogEl.innerHTML = '';
     if (!trades?.length) {
       const placeholder = document.createElement('li');
-      placeholder.textContent = 'No trades placed yet — the agent is still scouting the tape.';
+      placeholder.textContent = 'No trades placed yet — the policy network is still exploring the tape.';
       tradeLogEl.appendChild(placeholder);
       return;
     }
@@ -336,6 +342,7 @@
       portfolioUnrealizedEl.textContent = '—';
       portfolioReturnEl.textContent = '—';
       updateTradeLog([]);
+      updateTradingSummary(null);
       return;
     }
 
@@ -346,6 +353,50 @@
     portfolioUnrealizedEl.textContent = formatCurrency(portfolio.unrealizedPnl);
     portfolioReturnEl.textContent = formatPercent(portfolio.totalReturn);
     updateTradeLog(portfolio.trades);
+  }
+
+  function applyPolicyClass(el, value) {
+    if (!el) return;
+    el.classList.remove('gain', 'loss');
+    if (!Number.isFinite(value)) return;
+    if (value > 0) el.classList.add('gain');
+    else if (value < 0) el.classList.add('loss');
+  }
+
+  function updateTradingSummary(trading) {
+    if (!trading) {
+      tradingLastActionEl.textContent = '—';
+      tradingConfidenceEl.textContent = '—';
+      tradingEdgeEl.textContent = '—';
+      tradingLastRewardEl.textContent = '—';
+      tradingAvgRewardEl.textContent = '—';
+      tradingExplorationEl.textContent = '—';
+      applyPolicyClass(tradingLastRewardEl, null);
+      applyPolicyClass(tradingAvgRewardEl, null);
+      applyPolicyClass(tradingEdgeEl, null);
+      return;
+    }
+
+    const haveSamples = (trading.steps ?? 0) > 0;
+    tradingLastActionEl.textContent = haveSamples ? (trading.lastAction ?? '—') : '—';
+    tradingConfidenceEl.textContent = haveSamples && Number.isFinite(trading.lastConfidence)
+      ? formatPercent(trading.lastConfidence, 1)
+      : '—';
+    tradingEdgeEl.textContent = haveSamples && Number.isFinite(trading.lastEdge)
+      ? formatPercent(trading.lastEdge, 2)
+      : '—';
+    tradingLastRewardEl.textContent = haveSamples && Number.isFinite(trading.lastReward)
+      ? formatSigned(trading.lastReward, 4)
+      : '—';
+    tradingAvgRewardEl.textContent = haveSamples && Number.isFinite(trading.avgReward)
+      ? formatSigned(trading.avgReward, 4)
+      : '—';
+    tradingExplorationEl.textContent = Number.isFinite(trading.exploration)
+      ? formatPercent(trading.exploration, 1)
+      : '—';
+    applyPolicyClass(tradingLastRewardEl, haveSamples ? trading.lastReward : null);
+    applyPolicyClass(tradingAvgRewardEl, haveSamples ? trading.avgReward : null);
+    applyPolicyClass(tradingEdgeEl, Number.isFinite(trading.lastEdge) ? trading.lastEdge : null);
   }
 
   function applySnapshot(snapshot) {
@@ -377,6 +428,7 @@
     lastResetEl.textContent = stats?.lastReset ?? '—';
 
     updatePortfolioCard(snapshot.portfolio);
+    updateTradingSummary(snapshot.trading);
   }
 
   function setRunningState(value) {
