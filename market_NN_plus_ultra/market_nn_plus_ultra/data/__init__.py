@@ -1,16 +1,14 @@
-"""Data ingestion and feature engineering utilities."""
+"""Data ingestion and preprocessing utilities for Market NN Plus Ultra."""
 
-from .feature_pipeline import FeaturePipeline
-from .feature_registry import FeatureFn, FeatureRegistry, FeatureSpec
-from .sqlite_loader import SQLiteMarketDataset
-from .window_dataset import SlidingWindowDataset, WindowConfig
+from .sqlite_loader import SQLiteMarketSource, SQLiteMarketDataset
+from .feature_pipeline import FeatureRegistry, FeaturePipeline, FeatureSpec
+from .window_dataset import SlidingWindowDataset
 
 __all__ = [
-    "FeatureFn",
-    "FeaturePipeline",
-    "FeatureRegistry",
-    "FeatureSpec",
+    "SQLiteMarketSource",
     "SQLiteMarketDataset",
+    "FeatureRegistry",
+    "FeaturePipeline",
+    "FeatureSpec",
     "SlidingWindowDataset",
-    "WindowConfig",
 ]

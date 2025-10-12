@@ -1,5 +1,5 @@
 """Utility helpers for Market NN Plus Ultra."""
 
-from .random import set_seed
+from .seeding import seed_everything
 
-__all__ = ["set_seed"]
+__all__ = ["seed_everything"]

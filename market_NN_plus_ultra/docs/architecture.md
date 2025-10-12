@@ -12,13 +12,13 @@ single database file can power both batch research and live inference jobs.
 | Table        | Purpose                                                                                   |
 |--------------|-------------------------------------------------------------------------------------------|
 | `assets`     | Static metadata (`asset_id`, `symbol`, `sector`, `currency`). Serves as the entity spine.  |
-| `series`     | Primary OHLCV candles keyed by (`timestamp`, `asset_id`).                                  |
-| `indicators` | Long-form engineered indicators with (`name`, `value`). Can be sparsely populated.         |
+| `series`     | Primary OHLCV candles keyed by (`timestamp`, `symbol`).                                   |
+| `indicators` | Optional engineered indicators keyed by (`timestamp`, `symbol`, `name`).                  |
 | `trades`     | (Planned) Executed trade logs for reinforcement learning and evaluation feedback.          |
 | `benchmarks` | (Planned) Reference indices for relative performance measurement.                          |
 
-The loader merges these tables into a panel with a hierarchical index
-`(asset_id, timestamp)` before optional enrichment via the feature pipeline.
+`SQLiteMarketDataset` merges these tables into a panel with a hierarchical index
+`(timestamp, symbol)` before optional enrichment via the feature pipeline.
 
 ### Feature Pipeline
 
@@ -30,40 +30,44 @@ dependencies, descriptions) so that:
 2. Documentation can be auto-generated from the registry metadata.
 3. Missing dependencies are surfaced gracefully with structured logging.
 
+`FeaturePipeline.transform_panel` processes the dataset symbol by symbol,
+returning a consistently indexed panel ready for windowing.
+
 ### Window Dataset
 
 The `SlidingWindowDataset` slices the enriched panel into overlapping windows.
 Key behaviours:
 
-* Optional z-score normalisation fit across the training corpus.
+* Optional z-score normalisation fit within each window.
 * Multi-step forecast horizons aligned with the trainer's objective.
 * Configurable stride, enabling curriculum schedules over context length.
 
 ## Model Stack
 
-1. **Patch Embedding** – Linear or convolutional projections to lift raw
-   features into the model dimension while optionally reducing sequence length.
-2. **Hybrid temporal layers** – Each block combines
-   multi-head self-attention, dilated temporal convolutions, and a lightweight
-   state-space mixer. The mixture balances global awareness and local regime
-   sensitivity.
-3. **Gated residual feed-forward** – Gated residual networks provide
-   capacity for non-linear transformations without sacrificing stability.
-4. **Forecast head** – A dense head maps the final token representation to a
-   multi-step action distribution (buy / hold / sell by default). This can be
-   swapped for regression, quantile, or policy outputs as needed.
+1. **Patch Embedding** – `PatchEmbedding` lifts raw features into the model
+dimension while preserving sequence length.
+2. **Hybrid temporal layers** – `TemporalBlock` combines multi-head
+   self-attention, dilated temporal convolutions, and residual feed-forward
+   projections. The dilation schedule cycles across layers to cover long
+   horizons.
+3. **Forecast head** – `TemporalPolicyHead` maps the final token representation
+   to a multi-step action distribution (buy / hold / sell by default). Swap this
+   for regression, quantile, or reinforcement outputs as needed.
+
+`TemporalBackboneConfig` exposes all scaling knobs (depth, heads, dilations)
+through configuration files so experiments can scale up without touching code.
 
 ## Training Loop
 
-* **Risk-aware loss** – Combines prediction error with Sharpe and drawdown
-  penalties. Plug in alternative utility functions by supplying a custom
-  callable to `RiskAwareLoss`.
-* **Optimisation** – AdamW with cosine annealing, gradient clipping, and
-  optional mixed precision. This configuration scales to long training runs on
-  modern GPUs while maintaining stability on CPUs.
-* **Evaluation** – Validation losses are computed every epoch, and optional
-  checkpoints are persisted for offline analysis. The evaluation module exposes
-  ROI metrics suitable for leaderboards and automatic reporting.
+* **Risk-aware loss** – `CompositeTradingLoss` combines prediction error with
+  Sharpe and drawdown penalties.
+* **Optimisation** – AdamW with cosine annealing, gradient clipping, and mixed
+  precision. The configuration scales to long training runs on modern GPUs while
+  remaining viable on CPU for prototyping.
+* **Evaluation** – Validation losses are computed every epoch, and checkpoints
+  are persisted for offline analysis. The evaluation module exposes ROI metrics
+  (Sharpe, Sortino, drawdown, Calmar, volatility) suitable for leaderboards and
+  automatic reporting.
 
 ## Extension Opportunities
 

@@ -2,13 +2,13 @@
 
 This tracker organises the roadmap toward a production-ready "ultimate trader". Tasks are grouped by stage and prioritised for compounding ROI.
 
-## 0. Foundations (Immediate)
 - [ ] Finalise SQLite schema contract for `assets`, `series`, `indicators`, `trades`, and `benchmarks` tables.
 - [x] Implement feature registry with pluggable indicator computation (TA-Lib, spectral, macro, alternative data).
 - [ ] Add data validation suite (Great Expectations or pandera) to guarantee clean inputs.
 - [x] Define baseline experiment YAML files for different asset classes (equities, crypto, forex).
 - [x] Document canonical data flow in `docs/architecture.md` (extend with schema diagrams).
 - [ ] Automate feature registry documentation export (Markdown generated from `FeaturePipeline.describe()`).
+- [x] Ship Lightning training and data modules with YAML-driven configuration loading.
 
 ### Feature Registry Enhancements
 - [ ] Auto-generate documentation from `FeatureRegistry.describe()` into Markdown.
@@ -19,7 +19,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 ## 1. Deep Temporal Modelling
 - [ ] Implement TemporalFusionTransformer-style encoder with multi-horizon support.
 - [x] Add multi-resolution attention block mixing dilated convolutions and transformer layers.
-- [x] Integrate state-space (S4/SSM) module for long-context retention.
+- [ ] Integrate state-space (S4/SSM) module for long-context retention.
 - [ ] Pretrain on masked time-series reconstruction before supervised fine-tuning.
 - [ ] Introduce curriculum over window sizes and horizons to stabilise very deep models.
 

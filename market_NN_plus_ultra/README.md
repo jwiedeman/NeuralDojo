@@ -45,7 +45,8 @@ market_NN_plus_ultra/
     │   ├── __init__.py
     │   └── metrics.py         # ROI, drawdown, Sharpe, and policy evaluation metrics
     └── utils/
-        └── __init__.py
+        ├── __init__.py
+        └── seeding.py         # Reproducibility helpers
 ```
 
 Each module comes with docstrings explaining expected behaviour so future contributors can quickly implement and extend components. The goal is to offer a batteries-included base that can scale from rapid experimentation on a laptop to large-scale multi-GPU studies without major refactors.
@@ -53,7 +54,7 @@ Each module comes with docstrings explaining expected behaviour so future contri
 ## Core Capabilities
 
 * **Deep temporal modelling** — The default backbone stacks sixteen hybrid transformer layers that mix global attention, dilated convolutions, and state-space inspired mixers for memory retention over thousands of timesteps. Patch embeddings and learned positional encodings are designed to support high-dimensional feature spaces out of the box.
-* **Rich feature engineering** — The feature registry encapsulates momentum, volatility, regime, and spectral features while remaining easily extensible. Adding new indicators only requires registering a `FeatureSpec` with dependency metadata.
+* **Rich feature engineering** — The feature registry encapsulates momentum, volatility, regime, and spectral features while remaining easily extensible. Adding new indicators only requires registering a `FeatureSpec` with dependency metadata inside `feature_pipeline.py`.
 * **Risk-aware optimisation** — Custom loss functions marry standard regression objectives with differentiable Sharpe and drawdown penalties, rewarding policies that maximise return while respecting risk budgets.
 * **Automated evaluation** — The evaluation module exposes risk-adjusted metrics (Sharpe, Sortino, Calmar, drawdown) and trade-level analytics that plug directly into backtesting or live monitoring loops.
 * **Research ergonomics** — YAML-driven experiment configs, dataclass-backed runtime configs, and a high-level trainer streamline iteration while keeping experiments reproducible.
@@ -74,7 +75,7 @@ The default configuration is intentionally overprovisioned to unlock a rich hypo
 * **Input dimension** — Supports 128+ raw and engineered features per timestep, making room for alternative data and synthetic signals.
 * **Depth & heads** — Sixteen layers with eight attention heads per layer ensure strong expressivity across temporal resolutions.
 * **Multi-resolution mixing** — Convolutional dilations (`1, 2, 4, 8, 16, 32, ...`) are cycled across blocks to model both intraday microstructure and multi-week regimes.
-* **Forecast horizon** — Default head predicts a five-step distribution over buy/hold/sell actions, but can be adapted to price deltas or continuous targets.
+* **Forecast horizon** — Default head predicts a five-step output tensor suitable for regression; toggle `model.output_dim` to model discrete buy/hold/sell actions or richer targets.
 * **Extension points** — Swap in Temporal Fusion Transformer modules, S4-style state-space layers, or reinforcement learning policy heads without changing the trainer API.
 
 For a deeper discussion of the data flow, modular boundaries, and suggested extensions see [`docs/architecture.md`](./docs/architecture.md).
@@ -95,11 +96,11 @@ For a deeper discussion of the data flow, modular boundaries, and suggested exte
 
 3. **Configure an experiment**:
    * Copy `configs/default.yaml` and adapt for your data source, architecture depth, window size, and trading horizon.
-   * Key knobs:
-     - `model.conv_dilations` and `model.depth` scale temporal coverage.
-     - `training.window_size` / `window_stride` control how much history flows into each batch.
-     - `optimizer.lr` / `weight_decay` tune the AdamW optimiser.
-   * `train.py` parses the YAML, builds dataclass configs, seeds RNGs, and launches the hybrid transformer trainer.
+    * Key knobs:
+      - `model.conv_dilations` and `model.depth` scale temporal coverage.
+      - `data.window_size` / `data.stride` control how much history flows into each batch.
+      - `optimizer.lr` / `weight_decay` tune the AdamW optimiser.
+    * `scripts/train.py` parses the YAML, builds dataclass configs, and launches the Lightning-powered hybrid transformer trainer.
 
 4. **Iterate and evaluate**:
    * Use `market_nn_plus_ultra.evaluation.metrics` to compute risk-adjusted scores on trade logs.
@@ -117,7 +118,7 @@ See [`task_tracker.md`](./task_tracker.md) for the current backlog and [`docs/re
 
 ## Feature Registry
 
-Market NN Plus Ultra ships with a pluggable [`FeatureRegistry`](./market_nn_plus_ultra/data/feature_registry.py) that catalogues rich technical signals and engineered factors. Pipelines can cherry-pick subsets of indicators or extend the registry with custom research ideas. The default registry includes:
+Market NN Plus Ultra ships with a pluggable [`FeatureRegistry`](./market_nn_plus_ultra/data/feature_pipeline.py) that catalogues rich technical signals and engineered factors. Pipelines can cherry-pick subsets of indicators or extend the registry with custom research ideas. The default registry includes:
 
 * Momentum: RSI, MACD histogram and signal differentials, multi-step price velocity.
 * Volatility & risk: Bollinger band width, annualised realised volatility, Average True Range, rolling skew/kurtosis.

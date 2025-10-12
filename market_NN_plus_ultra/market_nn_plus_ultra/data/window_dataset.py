@@ -1,99 +1,82 @@
-"""Torch dataset utilities for sliding-window market data."""
+"""Dataset utilities for sliding market windows."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Sequence, Tuple
 
+import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
 
 @dataclass(slots=True)
-class WindowConfig:
-    """Configuration for slicing time-series windows."""
-
-    window_size: int = 256
-    forecast_horizon: int = 5
+class WindowSpec:
+    window_size: int
+    horizon: int
     stride: int = 1
-    target_column: str = "close"
-    normalise: bool = True
-
-
-class ZScoreNormalizer:
-    """Normalise features using running mean and std per column."""
-
-    def __init__(self, epsilon: float = 1e-6):
-        self.epsilon = epsilon
-        self.mean_: Optional[torch.Tensor] = None
-        self.std_: Optional[torch.Tensor] = None
-
-    def fit(self, tensor: torch.Tensor) -> "ZScoreNormalizer":
-        self.mean_ = tensor.mean(dim=(0, 1), keepdim=True)
-        self.std_ = tensor.std(dim=(0, 1), keepdim=True).clamp_min(self.epsilon)
-        return self
-
-    def transform(self, tensor: torch.Tensor) -> torch.Tensor:
-        if self.mean_ is None or self.std_ is None:
-            raise RuntimeError("Normalizer must be fitted before calling transform().")
-        return (tensor - self.mean_) / self.std_
-
-    def fit_transform(self, tensor: torch.Tensor) -> torch.Tensor:
-        return self.fit(tensor).transform(tensor)
 
 
 class SlidingWindowDataset(Dataset):
-    """Convert a multi-indexed dataframe into model-ready windows."""
+    """Turn a multi-indexed market panel into sliding windows."""
 
-    def __init__(self, panel: pd.DataFrame, config: WindowConfig):
-        if not isinstance(panel.index, pd.MultiIndex):
-            raise ValueError("Panel must have a MultiIndex of (asset_id, timestamp)")
+    def __init__(
+        self,
+        panel: pd.DataFrame,
+        feature_columns: Optional[Sequence[str]] = None,
+        target_columns: Optional[Sequence[str]] = None,
+        window_size: int = 256,
+        horizon: int = 5,
+        stride: int = 1,
+        normalise: bool = True,
+    ) -> None:
+        if not isinstance(panel.index, pd.MultiIndex) or panel.index.names != ["timestamp", "symbol"]:
+            raise ValueError("Panel must be indexed by ('timestamp', 'symbol')")
 
-        self.config = config
-        self.asset_ids = panel.index.get_level_values(0).unique()
-        self.feature_columns = panel.columns.tolist()
-        self.target_column = config.target_column
-        try:
-            self.target_idx = self.feature_columns.index(self.target_column)
-        except ValueError as exc:  # pragma: no cover - defensive
-            raise ValueError(f"Target column '{self.target_column}' not present in panel columns") from exc
+        self.panel = panel
+        self.feature_columns = feature_columns or [c for c in panel.columns if c not in ("symbol",)]
+        self.target_columns = target_columns or ["close"]
+        self.window_size = window_size
+        self.horizon = horizon
+        self.stride = stride
+        self.normalise = normalise
 
-        # Pre-compute windows per asset for efficient __getitem__.
-        self.windows: list[tuple[int, int]] = []  # (asset_idx, start_position)
-        self.asset_frames: list[pd.DataFrame] = []
-        for asset_id in self.asset_ids:
-            frame = panel.xs(asset_id).sort_index()
-            self.asset_frames.append(frame)
-            series_length = len(frame)
-            max_start = series_length - (config.window_size + config.forecast_horizon)
-            for start in range(0, max_start + 1, config.stride):
-                self.windows.append((len(self.asset_frames) - 1, start))
+        self._indices: list[Tuple[str, int]] = self._build_indices()
 
-        # Build tensor cache for all sequences to compute normalisation quickly.
-        self.normalizer = ZScoreNormalizer() if config.normalise else None
-        if self.normalizer is not None:
-            tensor_bank = []
-            for asset_index, start in self.windows:
-                frame = self.asset_frames[asset_index].iloc[start : start + config.window_size]
-                tensor_bank.append(torch.tensor(frame.values, dtype=torch.float32))
-            stacked = torch.stack(tensor_bank)
-            self.normalizer.fit(stacked)
+    def _build_indices(self) -> list[Tuple[str, int]]:
+        indices: list[Tuple[str, int]] = []
+        for symbol in self.panel.index.get_level_values("symbol").unique():
+            sym_df = self.panel.xs(symbol, level="symbol")
+            for start in range(0, len(sym_df) - self.window_size - self.horizon + 1, self.stride):
+                indices.append((symbol, start))
+        return indices
 
-    def __len__(self) -> int:  # pragma: no cover - trivial
-        return len(self.windows)
+    def __len__(self) -> int:
+        return len(self._indices)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
-        asset_index, start = self.windows[idx]
-        frame = self.asset_frames[asset_index]
-        window = frame.iloc[start : start + self.config.window_size]
-        horizon = frame.iloc[
-            start + self.config.window_size : start + self.config.window_size + self.config.forecast_horizon
-        ]
+    def _normalise(self, window: np.ndarray) -> np.ndarray:
+        if not self.normalise:
+            return window
+        mean = window.mean(axis=0, keepdims=True)
+        std = window.std(axis=0, keepdims=True) + 1e-6
+        return (window - mean) / std
 
-        features = torch.tensor(window.values, dtype=torch.float32)
-        if self.normalizer is not None:
-            features = self.normalizer.transform(features.unsqueeze(0)).squeeze(0)
+    def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
+        symbol, start = self._indices[idx]
+        sym_df = self.panel.xs(symbol, level="symbol")
 
-        targets = torch.tensor(horizon[self.target_column].values, dtype=torch.float32)
-        return features, targets
+        window_slice = slice(start, start + self.window_size)
+        target_slice = slice(start + self.window_size, start + self.window_size + self.horizon)
+
+        window = sym_df.iloc[window_slice][self.feature_columns].to_numpy(dtype=np.float32)
+        targets = sym_df.iloc[target_slice][self.target_columns].to_numpy(dtype=np.float32)
+
+        window = self._normalise(window)
+
+        return {
+            "symbol": symbol,
+            "features": torch.from_numpy(window),
+            "targets": torch.from_numpy(targets),
+        }
+

@@ -1,40 +1,54 @@
-"""Loss functions tailored for trading objectives."""
+"""Risk-aware loss functions for Market NN Plus Ultra."""
 
 from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import Callable
 
 import torch
 from torch import nn
 
 
-@dataclass(slots=True)
-class RiskAwareLoss:
-    """Combines prediction error with risk-sensitive penalties."""
+def sharpe_ratio_loss(returns: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
+    """Differentiable Sharpe ratio loss (negative Sharpe)."""
 
-    base_loss: Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
-    sharpe_target: float = 2.0
-    drawdown_lambda: float = 0.1
-
-    def __call__(self, predictions: torch.Tensor, targets: torch.Tensor, pnl: torch.Tensor) -> torch.Tensor:
-        """Compute the hybrid loss.
-
-        Args:
-            predictions: Model outputs (batch, horizon, output_dim).
-            targets: Ground-truth labels, typically actions or returns.
-            pnl: Simulated profit-and-loss trajectory aligned with predictions.
-        """
-
-        loss = self.base_loss(predictions, targets)
-        excess = pnl - pnl.mean()
-        sharpe = excess.mean() / (excess.std() + 1e-6)
-        sharpe_penalty = torch.relu(self.sharpe_target - sharpe)
-        drawdown = torch.cummax(-pnl, dim=-1)[0].max()
-        return loss + self.drawdown_lambda * (sharpe_penalty + drawdown)
+    mean = returns.mean()
+    std = returns.std(unbiased=False) + eps
+    sharpe = mean / std
+    return -sharpe
 
 
-def default_risk_loss() -> RiskAwareLoss:
-    """Return a default risk-aware loss instance using MSE base loss."""
+def sortino_ratio_loss(returns: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
+    downside = returns[returns < 0]
+    downside_std = downside.pow(2).mean().sqrt() + eps
+    target_return = returns.mean()
+    sortino = target_return / downside_std
+    return -sortino
 
-    return RiskAwareLoss(base_loss=nn.MSELoss(reduction="mean"))
+
+def max_drawdown_penalty(returns: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
+    cumulative = returns.cumsum(dim=-1)
+    rolling_max = torch.cummax(cumulative, dim=-1)[0]
+    drawdown = (cumulative - rolling_max) / (rolling_max.abs() + eps)
+    return drawdown.abs().max()
+
+
+class CompositeTradingLoss(nn.Module):
+    """Combine regression, Sharpe, and drawdown penalties."""
+
+    def __init__(self, sharpe_weight: float = 0.2, drawdown_weight: float = 0.1, mse_weight: float = 1.0) -> None:
+        super().__init__()
+        self.sharpe_weight = sharpe_weight
+        self.drawdown_weight = drawdown_weight
+        self.mse = nn.MSELoss()
+        self.mse_weight = mse_weight
+
+    def forward(self, preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        mse = self.mse(preds, targets)
+        pnl = preds - targets
+        pnl_series = pnl.mean(dim=-1)
+        sharpe = sharpe_ratio_loss(pnl_series)
+        drawdown = max_drawdown_penalty(pnl_series)
+        return self.mse_weight * mse + self.sharpe_weight * sharpe + self.drawdown_weight * drawdown
+
+
+def composite_trading_loss(preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+    return CompositeTradingLoss()(preds, targets)
+
