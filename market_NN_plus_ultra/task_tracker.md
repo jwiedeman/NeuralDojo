@@ -19,7 +19,8 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 ## 1. Deep Temporal Modelling
 - [ ] Implement TemporalFusionTransformer-style encoder with multi-horizon support.
 - [x] Add multi-resolution attention block mixing dilated convolutions and transformer layers.
-- [ ] Integrate state-space (S4/SSM) module for long-context retention.
+- [x] Integrate state-space (S4/SSM) module for long-context retention.
+- [ ] Benchmark omni-scale backbone versus hybrid baseline across multiple asset universes.
 - [ ] Pretrain on masked time-series reconstruction before supervised fine-tuning.
 - [ ] Introduce curriculum over window sizes and horizons to stabilise very deep models.
 

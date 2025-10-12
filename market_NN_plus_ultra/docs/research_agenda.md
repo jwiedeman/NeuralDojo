@@ -16,6 +16,8 @@ keeping the stack maintainable and research-friendly.
   to initialise deep weights before task-specific fine-tuning.
 * Experiment with hybrid backbones that combine multi-head attention, dilated temporal convolutions, and state-space mixers to
   stretch context windows into the multi-thousand timestep range.
+* Deploy the omni-scale backbone variant that layers cross-resolution attention and gated state-space mixers for experiments
+  targeting extreme horizon lengths and dense feature sets.
 * Add curriculum schedules for window lengths and forecast horizons to encourage the model to learn both micro and macro
   structures without destabilising optimisation.
 

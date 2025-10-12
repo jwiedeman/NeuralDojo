@@ -33,6 +33,13 @@ class ModelConfig:
     conv_dilations: tuple[int, ...] = (1, 2, 4, 8, 16, 32)
     horizon: int = 5
     output_dim: int = 3
+    architecture: str = "hybrid_transformer"
+    ff_mult: int = 4
+    ssm_state_dim: int = 256
+    ssm_kernel_size: int = 16
+    coarse_factor: int = 4
+    cross_every: int = 2
+    max_seq_len: int = 4096
 
 
 @dataclass(slots=True)
