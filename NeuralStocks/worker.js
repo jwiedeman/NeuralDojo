@@ -135,12 +135,33 @@ const emaPeriods = [5, 10, 20, 50, 100, 200];
 const rsiPeriods = [6, 14, 28];
 const macdConfig = { fast: 12, slow: 26, signal: 9 };
 const returnPeriods = [1, 5, 10, 20];
+const logReturnPeriods = [1, 5, 20];
+const realizedVolPeriods = [10, 20];
+const atrPeriods = [14, 21];
+const skewPeriods = [20];
+const kurtosisPeriods = [20];
+const volatilityZLookback = 60;
+const calendarDowCount = 5;
+const calendarMonthCount = 12;
 
 let smaSeries = [];
 let emaSeries = [];
 let rsiSeries = [];
 let macdSeries = { macd: new Float32Array(0), signal: new Float32Array(0), histogram: new Float32Array(0) };
 let returnSeries = [];
+let logReturnSeries = [];
+let realizedVolSeries = [];
+let downsideVolSeries = [];
+let atrSeries = [];
+let skewSeries = [];
+let kurtosisSeries = [];
+let distanceToSma200Series = new Float32Array(0);
+let gapSeries = new Float32Array(0);
+let trendRegimeSeries = new Float32Array(0);
+let volatilityZScoreSeries = new Float32Array(0);
+let volatilityRegimeSeries = new Float32Array(0);
+let dayOfWeekOneHotSeries = [];
+let monthOneHotSeries = [];
 
 function computeReturnSeries(values, period) {
   const result = new Float32Array(values.length);
@@ -155,6 +176,308 @@ function computeReturnSeries(values, period) {
     result[i] = 0;
   }
   return result;
+}
+
+function computeLogReturnSeries(values, period) {
+  const result = new Float32Array(values.length);
+  for (let i = 0; i < values.length; i++) {
+    if (i >= period && values[i - period] > 0 && values[i] > 0) {
+      result[i] = Math.log(values[i] / values[i - period]);
+    } else {
+      result[i] = 0;
+    }
+  }
+  return result;
+}
+
+function computeRealizedVolatility(returns, period) {
+  const result = new Float32Array(returns.length);
+  let sumSq = 0;
+  for (let i = 0; i < returns.length; i++) {
+    const value = Number.isFinite(returns[i]) ? returns[i] : 0;
+    sumSq += value * value;
+    if (i >= period) {
+      const prev = Number.isFinite(returns[i - period]) ? returns[i - period] : 0;
+      sumSq -= prev * prev;
+    }
+    const window = Math.min(i + 1, period);
+    const variance = window > 0 ? Math.max(sumSq / window, 0) : 0;
+    result[i] = Math.sqrt(variance) * Math.sqrt(252);
+  }
+  return result;
+}
+
+function computeDownsideVolatility(returns, period) {
+  const result = new Float32Array(returns.length);
+  for (let i = 0; i < returns.length; i++) {
+    const start = Math.max(0, i - period + 1);
+    let sumSq = 0;
+    let count = 0;
+    for (let j = start; j <= i; j++) {
+      const value = Number.isFinite(returns[j]) ? returns[j] : 0;
+      if (value < 0) {
+        sumSq += value * value;
+        count += 1;
+      }
+    }
+    if (count > 0) {
+      result[i] = Math.sqrt(sumSq / count) * Math.sqrt(252);
+    } else {
+      result[i] = 0;
+    }
+  }
+  return result;
+}
+
+function computeRollingAtr(values, period) {
+  const result = new Float32Array(values.length);
+  for (let i = 0; i < values.length; i++) {
+    const start = Math.max(1, i - period + 1);
+    let sum = 0;
+    let count = 0;
+    for (let j = start; j <= i; j++) {
+      const prev = values[j - 1];
+      const curr = values[j];
+      if (Number.isFinite(prev) && Number.isFinite(curr)) {
+        sum += Math.abs(curr - prev);
+        count += 1;
+      }
+    }
+    result[i] = count > 0 ? sum / count : 0;
+  }
+  return result;
+}
+
+function computeRollingSkew(values, period) {
+  const result = new Float32Array(values.length);
+  for (let i = 0; i < values.length; i++) {
+    const start = Math.max(0, i - period + 1);
+    const window = [];
+    for (let j = start; j <= i; j++) {
+      const value = Number.isFinite(values[j]) ? values[j] : 0;
+      window.push(value);
+    }
+    if (window.length < 3) {
+      result[i] = 0;
+      continue;
+    }
+    const mean = window.reduce((sum, v) => sum + v, 0) / window.length;
+    let variance = 0;
+    let thirdMoment = 0;
+    for (const value of window) {
+      const diff = value - mean;
+      variance += diff * diff;
+      thirdMoment += diff * diff * diff;
+    }
+    variance = variance / window.length;
+    const std = Math.sqrt(Math.max(variance, 0));
+    if (std === 0) {
+      result[i] = 0;
+      continue;
+    }
+    result[i] = (thirdMoment / window.length) / Math.pow(std, 3);
+  }
+  return result;
+}
+
+function computeRollingKurtosis(values, period) {
+  const result = new Float32Array(values.length);
+  for (let i = 0; i < values.length; i++) {
+    const start = Math.max(0, i - period + 1);
+    const window = [];
+    for (let j = start; j <= i; j++) {
+      const value = Number.isFinite(values[j]) ? values[j] : 0;
+      window.push(value);
+    }
+    if (window.length < 4) {
+      result[i] = 0;
+      continue;
+    }
+    const mean = window.reduce((sum, v) => sum + v, 0) / window.length;
+    let variance = 0;
+    let fourthMoment = 0;
+    for (const value of window) {
+      const diff = value - mean;
+      const diffSq = diff * diff;
+      variance += diffSq;
+      fourthMoment += diffSq * diffSq;
+    }
+    variance = variance / window.length;
+    const std = Math.sqrt(Math.max(variance, 0));
+    if (std === 0) {
+      result[i] = 0;
+      continue;
+    }
+    const excess = fourthMoment / window.length / Math.pow(std, 4) - 3;
+    result[i] = Number.isFinite(excess) ? excess : 0;
+  }
+  return result;
+}
+
+function computeDistanceToSeries(values, referenceSeries) {
+  const result = new Float32Array(values.length);
+  for (let i = 0; i < values.length; i++) {
+    const price = values[i];
+    const ref = referenceSeries?.[i];
+    if (Number.isFinite(price) && Number.isFinite(ref) && ref !== 0) {
+      result[i] = (price - ref) / ref;
+    } else {
+      result[i] = 0;
+    }
+  }
+  return result;
+}
+
+function computeGapSeries(values) {
+  const result = new Float32Array(values.length);
+  for (let i = 0; i < values.length; i++) {
+    if (i === 0) {
+      result[i] = 0;
+      continue;
+    }
+    const prev = values[i - 1];
+    const curr = values[i];
+    if (Number.isFinite(prev) && Number.isFinite(curr) && prev !== 0) {
+      result[i] = (curr - prev) / prev;
+    } else {
+      result[i] = 0;
+    }
+  }
+  return result;
+}
+
+function computeRollingZScore(values, period) {
+  const result = new Float32Array(values.length);
+  let sum = 0;
+  let sumSq = 0;
+  for (let i = 0; i < values.length; i++) {
+    const value = Number.isFinite(values[i]) ? values[i] : 0;
+    sum += value;
+    sumSq += value * value;
+    if (i >= period) {
+      const prev = Number.isFinite(values[i - period]) ? values[i - period] : 0;
+      sum -= prev;
+      sumSq -= prev * prev;
+    }
+    const count = Math.min(i + 1, period);
+    const mean = count > 0 ? sum / count : 0;
+    const variance = count > 0 ? Math.max(sumSq / count - mean * mean, 0) : 0;
+    const std = Math.sqrt(variance);
+    result[i] = std > 0 ? (value - mean) / std : 0;
+  }
+  return result;
+}
+
+function computeTrendRegime(values, slowSeries, fastSeries) {
+  const result = new Float32Array(values.length);
+  for (let i = 0; i < values.length; i++) {
+    const price = values[i];
+    const slow = slowSeries?.[i];
+    const fast = fastSeries?.[i];
+    if (Number.isFinite(price) && Number.isFinite(slow)) {
+      const aboveSlow = price >= slow ? 1 : -1;
+      if (Number.isFinite(fast)) {
+        const fastAboveSlow = fast >= slow ? 1 : -1;
+        result[i] = (aboveSlow + fastAboveSlow) / 2;
+      } else {
+        result[i] = aboveSlow;
+      }
+    } else {
+      result[i] = 0;
+    }
+  }
+  return result;
+}
+
+function computeVolatilityRegime(zScores) {
+  const result = new Float32Array(zScores.length);
+  for (let i = 0; i < zScores.length; i++) {
+    const z = Number.isFinite(zScores[i]) ? zScores[i] : 0;
+    if (z > 0.75) result[i] = 1;
+    else if (z < -0.75) result[i] = -1;
+    else result[i] = 0;
+  }
+  return result;
+}
+
+function parseDateSafe(dateStr) {
+  if (!dateStr) return null;
+  const parsed = new Date(`${dateStr}T00:00:00Z`);
+  return Number.isFinite(parsed?.getTime?.()) ? parsed : null;
+}
+
+function daysBetween(startStr, endStr) {
+  const start = parseDateSafe(startStr);
+  const end = parseDateSafe(endStr);
+  if (!start || !end) return 0;
+  const diffMs = end.getTime() - start.getTime();
+  return Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+}
+
+function computeCalendarOneHot(dateArray, count, mode) {
+  const series = Array.from({ length: count }, () => new Float32Array(dateArray.length));
+  for (let i = 0; i < dateArray.length; i++) {
+    const date = parseDateSafe(dateArray[i]);
+    if (!date) continue;
+    if (mode === 'dow') {
+      const day = date.getUTCDay();
+      if (day >= 1 && day <= 5) {
+        series[day - 1][i] = 1;
+      }
+    } else if (mode === 'month') {
+      const month = date.getUTCMonth();
+      if (month >= 0 && month < count) {
+        series[month][i] = 1;
+      }
+    }
+  }
+  return series;
+}
+
+function estimateTransactionCost(shares, price, idx, edge = 0) {
+  if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(shares) || shares <= 0) {
+    return 0;
+  }
+  const notional = shares * price;
+  const vol10 = realizedVolSeries[0]?.[idx] ?? 0;
+  const vol20 = realizedVolSeries[realizedVolSeries.length - 1]?.[idx] ?? vol10;
+  const vol = Math.max(0, Number.isFinite(vol10) ? vol10 : 0, Number.isFinite(vol20) ? vol20 : 0);
+  const volImpact = Math.min(config.slippageVolCap, vol * config.slippageVolCoeff);
+  const zScore = Number.isFinite(volatilityZScoreSeries[idx]) ? Math.abs(volatilityZScoreSeries[idx]) : 0;
+  const zImpact = Math.min(config.slippageVolCap, zScore * config.slippageZCoeff);
+  const edgeImpact = Math.min(config.slippageVolCap, Math.abs(edge) * config.edgeImpactCoeff);
+  const variableCost = notional * (config.costPerSideBps + volImpact + zImpact + edgeImpact);
+  const totalCost = Math.max(config.minCommission, variableCost);
+  return Math.min(notional * 0.1, totalCost);
+}
+
+function updateHoldDurations(sharesSold, sellIndex) {
+  if (!portfolio || !Array.isArray(portfolio.openLots) || sharesSold <= 0) {
+    return null;
+  }
+  let remaining = sharesSold;
+  let weightedDays = 0;
+  let sharesAccounted = 0;
+  while (remaining > 0 && portfolio.openLots.length > 0) {
+    const lot = portfolio.openLots[0];
+    if (!lot) break;
+    const consume = Math.min(remaining, lot.shares);
+    const holdDays = daysBetween(dates[lot.index], dates[sellIndex]);
+    weightedDays += holdDays * consume;
+    sharesAccounted += consume;
+    portfolio.totalHoldDays += holdDays * consume;
+    portfolio.closedPositions += consume;
+    lot.shares -= consume;
+    if (lot.shares <= 0) {
+      portfolio.openLots.shift();
+    }
+    remaining -= consume;
+  }
+  portfolio.avgHoldDays = portfolio.closedPositions > 0 ? portfolio.totalHoldDays / portfolio.closedPositions : 0;
+  if (sharesAccounted > 0) {
+    return weightedDays / sharesAccounted;
+  }
+  return null;
 }
 
 function updateDatasetMoments() {
@@ -183,6 +506,25 @@ function refreshTechnicalSeries() {
   rsiSeries = rsiPeriods.map(period => computeRSI(prices, period));
   macdSeries = computeMACDSeries(prices, macdConfig.fast, macdConfig.slow, macdConfig.signal);
   returnSeries = returnPeriods.map(period => computeReturnSeries(prices, period));
+  logReturnSeries = logReturnPeriods.map(period => computeLogReturnSeries(prices, period));
+  const oneDayReturns = computeReturnSeries(prices, 1);
+  realizedVolSeries = realizedVolPeriods.map(period => computeRealizedVolatility(oneDayReturns, period));
+  downsideVolSeries = realizedVolPeriods.map(period => computeDownsideVolatility(oneDayReturns, period));
+  atrSeries = atrPeriods.map(period => computeRollingAtr(prices, period));
+  skewSeries = skewPeriods.map(period => computeRollingSkew(oneDayReturns, period));
+  kurtosisSeries = kurtosisPeriods.map(period => computeRollingKurtosis(oneDayReturns, period));
+  const slowIdx = smaPeriods.indexOf(200);
+  const slowSeries = slowIdx >= 0 ? smaSeries[slowIdx] : null;
+  distanceToSma200Series = computeDistanceToSeries(prices, slowSeries);
+  gapSeries = computeGapSeries(prices);
+  const fastIdx = smaPeriods.indexOf(50);
+  const fastSeries = fastIdx >= 0 ? smaSeries[fastIdx] : null;
+  trendRegimeSeries = computeTrendRegime(prices, slowSeries, fastSeries);
+  const volReference = realizedVolSeries.length ? realizedVolSeries[realizedVolSeries.length - 1] : new Float32Array(prices.length);
+  volatilityZScoreSeries = computeRollingZScore(volReference, volatilityZLookback);
+  volatilityRegimeSeries = computeVolatilityRegime(volatilityZScoreSeries);
+  dayOfWeekOneHotSeries = computeCalendarOneHot(dates, calendarDowCount, 'dow');
+  monthOneHotSeries = computeCalendarOneHot(dates, calendarMonthCount, 'month');
 }
 
 function normalize(price) {
@@ -468,7 +810,13 @@ const config = {
   traderExploration: 0.05,
   traderRewardScale: 120,
   tickerSubsetMin: 5,
-  tickerSubsetMax: 10
+  tickerSubsetMax: 10,
+  costPerSideBps: 0.0005,
+  minCommission: 0,
+  slippageVolCoeff: 0.02,
+  slippageVolCap: 0.003,
+  slippageZCoeff: 0.0005,
+  edgeImpactCoeff: 0.0005
 };
 
 let net = null;
@@ -501,7 +849,19 @@ function createPortfolio() {
     totalReturn: 0,
     lastPrice: null,
     trades: [],
-    equityHistory: []
+    equityHistory: [],
+    costsPaid: 0,
+    totalValueTraded: 0,
+    totalVolume: 0,
+    tradeCountTotal: 0,
+    closedTradeCount: 0,
+    hitCount: 0,
+    winPnls: [],
+    lossPnls: [],
+    openLots: [],
+    totalHoldDays: 0,
+    closedPositions: 0,
+    avgHoldDays: 0
   };
 }
 
@@ -616,7 +976,27 @@ function setActiveDataset(dataset, { resetNetwork = false, resetTrader = false }
 }
 
 function tradingFeatureCount() {
-  return 3 + smaPeriods.length + emaPeriods.length + rsiPeriods.length + 3 + returnPeriods.length;
+  return (
+    3 +
+    smaPeriods.length +
+    emaPeriods.length +
+    rsiPeriods.length +
+    3 +
+    returnPeriods.length +
+    logReturnPeriods.length +
+    realizedVolPeriods.length +
+    realizedVolPeriods.length +
+    skewPeriods.length +
+    kurtosisPeriods.length +
+    atrPeriods.length +
+    1 + // distance to SMA200
+    1 + // gap size
+    1 + // trend regime
+    1 + // volatility z-score
+    1 + // volatility regime bucket
+    calendarDowCount +
+    calendarMonthCount
+  );
 }
 
 function createTraderInputSize() {
@@ -784,7 +1164,7 @@ function markToMarket(date, price) {
   }
 }
 
-function recordTrade({ date, side, shares, price, edgePct, pnl }) {
+function recordTrade({ date, side, shares, price, edgePct, pnl, costs, holdingDays }) {
   if (!portfolio) return;
   const entry = {
     date,
@@ -793,6 +1173,8 @@ function recordTrade({ date, side, shares, price, edgePct, pnl }) {
     price,
     edgePct,
     pnl,
+    costs,
+    holdingDays,
     equityAfter: portfolio.equity,
     cashAfter: portfolio.cash,
     positionAfter: portfolio.position
@@ -800,6 +1182,22 @@ function recordTrade({ date, side, shares, price, edgePct, pnl }) {
   portfolio.trades.unshift(entry);
   if (portfolio.trades.length > portfolioConfig.tradeHistoryLimit) {
     portfolio.trades.pop();
+  }
+  portfolio.tradeCountTotal = (portfolio.tradeCountTotal || 0) + 1;
+  if (side === 'SELL' && Number.isFinite(pnl)) {
+    portfolio.closedTradeCount = (portfolio.closedTradeCount || 0) + 1;
+    if (pnl > 0) {
+      portfolio.hitCount = (portfolio.hitCount || 0) + 1;
+      portfolio.winPnls.push(pnl);
+      if (portfolio.winPnls.length > portfolioConfig.tradeHistoryLimit) {
+        portfolio.winPnls.shift();
+      }
+    } else if (pnl < 0) {
+      portfolio.lossPnls.push(pnl);
+      if (portfolio.lossPnls.length > portfolioConfig.tradeHistoryLimit) {
+        portfolio.lossPnls.shift();
+      }
+    }
   }
   if (tradingStats) {
     tradingStats.trades = (tradingStats.trades || 0) + 1;
@@ -812,22 +1210,40 @@ function recordTrade({ date, side, shares, price, edgePct, pnl }) {
   }
 }
 
-function attemptBuy(price, fraction, date, edge) {
+function attemptBuy(price, fraction, date, edge, idx) {
   if (!portfolio || !Number.isFinite(price) || price <= 0) {
     markToMarket(date, price);
     return false;
   }
   const budget = Math.min(portfolio.cash, portfolio.equity * fraction);
-  const shares = Math.floor(budget / price);
+  let shares = Math.floor(budget / price);
+  while (shares > 0) {
+    const cost = shares * price;
+    const tradeCost = estimateTransactionCost(shares, price, idx, edge);
+    if (cost + tradeCost <= portfolio.cash + 1e-6) {
+      break;
+    }
+    shares -= 1;
+  }
   if (shares <= 0) {
     markToMarket(date, price);
     return false;
   }
   const cost = shares * price;
+  const tradeCost = estimateTransactionCost(shares, price, idx, edge);
+  const totalCost = cost + tradeCost;
+  if (totalCost > portfolio.cash) {
+    markToMarket(date, price);
+    return false;
+  }
   const existingValue = portfolio.avgCost * portfolio.position;
-  portfolio.cash -= cost;
+  portfolio.cash -= totalCost;
   portfolio.position += shares;
   portfolio.avgCost = portfolio.position > 0 ? (existingValue + cost) / portfolio.position : 0;
+  portfolio.costsPaid += tradeCost;
+  portfolio.totalValueTraded += cost;
+  portfolio.totalVolume += shares;
+  portfolio.openLots.push({ shares, index: idx });
   markToMarket(date, price);
   recordTrade({
     date,
@@ -835,12 +1251,13 @@ function attemptBuy(price, fraction, date, edge) {
     shares,
     price,
     edgePct: edge * 100,
-    pnl: 0
+    pnl: 0,
+    costs: tradeCost
   });
   return true;
 }
 
-function attemptSell(price, fraction, date, edge) {
+function attemptSell(price, fraction, date, edge, idx) {
   if (!portfolio || portfolio.position <= 0 || !Number.isFinite(price) || price <= 0) {
     markToMarket(date, price);
     return false;
@@ -852,14 +1269,21 @@ function attemptSell(price, fraction, date, edge) {
     return false;
   }
   const proceeds = shares * price;
-  portfolio.cash += proceeds;
+  const tradeCost = estimateTransactionCost(shares, price, idx, edge);
+  const netProceeds = proceeds - tradeCost;
+  portfolio.cash += netProceeds;
   portfolio.position -= shares;
-  const realized = portfolio.avgCost > 0 ? (price - portfolio.avgCost) * shares : 0;
+  const realizedGross = portfolio.avgCost > 0 ? (price - portfolio.avgCost) * shares : 0;
+  const realized = realizedGross - tradeCost;
   portfolio.realizedPnl += realized;
   if (portfolio.position <= 0) {
     portfolio.position = 0;
     portfolio.avgCost = 0;
   }
+  portfolio.costsPaid += tradeCost;
+  portfolio.totalValueTraded += proceeds;
+  portfolio.totalVolume += shares;
+  const holdingDays = updateHoldDurations(shares, idx);
   markToMarket(date, price);
   recordTrade({
     date,
@@ -867,7 +1291,9 @@ function attemptSell(price, fraction, date, edge) {
     shares,
     price,
     edgePct: edge * 100,
-    pnl: realized
+    pnl: realized,
+    costs: tradeCost,
+    holdingDays
   });
   return true;
 }
@@ -914,6 +1340,48 @@ function buildTradingFeatures(sample, predictedPrice) {
     const clamped = Number.isFinite(value) ? Math.max(-3, Math.min(3, value)) : 0;
     features[offset++] = clamped;
   }
+  for (let i = 0; i < logReturnSeries.length; i++) {
+    const value = logReturnSeries[i][idx];
+    const clamped = Number.isFinite(value) ? Math.max(-3, Math.min(3, value)) : 0;
+    features[offset++] = clamped;
+  }
+  for (let i = 0; i < realizedVolSeries.length; i++) {
+    const value = realizedVolSeries[i][idx];
+    features[offset++] = Number.isFinite(value) ? Math.min(5, Math.max(0, value)) : 0;
+  }
+  for (let i = 0; i < downsideVolSeries.length; i++) {
+    const value = downsideVolSeries[i][idx];
+    features[offset++] = Number.isFinite(value) ? Math.min(5, Math.max(0, value)) : 0;
+  }
+  for (let i = 0; i < skewSeries.length; i++) {
+    const value = skewSeries[i][idx];
+    features[offset++] = Number.isFinite(value) ? Math.max(-5, Math.min(5, value)) : 0;
+  }
+  for (let i = 0; i < kurtosisSeries.length; i++) {
+    const value = kurtosisSeries[i][idx];
+    features[offset++] = Number.isFinite(value) ? Math.max(-5, Math.min(5, value)) : 0;
+  }
+  for (let i = 0; i < atrSeries.length; i++) {
+    const value = atrSeries[i][idx];
+    const normalized = Number.isFinite(value) && sample.targetPrice > 0 ? value / sample.targetPrice : 0;
+    features[offset++] = Math.max(0, Math.min(5, normalized));
+  }
+  const distance = distanceToSma200Series[idx];
+  features[offset++] = Number.isFinite(distance) ? Math.max(-5, Math.min(5, distance)) : 0;
+  const gap = gapSeries[idx];
+  features[offset++] = Number.isFinite(gap) ? Math.max(-5, Math.min(5, gap)) : 0;
+  const trendRegime = trendRegimeSeries[idx];
+  features[offset++] = Number.isFinite(trendRegime) ? Math.max(-1, Math.min(1, trendRegime)) : 0;
+  const volZ = volatilityZScoreSeries[idx];
+  features[offset++] = Number.isFinite(volZ) ? Math.max(-5, Math.min(5, volZ)) : 0;
+  const volBucket = volatilityRegimeSeries[idx];
+  features[offset++] = Number.isFinite(volBucket) ? Math.max(-1, Math.min(1, volBucket)) : 0;
+  for (let i = 0; i < dayOfWeekOneHotSeries.length; i++) {
+    features[offset++] = dayOfWeekOneHotSeries[i]?.[idx] ?? 0;
+  }
+  for (let i = 0; i < monthOneHotSeries.length; i++) {
+    features[offset++] = monthOneHotSeries[i]?.[idx] ?? 0;
+  }
   return { features, edge };
 }
 
@@ -936,6 +1404,7 @@ function updateTradingStats(decision, reward, edge) {
 
 function applyTradingPolicy(sample, predictedPrice) {
   if (!portfolio || !sample || !Number.isFinite(sample.targetPrice)) return;
+  const idx = sample.index ?? cursor;
   const { features, edge } = buildTradingFeatures(sample, predictedPrice);
   const decision = trader.act(features, config.traderExploration);
   const price = sample.targetPrice;
@@ -945,9 +1414,9 @@ function applyTradingPolicy(sample, predictedPrice) {
   const maxFraction = 0.5;
   const fraction = Math.min(maxFraction, minFraction + (maxFraction - minFraction) * Math.max(0, decision.confidence));
   if (decision.index === 1) {
-    traded = attemptBuy(price, fraction, sample.date, edge);
+    traded = attemptBuy(price, fraction, sample.date, edge, idx);
   } else if (decision.index === 2) {
-    traded = attemptSell(price, fraction, sample.date, edge);
+    traded = attemptSell(price, fraction, sample.date, edge, idx);
   }
   if (!traded) {
     markToMarket(sample.date, price);
@@ -961,14 +1430,33 @@ function applyTradingPolicy(sample, predictedPrice) {
 
 function computeEquityMetrics(history) {
   if (!Array.isArray(history) || history.length === 0) {
-    return { maxDrawdown: 0, sharpe: 0 };
+    return {
+      maxDrawdown: 0,
+      sharpe: 0,
+      sortino: 0,
+      calmar: 0,
+      cagr: 0,
+      downsideDeviation: 0
+    };
   }
   let peak = null;
   let maxDrawdown = 0;
   const returns = [];
+  const downsideReturns = [];
+  let startEquity = null;
+  let endEquity = null;
+  let startDate = null;
+  let endDate = null;
   for (let i = 0; i < history.length; i++) {
-    const equity = Number(history[i]?.equity);
+    const entry = history[i];
+    const equity = Number(entry?.equity);
     if (!Number.isFinite(equity)) continue;
+    if (startEquity == null) {
+      startEquity = equity;
+      startDate = entry?.date ?? null;
+    }
+    endEquity = equity;
+    endDate = entry?.date ?? endDate;
     if (peak == null || equity > peak) {
       peak = equity;
     }
@@ -981,11 +1469,17 @@ function computeEquityMetrics(history) {
     if (i > 0) {
       const prev = Number(history[i - 1]?.equity);
       if (Number.isFinite(prev) && prev > 0) {
-        returns.push((equity - prev) / prev);
+        const ret = (equity - prev) / prev;
+        returns.push(ret);
+        if (ret < 0) {
+          downsideReturns.push(ret);
+        }
       }
     }
   }
   let sharpe = 0;
+  let sortino = 0;
+  let downsideDeviation = 0;
   if (returns.length > 1) {
     const meanRet = returns.reduce((sum, v) => sum + v, 0) / returns.length;
     const variance = returns.reduce((sum, v) => sum + Math.pow(v - meanRet, 2), 0) / (returns.length - 1);
@@ -993,13 +1487,47 @@ function computeEquityMetrics(history) {
     if (volatility > 0) {
       sharpe = (meanRet / volatility) * Math.sqrt(252);
     }
+    if (downsideReturns.length > 0) {
+      const downsideVar = downsideReturns.reduce((sum, v) => sum + v * v, 0) / downsideReturns.length;
+      downsideDeviation = Math.sqrt(Math.max(downsideVar, 0)) * Math.sqrt(252);
+      if (downsideDeviation > 0) {
+        sortino = (meanRet * 252) / downsideDeviation;
+      }
+    }
   }
-  return { maxDrawdown, sharpe };
+  const start = Number.isFinite(startEquity) ? startEquity : null;
+  const end = Number.isFinite(endEquity) ? endEquity : null;
+  let cagr = 0;
+  if (start && end && start > 0 && end > 0) {
+    const diffDays = Math.max(1, daysBetween(startDate, endDate));
+    const years = diffDays / 365.25;
+    if (years > 0) {
+      cagr = Math.pow(end / start, 1 / years) - 1;
+    }
+  }
+  const calmar = maxDrawdown < 0 ? cagr / Math.abs(maxDrawdown) : 0;
+  return { maxDrawdown, sharpe, sortino, calmar, cagr, downsideDeviation };
 }
 
 function createPortfolioSnapshot() {
   if (!portfolio) return null;
   const metrics = computeEquityMetrics(portfolio.equityHistory);
+  const tradeCount = portfolio.tradeCountTotal || portfolio.trades.length;
+  const closedTrades = portfolio.closedTradeCount || 0;
+  const hitRate = closedTrades > 0 ? (portfolio.hitCount || 0) / closedTrades : 0;
+  const avgWin = portfolio.winPnls.length
+    ? portfolio.winPnls.reduce((sum, v) => sum + v, 0) / portfolio.winPnls.length
+    : null;
+  const avgLoss = portfolio.lossPnls.length
+    ? portfolio.lossPnls.reduce((sum, v) => sum + v, 0) / portfolio.lossPnls.length
+    : null;
+  const winLossRatio = Number.isFinite(avgWin) && Number.isFinite(avgLoss) && avgLoss !== 0
+    ? avgWin / Math.abs(avgLoss)
+    : null;
+  const turnover = portfolio.initialCash > 0 ? portfolio.totalValueTraded / portfolio.initialCash : 0;
+  const costDrag = portfolio.totalValueTraded > 0 ? portfolio.costsPaid / portfolio.totalValueTraded : 0;
+  const capacityPerShare = portfolio.totalVolume > 0 ? portfolio.costsPaid / portfolio.totalVolume : 0;
+  const avgHoldDays = portfolio.avgHoldDays ?? 0;
   return {
     equity: portfolio.equity,
     cash: portfolio.cash,
@@ -1013,8 +1541,22 @@ function createPortfolioSnapshot() {
     equityHistory: portfolio.equityHistory.slice(),
     maxDrawdown: metrics.maxDrawdown,
     sharpe: metrics.sharpe,
-    tradeCount: tradingStats?.trades ?? portfolio.trades.length,
-    winRate: tradingStats?.winRate ?? 0
+    sortino: metrics.sortino,
+    calmar: metrics.calmar,
+    cagr: metrics.cagr,
+    downsideDeviation: metrics.downsideDeviation,
+    tradeCount,
+    winRate: hitRate,
+    hitRate,
+    closedTradeCount: closedTrades,
+    avgWin,
+    avgLoss,
+    winLossRatio,
+    turnover,
+    costDrag,
+    capacityPerShare,
+    avgHoldDays,
+    costsPaid: portfolio.costsPaid
   };
 }
 
@@ -1223,6 +1765,12 @@ function applyConfig(newConfig) {
     : 120;
   config.tickerSubsetMin = Math.max(1, Math.min((config.tickerSubsetMin | 0) || 1, marketUniverse.length));
   config.tickerSubsetMax = Math.max(config.tickerSubsetMin, Math.min((config.tickerSubsetMax | 0) || config.tickerSubsetMin, marketUniverse.length));
+  config.costPerSideBps = Number.isFinite(config.costPerSideBps) ? Math.max(0, config.costPerSideBps) : 0.0005;
+  config.minCommission = Number.isFinite(config.minCommission) ? Math.max(0, config.minCommission) : 0;
+  config.slippageVolCoeff = Number.isFinite(config.slippageVolCoeff) ? Math.max(0, config.slippageVolCoeff) : 0.02;
+  config.slippageVolCap = Number.isFinite(config.slippageVolCap) ? Math.max(0, config.slippageVolCap) : 0.003;
+  config.slippageZCoeff = Number.isFinite(config.slippageZCoeff) ? Math.max(0, config.slippageZCoeff) : 0.0005;
+  config.edgeImpactCoeff = Number.isFinite(config.edgeImpactCoeff) ? Math.max(0, config.edgeImpactCoeff) : 0.0005;
 
   const requiresReset = (
     config.hiddenUnits !== prevHiddenUnits ||
