@@ -48,7 +48,36 @@ market_NN_plus_ultra/
         └── __init__.py
 ```
 
-Each module comes with docstrings explaining expected behaviour so future contributors can quickly implement and extend components.
+Each module comes with docstrings explaining expected behaviour so future contributors can quickly implement and extend components. The goal is to offer a batteries-included base that can scale from rapid experimentation on a laptop to large-scale multi-GPU studies without major refactors.
+
+## Core Capabilities
+
+* **Deep temporal modelling** — The default backbone stacks sixteen hybrid transformer layers that mix global attention, dilated convolutions, and state-space inspired mixers for memory retention over thousands of timesteps. Patch embeddings and learned positional encodings are designed to support high-dimensional feature spaces out of the box.
+* **Rich feature engineering** — The feature registry encapsulates momentum, volatility, regime, and spectral features while remaining easily extensible. Adding new indicators only requires registering a `FeatureSpec` with dependency metadata.
+* **Risk-aware optimisation** — Custom loss functions marry standard regression objectives with differentiable Sharpe and drawdown penalties, rewarding policies that maximise return while respecting risk budgets.
+* **Automated evaluation** — The evaluation module exposes risk-adjusted metrics (Sharpe, Sortino, Calmar, drawdown) and trade-level analytics that plug directly into backtesting or live monitoring loops.
+* **Research ergonomics** — YAML-driven experiment configs, dataclass-backed runtime configs, and a high-level trainer streamline iteration while keeping experiments reproducible.
+
+## Data Flow Overview
+
+1. **SQLite ingestion** — `SQLiteMarketDataset` loads OHLCV candles, merges optional indicator tables, and restricts the universe to configured symbols.
+2. **Feature augmentation** — `FeaturePipeline` executes the registered feature functions, automatically skipping features when dependencies are missing and appending results to the panel.
+3. **Windowing & normalisation** — `SlidingWindowDataset` converts the multi-indexed panel into sliding windows with optional z-score normalisation, surfacing tensors ready for GPU training.
+4. **Model forward pass** — `TemporalBackbone` consumes windows, applies patch embeddings, and processes sequences through the hybrid temporal stack to forecast multi-step actions/returns.
+5. **Loss & optimisation** — The trainer computes risk-aware losses, backpropagates gradients, clips norms, and applies cosine-annealed AdamW updates.
+6. **Evaluation loop** — Validation splits are evaluated every epoch, logging ROI-focused metrics and saving checkpoints for further analysis.
+
+## Architecture Blueprint
+
+The default configuration is intentionally overprovisioned to unlock a rich hypothesis space:
+
+* **Input dimension** — Supports 128+ raw and engineered features per timestep, making room for alternative data and synthetic signals.
+* **Depth & heads** — Sixteen layers with eight attention heads per layer ensure strong expressivity across temporal resolutions.
+* **Multi-resolution mixing** — Convolutional dilations (`1, 2, 4, 8, 16, 32, ...`) are cycled across blocks to model both intraday microstructure and multi-week regimes.
+* **Forecast horizon** — Default head predicts a five-step distribution over buy/hold/sell actions, but can be adapted to price deltas or continuous targets.
+* **Extension points** — Swap in Temporal Fusion Transformer modules, S4-style state-space layers, or reinforcement learning policy heads without changing the trainer API.
+
+For a deeper discussion of the data flow, modular boundaries, and suggested extensions see [`docs/architecture.md`](./docs/architecture.md).
 
 ## Getting Started
 

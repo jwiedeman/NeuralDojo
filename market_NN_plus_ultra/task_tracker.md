@@ -7,6 +7,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Implement feature registry with pluggable indicator computation (TA-Lib, spectral, macro, alternative data).
 - [ ] Add data validation suite (Great Expectations or pandera) to guarantee clean inputs.
 - [ ] Define baseline experiment YAML files for different asset classes (equities, crypto, forex).
+- [ ] Document canonical data flow in `docs/architecture.md` (extend with schema diagrams).
 
 ### Feature Registry Enhancements
 - [ ] Auto-generate documentation from `FeatureRegistry.describe()` into Markdown.
@@ -31,12 +32,14 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [ ] Compute ROI, max drawdown, Calmar, hit rate, and tail risk metrics by default.
 - [ ] Generate Markdown/HTML reports with charts for quick inspection.
 - [ ] Wire up experiment tracking (Weights & Biases or MLflow) for metadata and artefacts.
+- [ ] Add automated guardrail metrics (exposure, turnover, tail percentiles) for live trading readiness.
 
 ## 4. Automation & Deployment
 - [ ] Containerise training + inference pipelines with GPU support.
 - [ ] Expose REST/gRPC service that mirrors the existing market agent API but uses the new brain.
 - [ ] Schedule continuous retraining jobs triggered by new data arrival.
 - [ ] Set up online monitoring for live performance and drift detection.
+- [ ] Build playbook for human-in-the-loop overrides and risk manager approvals.
 
 ---
 
