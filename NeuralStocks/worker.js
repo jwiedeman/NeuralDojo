@@ -638,6 +638,21 @@ class PriceNet {
     this.learningRate = lr;
   }
 
+  applyOutputScale(scale) {
+    if (!Number.isFinite(scale) || scale <= 0) {
+      return;
+    }
+    const safeScale = scale;
+    for (let i = 0; i < this.w2.length; i++) {
+      const next = clampWeight(this.w2[i] * safeScale);
+      this.w2[i] = next;
+    }
+    for (let i = 0; i < this.b2.length; i++) {
+      const next = clampWeight(this.b2[i] * safeScale);
+      this.b2[i] = next;
+    }
+  }
+
   forward(features) {
     const hidden = new Float32Array(this.hiddenUnits);
     for (let h = 0; h < this.hiddenUnits; h++) {
@@ -1195,6 +1210,102 @@ function playlistPosition() {
   return activePlaylistIndex >= 0 ? activePlaylistIndex + 1 : 0;
 }
 
+const forecasterStabilityConfig = {
+  maxNormRatio: 200,
+  maxPriceRatio: 200,
+  minTargetNorm: 1e-3,
+  minTargetPrice: 1,
+  minScale: 1e-4,
+  maxIterations: 4,
+  biasTolerance: 0.5
+};
+
+function computeForecasterStability(predNorm, predPrice, targetNorm, targetPrice) {
+  const denomNorm = Math.max(forecasterStabilityConfig.minTargetNorm, Math.abs(targetNorm));
+  const denomPrice = Math.max(forecasterStabilityConfig.minTargetPrice, Math.abs(targetPrice));
+  const normRatio = Number.isFinite(predNorm) ? Math.abs(predNorm) / denomNorm : Infinity;
+  const priceRatio = Number.isFinite(predPrice) ? Math.abs(predPrice) / denomPrice : Infinity;
+  const unstable =
+    !Number.isFinite(normRatio) ||
+    !Number.isFinite(priceRatio) ||
+    normRatio > forecasterStabilityConfig.maxNormRatio ||
+    priceRatio > forecasterStabilityConfig.maxPriceRatio;
+  return { normRatio, priceRatio, unstable };
+}
+
+function alignForecasterBiases(targetNorms, predictedNorms) {
+  if (!net || !Array.isArray(targetNorms) && !(targetNorms instanceof Float32Array)) return;
+  const predictedArray = Array.isArray(predictedNorms) || predictedNorms instanceof Float32Array
+    ? predictedNorms
+    : [];
+  const limit = Math.min(targetNorms.length, predictedArray.length, net.b2.length);
+  for (let i = 0; i < limit; i++) {
+    const desired = Number.isFinite(targetNorms[i]) ? targetNorms[i] : 0;
+    const predicted = Number.isFinite(predictedArray[i]) ? predictedArray[i] : 0;
+    const delta = desired - predicted;
+    if (Math.abs(delta) < forecasterStabilityConfig.biasTolerance) continue;
+    const bias = coerceFinite(net.b2[i]);
+    net.b2[i] = clampWeight(bias + delta);
+  }
+}
+
+function stabilizeForecasterForDataset({ networkReset = false } = {}) {
+  if (!net || !totalPoints || networkReset) return;
+  const maxIndex = lastSampleIndex();
+  const baseCursor = cursor > 0 ? cursor : config.windowSize;
+  const probeIndex = Math.max(config.windowSize, Math.min(maxIndex, baseCursor));
+  if (!Number.isFinite(probeIndex) || probeIndex <= 0 || probeIndex < config.windowSize) return;
+  const sample = sampleAt(probeIndex, { injectNoise: false });
+  if (!sample || !sample.targetNorms || sample.targetNorms.length === 0) return;
+  const targetNorm = Number.isFinite(sample.targetNorms[0]) ? sample.targetNorms[0] : 0;
+  const targetPrice = Number.isFinite(sample.targetPrices?.[0]) ? sample.targetPrices[0] : null;
+  if (!Number.isFinite(targetPrice) || targetPrice === null) return;
+
+  let forwardResult = net.forward(sample.features);
+  let predictedNormRaw = forwardResult?.output?.[0];
+  let predictedPriceRaw = Number.isFinite(predictedNormRaw)
+    ? denormalize(predictedNormRaw, sample.index)
+    : Infinity;
+  let metrics = computeForecasterStability(predictedNormRaw, predictedPriceRaw, targetNorm, targetPrice);
+  let adjusted = false;
+  let iteration = 0;
+
+  while (metrics.unstable && iteration < forecasterStabilityConfig.maxIterations) {
+    const ratio = Math.max(metrics.normRatio, metrics.priceRatio, 1);
+    const scale = Math.max(
+      forecasterStabilityConfig.minScale,
+      Math.min(1, 1 / Math.sqrt(ratio))
+    );
+    if (scale >= 1 && ratio <= 1) {
+      break;
+    }
+    net.applyOutputScale(scale);
+    adjusted = true;
+    forwardResult = net.forward(sample.features);
+    predictedNormRaw = forwardResult?.output?.[0];
+    predictedPriceRaw = Number.isFinite(predictedNormRaw)
+      ? denormalize(predictedNormRaw, sample.index)
+      : Infinity;
+    metrics = computeForecasterStability(predictedNormRaw, predictedPriceRaw, targetNorm, targetPrice);
+    iteration += 1;
+  }
+
+  if (!metrics.unstable && !adjusted) {
+    return;
+  }
+
+  if (metrics.unstable) {
+    net.applyOutputScale(forecasterStabilityConfig.minScale);
+    forwardResult = net.forward(sample.features);
+    adjusted = true;
+  }
+
+  if (adjusted || metrics.unstable) {
+    const finalOutput = forwardResult?.output || [];
+    alignForecasterBiases(sample.targetNorms, finalOutput);
+  }
+}
+
 function rebuildTickerPlaylist() {
   if (!marketUniverse.length) {
     playlist = [];
@@ -1277,6 +1388,7 @@ function setActiveDataset(dataset, { resetNetwork = false, resetTrader = false }
   stats.windowCoverage = windowCoverage();
   stats.lastReset = formatClock();
   stats.loops = loops;
+  stabilizeForecasterForDataset({ networkReset: resetNetwork });
   return true;
 }
 
@@ -1431,12 +1543,13 @@ function setRunning(value) {
   self.postMessage({ type: 'status', running });
 }
 
-function sampleAt(index) {
+function sampleAt(index, options = {}) {
+  const { injectNoise = true } = options;
   const features = new Float32Array(config.windowSize);
   const start = index - config.windowSize;
   for (let i = 0; i < config.windowSize; i++) {
     let value = normalize(prices[start + i], start + i);
-    if (config.noise > 0) {
+    if (injectNoise && config.noise > 0) {
       value += (Math.random() * 2 - 1) * config.noise;
     }
     features[i] = value;
