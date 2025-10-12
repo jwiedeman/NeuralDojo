@@ -1,4 +1,4 @@
-"""Experiment configuration dataclasses."""
+"""Experiment configuration dataclasses for Market NN Plus Ultra."""
 
 from __future__ import annotations
 
