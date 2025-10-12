@@ -18,6 +18,16 @@ function safeContext(canvas, type = '2d') {
   }
 }
 
+function maxAbs(values) {
+  if (!values || !values.length) return 1e-6;
+  let max = 0;
+  for (let i = 0; i < values.length; i++) {
+    const value = Math.abs(values[i] ?? 0);
+    if (value > max) max = value;
+  }
+  return Math.max(max, 1e-6);
+}
+
 export class DashboardView {
   constructor(elements) {
     this.el = elements;
@@ -25,11 +35,17 @@ export class DashboardView {
     this.errorCanvas = elements.errorCanvas;
     this.weightsCanvas = elements.weightsCanvas;
     this.outputCanvas = elements.outputCanvas;
+    this.traderInputCanvas = elements.traderInputCanvas;
+    this.traderHiddenCanvas = elements.traderHiddenCanvas;
+    this.traderOutputCanvas = elements.traderOutputCanvas;
 
     this.priceCtx = safeContext(this.priceCanvas);
     this.errorCtx = safeContext(this.errorCanvas);
     this.weightsCtx = safeContext(this.weightsCanvas);
     this.outputCtx = safeContext(this.outputCanvas);
+    this.traderInputCtx = safeContext(this.traderInputCanvas);
+    this.traderHiddenCtx = safeContext(this.traderHiddenCanvas);
+    this.traderOutputCtx = safeContext(this.traderOutputCanvas);
   }
 
   drawPriceChart(actual, predicted) {
@@ -113,21 +129,24 @@ export class DashboardView {
     ctx.stroke();
   }
 
-  drawWeightsHeatmap(weights, hiddenUnits, inputSize) {
-    if (!this.weightsCanvas || !this.weightsCtx) return;
-    const ctx = this.weightsCtx;
-    const w = this.weightsCanvas.width;
-    const h = this.weightsCanvas.height;
+  drawMatrixHeatmap(canvas, ctx, weights, rows, cols) {
+    if (!canvas || !ctx) return;
+    const w = canvas.width;
+    const h = canvas.height;
     ctx.clearRect(0, 0, w, h);
-    if (!weights || !hiddenUnits || !inputSize) return;
-    const cellW = w / inputSize;
-    const cellH = h / hiddenUnits;
-    const maxAbs = Math.max(...weights.map(v => Math.abs(v)), 1e-6);
+    if (!weights?.length || !rows || !cols) return;
+    ctx.fillStyle = '#fbfbfb';
+    ctx.fillRect(0, 0, w, h);
 
-    for (let row = 0; row < hiddenUnits; row++) {
-      for (let col = 0; col < inputSize; col++) {
-        const value = weights[row * inputSize + col];
-        const norm = Math.abs(value) / maxAbs;
+    const cellW = cols > 0 ? w / cols : w;
+    const cellH = rows > 0 ? h / rows : h;
+    const max = maxAbs(weights);
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const idx = row * cols + col;
+        const value = weights[idx] ?? 0;
+        const norm = Math.abs(value) / max;
         const alpha = 0.15 + 0.85 * norm;
         ctx.fillStyle = value >= 0
           ? `rgba(255, 146, 43, ${alpha.toFixed(3)})`
@@ -138,20 +157,24 @@ export class DashboardView {
 
     ctx.strokeStyle = 'rgba(0,0,0,0.15)';
     ctx.lineWidth = 1;
-    for (let row = 0; row <= hiddenUnits; row++) {
+    for (let row = 0; row <= rows; row++) {
       const y = row * cellH;
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(w, y);
       ctx.stroke();
     }
-    for (let col = 0; col <= inputSize; col++) {
+    for (let col = 0; col <= cols; col++) {
       const x = col * cellW;
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, h);
       ctx.stroke();
     }
+  }
+
+  drawWeightsHeatmap(weights, hiddenUnits, inputSize) {
+    this.drawMatrixHeatmap(this.weightsCanvas, this.weightsCtx, weights, hiddenUnits, inputSize);
   }
 
   drawOutputWeights(weights) {
@@ -161,7 +184,7 @@ export class DashboardView {
     const h = this.outputCanvas.height;
     ctx.clearRect(0, 0, w, h);
     if (!weights?.length) return;
-    const maxAbs = Math.max(...weights.map(v => Math.abs(v)), 1e-6);
+    const limit = maxAbs(weights);
     const midY = h / 2;
 
     ctx.fillStyle = '#fbfbfb';
@@ -174,7 +197,7 @@ export class DashboardView {
 
     const barHeight = h / weights.length;
     weights.forEach((value, idx) => {
-      const norm = value / maxAbs;
+      const norm = value / limit;
       const barWidth = (w / 2) * Math.abs(norm);
       const y = idx * barHeight;
       ctx.fillStyle = value >= 0 ? 'rgba(255, 146, 43, 0.85)' : 'rgba(21, 170, 191, 0.85)';
@@ -184,6 +207,33 @@ export class DashboardView {
         ctx.fillRect(w / 2 - barWidth, y + 2, barWidth, barHeight - 4);
       }
     });
+  }
+
+  drawTraderInput(weights, hiddenUnits, inputSize) {
+    if (!this.traderInputCanvas || !this.traderInputCtx) return;
+    if (!weights?.length || !hiddenUnits || !inputSize) {
+      this.traderInputCtx.clearRect(0, 0, this.traderInputCanvas.width, this.traderInputCanvas.height);
+      return;
+    }
+    this.drawMatrixHeatmap(this.traderInputCanvas, this.traderInputCtx, weights, hiddenUnits, inputSize);
+  }
+
+  drawTraderHidden(weights, hiddenUnits2, hiddenUnits1) {
+    if (!this.traderHiddenCanvas || !this.traderHiddenCtx) return;
+    if (!weights?.length || !hiddenUnits2 || !hiddenUnits1) {
+      this.traderHiddenCtx.clearRect(0, 0, this.traderHiddenCanvas.width, this.traderHiddenCanvas.height);
+      return;
+    }
+    this.drawMatrixHeatmap(this.traderHiddenCanvas, this.traderHiddenCtx, weights, hiddenUnits2, hiddenUnits1);
+  }
+
+  drawTraderOutput(weights, actionCount, hiddenUnits2) {
+    if (!this.traderOutputCanvas || !this.traderOutputCtx) return;
+    if (!weights?.length || !actionCount || !hiddenUnits2) {
+      this.traderOutputCtx.clearRect(0, 0, this.traderOutputCanvas.width, this.traderOutputCanvas.height);
+      return;
+    }
+    this.drawMatrixHeatmap(this.traderOutputCanvas, this.traderOutputCtx, weights, actionCount, hiddenUnits2);
   }
 
   updateRecentList(entries) {
@@ -645,14 +695,43 @@ export class DashboardView {
     const { weights } = snapshot;
     const stringify = obj => JSON.stringify(obj, null, 2);
     const sections = [];
-    if (weights.inputWeights) {
-      sections.push(`Input → Hidden\n${stringify(weights.inputWeights)}`);
+    if (weights.forecaster) {
+      const forecaster = weights.forecaster;
+      const forecasterSections = [];
+      if (forecaster.inputWeights?.length) {
+        forecasterSections.push(`Input → Hidden\n${stringify(forecaster.inputWeights)}`);
+      }
+      if (forecaster.outputWeights?.length) {
+        forecasterSections.push(`Hidden → Output\n${stringify(forecaster.outputWeights)}`);
+      }
+      if (forecaster.biases) {
+        forecasterSections.push(`Biases\n${stringify(forecaster.biases)}`);
+      }
+      if (forecasterSections.length) {
+        sections.push(["Forecaster", forecasterSections.join('\n\n')].join('\n\n'));
+      }
     }
-    if (weights.outputWeights) {
-      sections.push(`Hidden → Output\n${stringify(weights.outputWeights)}`);
+    if (weights.trader) {
+      const trader = weights.trader;
+      const traderSections = [];
+      if (trader.inputWeights?.length) {
+        traderSections.push(`Input → Hidden 1\n${stringify(trader.inputWeights)}`);
+      }
+      if (trader.hiddenWeights?.length) {
+        traderSections.push(`Hidden 1 → Hidden 2\n${stringify(trader.hiddenWeights)}`);
+      }
+      if (trader.outputWeights?.length) {
+        traderSections.push(`Hidden 2 → Actions\n${stringify(trader.outputWeights)}`);
+      }
+      if (trader.biases) {
+        traderSections.push(`Biases\n${stringify(trader.biases)}`);
+      }
+      if (traderSections.length) {
+        sections.push(["Trader", traderSections.join('\n\n')].join('\n\n'));
+      }
     }
-    if (weights.biases) {
-      sections.push(`Biases\n${stringify(weights.biases)}`);
+    if (!sections.length) {
+      sections.push('—');
     }
     el.textContent = sections.join('\n\n');
   }
@@ -739,10 +818,31 @@ export class DashboardView {
   applySnapshot(snapshot) {
     if (!snapshot) return;
     const { history, stats, weights } = snapshot;
+    const forecasterWeights = weights?.forecaster;
+    const traderWeights = weights?.trader;
     this.drawPriceChart(history?.actual, history?.predicted);
     this.drawErrorChart(history?.errors);
-    this.drawWeightsHeatmap(weights?.inputWeights, weights?.hiddenUnits, weights?.inputSize);
-    this.drawOutputWeights(weights?.outputWeights);
+    this.drawWeightsHeatmap(
+      forecasterWeights?.inputWeights,
+      forecasterWeights?.hiddenUnits,
+      forecasterWeights?.inputSize
+    );
+    this.drawOutputWeights(forecasterWeights?.outputWeights);
+    this.drawTraderInput(
+      traderWeights?.inputWeights,
+      traderWeights?.hiddenUnits1,
+      traderWeights?.inputSize
+    );
+    this.drawTraderHidden(
+      traderWeights?.hiddenWeights,
+      traderWeights?.hiddenUnits2,
+      traderWeights?.hiddenUnits1
+    );
+    this.drawTraderOutput(
+      traderWeights?.outputWeights,
+      traderWeights?.actionCount,
+      traderWeights?.hiddenUnits2
+    );
     this.updateWeightsRaw(snapshot);
     this.updateRecentList(snapshot.recentPredictions);
     this.updateForwardProjection(snapshot.forecast);

@@ -22,7 +22,10 @@
 #priceChart,
 #errorChart,
 #weightsCanvas,
-#outputCanvas {
+#outputCanvas,
+#traderInputCanvas,
+#traderHiddenCanvas,
+#traderOutputCanvas {
   width: 100%;
   background: #fff;
   border: 1px solid var(--border);
@@ -217,6 +220,57 @@
 
 .forward-table td.neutral {
   color: var(--muted);
+}
+
+.training-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.full-span {
+  grid-column: 1 / -1;
+}
+
+.model-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px;
+}
+
+.trading-stats {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.trade-log {
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.trade-log::-webkit-scrollbar {
+  width: 6px;
+}
+
+.trade-log::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.tab-panels {
+  margin-top: 4px;
+}
+
+.tab-panel {
+  overflow: visible;
+}
+
+@media (max-width: 1480px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+  .pane.right {
+    min-height: auto;
+  }
 }
 
 .trading-stats .policy-metric.gain {
