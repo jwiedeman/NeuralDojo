@@ -1,7 +1,13 @@
 """Training utilities for Market NN Plus Ultra."""
 
-from .config import DataConfig, ModelConfig, OptimizerConfig, TrainerConfig, ExperimentConfig
-from .train_loop import MarketLightningModule, MarketDataModule, load_experiment_from_file, run_training
+from .config import DataConfig, ExperimentConfig, ModelConfig, OptimizerConfig, TrainerConfig
+from .train_loop import (
+    MarketDataModule,
+    MarketLightningModule,
+    instantiate_modules,
+    load_experiment_from_file,
+    run_training,
+)
 
 __all__ = [
     "DataConfig",
@@ -11,6 +17,7 @@ __all__ = [
     "ExperimentConfig",
     "MarketLightningModule",
     "MarketDataModule",
+    "instantiate_modules",
     "load_experiment_from_file",
     "run_training",
 ]

@@ -63,6 +63,23 @@ class MarketLightningModule(pl.LightningModule):
         hidden = self.backbone(features)
         return self.head(hidden)
 
+    @classmethod
+    def from_checkpoint(
+        cls,
+        checkpoint_path: Path | str,
+        model_config: ModelConfig,
+        optimizer_config: OptimizerConfig,
+        map_location: str | torch.device | None = None,
+    ) -> "MarketLightningModule":
+        """Instantiate a module and restore weights from a checkpoint."""
+
+        module = cls(model_config, optimizer_config)
+        checkpoint = torch.load(checkpoint_path, map_location=map_location)
+        state_dict = checkpoint.get("state_dict", checkpoint)
+        module.load_state_dict(state_dict)
+        module.eval()
+        return module
+
     def training_step(self, batch: Dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
         preds = self(batch["features"])
         targets = batch["targets"]
