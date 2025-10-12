@@ -15,7 +15,8 @@ body {
   font-family: var(--mono);
   background: var(--bg);
   color: var(--fg);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 #app {
@@ -50,7 +51,10 @@ header { margin-bottom: 10px; }
   min-height: 0;
 }
 .pane.left { gap: 12px; }
-.pane.right { overflow: hidden; }
+.pane.right {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
 
 .panel-header {
   border-bottom: 2px dotted var(--border);
