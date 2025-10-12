@@ -902,12 +902,12 @@ const config = {
   traderStopoutReturn: -0.02,
   tickerSubsetMin: 5,
   tickerSubsetMax: 10,
-  costPerSideBps: 0.0005,
+  costPerSideBps: 0,
   minCommission: 0,
-  slippageVolCoeff: 0.02,
-  slippageVolCap: 0.003,
-  slippageZCoeff: 0.0005,
-  edgeImpactCoeff: 0.0005
+  slippageVolCoeff: 0,
+  slippageVolCap: 0,
+  slippageZCoeff: 0,
+  edgeImpactCoeff: 0
 };
 
 let net = null;
@@ -2329,12 +2329,12 @@ function applyConfig(newConfig) {
     : -0.02;
   config.tickerSubsetMin = Math.max(1, Math.min((config.tickerSubsetMin | 0) || 1, marketUniverse.length));
   config.tickerSubsetMax = Math.max(config.tickerSubsetMin, Math.min((config.tickerSubsetMax | 0) || config.tickerSubsetMin, marketUniverse.length));
-  config.costPerSideBps = Number.isFinite(config.costPerSideBps) ? Math.max(0, config.costPerSideBps) : 0.0005;
+  config.costPerSideBps = Number.isFinite(config.costPerSideBps) ? Math.max(0, config.costPerSideBps) : 0;
   config.minCommission = Number.isFinite(config.minCommission) ? Math.max(0, config.minCommission) : 0;
-  config.slippageVolCoeff = Number.isFinite(config.slippageVolCoeff) ? Math.max(0, config.slippageVolCoeff) : 0.02;
-  config.slippageVolCap = Number.isFinite(config.slippageVolCap) ? Math.max(0, config.slippageVolCap) : 0.003;
-  config.slippageZCoeff = Number.isFinite(config.slippageZCoeff) ? Math.max(0, config.slippageZCoeff) : 0.0005;
-  config.edgeImpactCoeff = Number.isFinite(config.edgeImpactCoeff) ? Math.max(0, config.edgeImpactCoeff) : 0.0005;
+  config.slippageVolCoeff = Number.isFinite(config.slippageVolCoeff) ? Math.max(0, config.slippageVolCoeff) : 0;
+  config.slippageVolCap = Number.isFinite(config.slippageVolCap) ? Math.max(0, config.slippageVolCap) : 0;
+  config.slippageZCoeff = Number.isFinite(config.slippageZCoeff) ? Math.max(0, config.slippageZCoeff) : 0;
+  config.edgeImpactCoeff = Number.isFinite(config.edgeImpactCoeff) ? Math.max(0, config.edgeImpactCoeff) : 0;
 
   const requiresReset = (
     config.hiddenUnits !== prevHiddenUnits ||
