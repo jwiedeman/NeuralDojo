@@ -739,15 +739,41 @@
   }
 
   function resolveWorkerUrl() {
+    const candidates = [];
     const scriptEl = document.currentScript;
-    const base = scriptEl?.src || document.baseURI || window.location?.href;
-    if (!base) return 'worker.js';
-    try {
-      return new URL('worker.js', base).toString();
-    } catch (error) {
-      console.warn('Falling back to relative worker script path', error);
-      return 'worker.js';
+    if (scriptEl?.src) candidates.push(scriptEl.src);
+    // Fallback to any script tag that looks like our own bundle.
+    const fallbackScript = document.querySelector('script[src$="main.js"]');
+    if (fallbackScript?.src) candidates.push(fallbackScript.src);
+    if (document.baseURI) candidates.push(document.baseURI);
+    if (window.location?.href) candidates.push(window.location.href);
+
+    for (const base of candidates) {
+      try {
+        if (!base) continue;
+        const resolved = new URL('worker.js', base);
+        if (resolved?.href) {
+          return resolved.href;
+        }
+      } catch (error) {
+        console.warn('Unable to resolve worker URL from base', base, error);
+      }
     }
+
+    try {
+      const origin = window.location?.origin;
+      if (origin) {
+        const fallback = new URL('worker.js', `${origin}${window.location?.pathname || '/'}`);
+        if (fallback?.href) {
+          return fallback.href;
+        }
+      }
+    } catch (error) {
+      console.warn('Unable to resolve worker URL from window location', error);
+    }
+
+    console.warn('Falling back to relative worker script path');
+    return './worker.js';
   }
 
   function initWorker() {
