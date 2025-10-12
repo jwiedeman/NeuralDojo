@@ -1,0 +1,103 @@
+/* NeuralStocks specific styling layered on the shared Neural UI system. */
+:root {
+  --market-up: #ff922b;
+  --market-down: #15aabf;
+  --market-grid: #f2f4f8;
+}
+
+#priceChart,
+#errorChart,
+#weightsCanvas,
+#outputCanvas {
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.chart-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.recent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recent-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(3, auto);
+  gap: 8px;
+  align-items: baseline;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 4px;
+  font-size: 12px;
+}
+
+.recent-list li span {
+  font-variant-numeric: tabular-nums;
+}
+
+.recent-list li .error {
+  color: var(--muted);
+}
+
+.recent-list li .error.over {
+  color: var(--market-up);
+}
+
+.recent-list li .error.under {
+  color: var(--market-down);
+}
+
+.hint-block {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.weights-raw {
+  font-size: 11px;
+  background: #fafafa;
+  padding: 8px;
+  border: 1px dashed var(--border);
+}
+
+.dataset-note {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+  margin-top: 8px;
+}
+
+.weights-raw summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.weights-raw pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.canvas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.stats-tight span {
+  font-variant-numeric: tabular-nums;
+}
+
+.hud span {
+  font-variant-numeric: tabular-nums;
+}
