@@ -1128,7 +1128,7 @@ function setActiveDataset(dataset, { resetNetwork = false, resetTrader = false }
 
 function tradingFeatureCount() {
   return (
-    3 +
+    6 + // predicted z, edge, normalized price, log price delta, log predicted delta, |edge|%
     smaPeriods.length +
     emaPeriods.length +
     rsiPeriods.length +
@@ -1475,14 +1475,25 @@ function tradingActionLabel(index) {
 function buildTradingFeatures(sample, predictedPrice) {
   const features = new Float32Array(createTraderInputSize());
   features.set(sample.features);
-  const predictedNorm = Number.isFinite(predictedPrice) ? normalize(predictedPrice) : 0;
+  const price = sample.targetPrice;
+  const safePredicted = Number.isFinite(predictedPrice) ? predictedPrice : price;
+  const predictedNorm = Number.isFinite(safePredicted) ? normalize(safePredicted) : 0;
   let offset = config.windowSize;
   features[offset++] = predictedNorm;
-  const edge = Number.isFinite(predictedPrice) && sample.targetPrice > 0
-    ? (predictedPrice - sample.targetPrice) / sample.targetPrice
+  const edge = Number.isFinite(safePredicted) && price > 0
+    ? (safePredicted - price) / price
     : 0;
   features[offset++] = edge;
-  features[offset++] = normalizeOrZero(sample.targetPrice);
+  features[offset++] = normalizeOrZero(price);
+  const logMean = mean > 0 ? Math.log(mean) : 0;
+  const logPrice = Number.isFinite(price) && price > 0 ? Math.log(price) - logMean : 0;
+  const logPredicted = Number.isFinite(safePredicted) && safePredicted > 0
+    ? Math.log(safePredicted) - logMean
+    : logPrice;
+  features[offset++] = Math.max(-10, Math.min(10, logPrice));
+  features[offset++] = Math.max(-10, Math.min(10, logPredicted));
+  const edgeMagnitude = Math.abs(edge) * 100;
+  features[offset++] = Math.max(0, Math.min(5, edgeMagnitude));
   const idx = sample.index ?? cursor;
   for (let i = 0; i < smaSeries.length; i++) {
     const value = smaSeries[i][idx];
