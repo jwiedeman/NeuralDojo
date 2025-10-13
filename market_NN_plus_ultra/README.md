@@ -113,6 +113,7 @@ For a deeper discussion of the data flow, modular boundaries, and suggested exte
 4. **Warm-start with self-supervision (optional but recommended)**:
    * Launch the masked time-series pretraining loop with `python scripts/pretrain.py --config configs/pretrain.yaml` to initialise deep weights before supervised optimisation.
    * The pretraining module randomly masks context timesteps and learns to reconstruct the original signals, sharpening the backbone for downstream ROI-driven tasks.
+   * Pass overrides such as `--devices auto`, `--max-epochs 100`, or `--mask-prob 0.35` directly to the CLI to iterate quickly without editing YAML files. When `--mask-value mean` is supplied the loader fills masked regions with the window average.
 
 5. **Iterate and evaluate**:
    * Use `market_nn_plus_ultra.evaluation.metrics` to compute risk-adjusted scores on trade logs.
@@ -127,6 +128,13 @@ Once a model has been trained (or even with random weights for smoke tests) the 
 ```bash
 python scripts/run_agent.py --config configs/default.yaml --checkpoint path/to/checkpoint.ckpt --device cuda:0 \
   --output outputs/predictions.parquet
+```
+
+Training runs accept the same style of overrides. For example, to train an omni backbone with 24 layers and a widened model dimension on a single GPU without touching the YAML:
+
+```bash
+python scripts/train.py --config configs/default.yaml --devices 1 --architecture omni_mixture \
+  --depth 24 --model-dim 1024 --batch-size 64 --learning-rate 0.0001
 ```
 
 The script orchestrates data loading, feature enrichment, sliding-window inference, and optional ROI evaluation if realised returns are present. Use `--no-eval` to skip metrics and `--return-column` to target a specific realised return column in the generated prediction frame.
