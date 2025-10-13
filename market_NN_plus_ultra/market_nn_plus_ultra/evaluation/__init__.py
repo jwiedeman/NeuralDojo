@@ -14,6 +14,12 @@ from .metrics import (
     ulcer_index,
     value_at_risk,
 )
+from .walkforward import (
+    WalkForwardBacktester,
+    WalkForwardConfig,
+    WalkForwardSplit,
+    generate_walk_forward_splits,
+)
 
 __all__ = [
     "calmar_ratio",
@@ -28,4 +34,8 @@ __all__ = [
     "sortino_ratio",
     "ulcer_index",
     "value_at_risk",
+    "WalkForwardBacktester",
+    "WalkForwardConfig",
+    "WalkForwardSplit",
+    "generate_walk_forward_splits",
 ]

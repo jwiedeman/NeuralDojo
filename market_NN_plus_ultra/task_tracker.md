@@ -20,7 +20,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 ### Feature Registry Enhancements
 - [x] Auto-generate documentation from `FeatureRegistry.describe()` into Markdown.
 - [ ] Add alternative data connectors (on-chain metrics, macro calendars) into the registry.
-- [ ] Surface dependency errors with structured logging for experiment reproducibility.
+- [x] Surface dependency errors with structured logging for experiment reproducibility. (PR TBD)
 - [x] Seed registry with higher-moment statistics and spectral energy factors.
 
 ## 1. Deep Temporal Modelling
@@ -42,7 +42,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [ ] Explore calibration-aware heads (Dirichlet / quantile) for action confidence.
 
 ## 3. Evaluation & Monitoring
-- [ ] Build evaluation harness for daily/weekly backtests with walk-forward splits.
+- [x] Build evaluation harness for daily/weekly backtests with walk-forward splits.
 - [x] Compute ROI, max drawdown, Calmar, hit rate, and tail risk metrics by default.
 - [x] Ship inference agent + CLI to produce prediction frames from SQLite sources.
 - [ ] Generate Markdown/HTML reports with charts for quick inspection.

@@ -2,10 +2,13 @@
 
 from .seeding import seed_everything
 from .reporting import format_metrics_table, sanitize_metrics, write_metrics_report
+from .logging import StructuredLogger, get_structured_logger
 
 __all__ = [
     "seed_everything",
     "format_metrics_table",
     "sanitize_metrics",
     "write_metrics_report",
+    "StructuredLogger",
+    "get_structured_logger",
 ]
