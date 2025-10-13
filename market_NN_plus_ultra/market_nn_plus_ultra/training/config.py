@@ -78,4 +78,15 @@ class ExperimentConfig:
     trainer: TrainerConfig = field(default_factory=TrainerConfig)
     wandb_project: Optional[str] = None
     notes: Optional[str] = None
+    pretraining: Optional["PretrainingConfig"] = None
+
+
+@dataclass(slots=True)
+class PretrainingConfig:
+    """Configuration for self-supervised pretraining tasks."""
+
+    mask_prob: float = 0.25
+    mask_value: float = 0.0
+    loss: str = "mse"
+    monitor_metric: str = "val/pretrain_loss"
 

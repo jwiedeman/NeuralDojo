@@ -105,7 +105,11 @@ For a deeper discussion of the data flow, modular boundaries, and suggested exte
       - `optimizer.lr` / `weight_decay` tune the AdamW optimiser.
     * `scripts/train.py` parses the YAML, builds dataclass configs, and launches the Lightning-powered hybrid transformer trainer.
 
-4. **Iterate and evaluate**:
+4. **Warm-start with self-supervision (optional but recommended)**:
+   * Launch the masked time-series pretraining loop with `python scripts/pretrain.py --config configs/pretrain.yaml` to initialise deep weights before supervised optimisation.
+   * The pretraining module randomly masks context timesteps and learns to reconstruct the original signals, sharpening the backbone for downstream ROI-driven tasks.
+
+5. **Iterate and evaluate**:
    * Use `market_nn_plus_ultra.evaluation.metrics` to compute risk-adjusted scores on trade logs.
    * Inspect checkpoints saved under `training.checkpoint_dir` and feed results back into the task tracker to prioritise the next steps.
    * Deploy the new inference agent (`scripts/run_agent.py`) to mirror the classic market agent workflow on fresh SQLite dumps.
@@ -126,6 +130,7 @@ The script orchestrates data loading, feature enrichment, sliding-window inferen
 * **Hybrid temporal backbone** — stacks multi-head attention, dilated temporal convolutions, and state-space mixers for long-term memory. A heavier `MarketOmniBackbone` pushes context even further with cross-resolution attention and gated state-space mixers.
 * **Rich data preprocessing** — SQLite ingestion joins OHLCV, indicators, and on-the-fly engineered features with z-score normalisation.
 * **Risk-aware objectives** — differentiable Sharpe/drawdown penalties baked into the default loss encourage ROI-focussed behaviour.
+* **Self-supervised warm start** — Masked time-series reconstruction (`scripts/pretrain.py`) primes the backbone on vast context windows before ROI-optimised fine-tuning.
 
 ## Next Steps
 
