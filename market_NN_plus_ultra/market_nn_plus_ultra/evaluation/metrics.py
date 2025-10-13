@@ -1,5 +1,3 @@
-"""Risk and performance metrics for Market NN Plus Ultra."""
-
 from __future__ import annotations
 
 from typing import Dict
@@ -44,6 +42,24 @@ def calmar_ratio(returns: np.ndarray, equity_curve: np.ndarray, eps: float = 1e-
     return float(annualised_return / (max_dd + eps))
 
 
+def hit_rate(returns: np.ndarray, eps: float = 1e-9) -> float:
+    """Return the proportion of positive returns in the series."""
+
+    if returns.size == 0:
+        return 0.0
+    positives = (returns > 0).sum()
+    return float((positives + eps) / (returns.size + eps))
+
+
+def downside_deviation(returns: np.ndarray, eps: float = 1e-6) -> float:
+    """Compute the downside deviation used in Sortino-like objectives."""
+
+    downside = returns[returns < 0]
+    if downside.size == 0:
+        return 0.0
+    return float(np.sqrt(((downside**2).mean()) + eps))
+
+
 def risk_metrics(returns: np.ndarray, periods_per_year: int = 252) -> Dict[str, float]:
     """Return a suite of risk metrics for a stream of returns."""
 
@@ -53,12 +69,16 @@ def risk_metrics(returns: np.ndarray, periods_per_year: int = 252) -> Dict[str, 
     drawdown = max_drawdown(equity)
     calmar = calmar_ratio(returns, equity)
     volatility = float(returns.std(ddof=0) * np.sqrt(periods_per_year))
+    downside_dev = downside_deviation(returns)
+    hit = hit_rate(returns)
     return {
         "sharpe": sharpe,
         "sortino": sortino,
         "max_drawdown": drawdown,
         "calmar": calmar,
         "volatility": volatility,
+        "downside_deviation": downside_dev,
+        "hit_rate": hit,
     }
 
 
