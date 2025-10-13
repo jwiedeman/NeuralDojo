@@ -98,6 +98,7 @@ For a deeper discussion of the data flow, modular boundaries, and suggested exte
 2. **Prepare market data**:
    * Provide a SQLite database that includes `assets`, `series`, and `indicators` tables (see `sqlite_loader.py` for the expected schema).
    * Extend `feature_pipeline.py` to compute additional technical features (e.g. Fourier transforms, macro factors, news sentiment embeddings).
+   * Reference [`docs/sqlite_schema.md`](./docs/sqlite_schema.md) for the canonical table definitions and indexing guidance.
 
 3. **Configure an experiment**:
    * Copy `configs/default.yaml` and adapt for your data source, architecture depth, window size, and trading horizon.
@@ -115,6 +116,7 @@ For a deeper discussion of the data flow, modular boundaries, and suggested exte
    * Use `market_nn_plus_ultra.evaluation.metrics` to compute risk-adjusted scores on trade logs.
    * Inspect checkpoints saved under `training.checkpoint_dir` and feed results back into the task tracker to prioritise the next steps.
    * Deploy the new inference agent (`scripts/run_agent.py`) to mirror the classic market agent workflow on fresh SQLite dumps.
+   * Regenerate feature documentation with `python scripts/export_features.py --output docs/generated_features.md` after extending the registry.
 
 ### Running the Inference Agent
 
