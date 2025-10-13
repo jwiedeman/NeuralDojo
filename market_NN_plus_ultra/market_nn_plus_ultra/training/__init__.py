@@ -17,6 +17,7 @@ from .train_loop import (
     run_training,
 )
 from .pretrain_loop import (
+    ContrastiveTimeSeriesLightningModule,
     MaskedTimeSeriesLightningModule,
     instantiate_pretraining_module,
     run_pretraining,
@@ -42,6 +43,7 @@ __all__ = [
     "load_experiment_from_file",
     "run_training",
     "MaskedTimeSeriesLightningModule",
+    "ContrastiveTimeSeriesLightningModule",
     "instantiate_pretraining_module",
     "run_pretraining",
     "MarketPolicyNetwork",

@@ -32,7 +32,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [ ] Benchmark omni-scale backbone versus hybrid baseline across multiple asset universes.
 - [x] Pretrain on masked time-series reconstruction before supervised fine-tuning (`scripts/pretrain.py`).
 - [ ] Benchmark pretraining checkpoints vs. scratch initialisation across asset classes.
-- [ ] Extend pretraining tasks with contrastive (TS2Vec-style) objectives for regime discrimination.
+- [x] Extend pretraining tasks with contrastive (TS2Vec-style) objectives for regime discrimination.
 - [ ] Introduce curriculum over window sizes and horizons to stabilise very deep models.
 
 ## 2. Trading Objective & Reinforcement Learning

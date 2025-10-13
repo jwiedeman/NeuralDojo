@@ -113,9 +113,9 @@ For a deeper discussion of the data flow, modular boundaries, and suggested exte
     * `scripts/train.py` parses the YAML, builds dataclass configs, and launches the Lightning-powered hybrid transformer trainer.
 
 4. **Warm-start with self-supervision (optional but recommended)**:
-   * Launch the masked time-series pretraining loop with `python scripts/pretrain.py --config configs/pretrain.yaml` to initialise deep weights before supervised optimisation.
-   * The pretraining module randomly masks context timesteps and learns to reconstruct the original signals, sharpening the backbone for downstream ROI-driven tasks.
-   * Pass overrides such as `--devices auto`, `--max-epochs 100`, or `--mask-prob 0.35` directly to the CLI to iterate quickly without editing YAML files. When `--mask-value mean` is supplied the loader fills masked regions with the window average.
+   * Launch the self-supervised pretraining loop with `python scripts/pretrain.py --config configs/pretrain.yaml` to initialise deep weights before supervised optimisation.
+   * Choose between masked reconstruction (`--objective masked`) and contrastive TS2Vec-style pretraining (`--objective contrastive`). The masked variant replaces random timesteps and learns to in-fill them, while the contrastive route generates augmented views (jitter, scaling, time masking) and maximises agreement through an InfoNCE loss.
+   * Pass overrides such as `--devices auto`, `--max-epochs 100`, `--mask-prob 0.35`, or `--temperature 0.05` directly to the CLI to iterate quickly without editing YAML files. When `--mask-value mean` or `--time-mask-fill mean` is supplied the loader fills masked regions with the window average.
 
 5. **Iterate and evaluate**:
    * Use `market_nn_plus_ultra.evaluation.metrics` to compute risk-adjusted scores on trade logs.
@@ -157,7 +157,7 @@ The CLI mirrors the reinforcement config dataclass so you can override rollout s
 * **Hybrid temporal backbone** — stacks multi-head attention, dilated temporal convolutions, and state-space mixers for long-term memory. A heavier `MarketOmniBackbone` pushes context even further with cross-resolution attention and gated state-space mixers.
 * **Rich data preprocessing** — SQLite ingestion joins OHLCV, indicators, and on-the-fly engineered features with z-score normalisation.
 * **Risk-aware objectives** — differentiable Sharpe/drawdown penalties baked into the default loss encourage ROI-focussed behaviour.
-* **Self-supervised warm start** — Masked time-series reconstruction (`scripts/pretrain.py`) primes the backbone on vast context windows before ROI-optimised fine-tuning.
+* **Self-supervised warm start** — Masked reconstruction and contrastive InfoNCE pretraining (`scripts/pretrain.py`) prime the backbone on vast context windows before ROI-optimised fine-tuning.
 
 ## Next Steps
 
