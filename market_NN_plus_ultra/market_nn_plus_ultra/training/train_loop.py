@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader, random_split
 from ..data import FeatureRegistry, SQLiteMarketDataset, SlidingWindowDataset
 from ..data.sqlite_loader import SQLiteMarketSource
 from ..models.temporal_transformer import TemporalBackbone, TemporalBackboneConfig, TemporalPolicyHead
+from ..models.temporal_fusion import TemporalFusionConfig, TemporalFusionTransformer
 from ..models.omni_mixture import MarketOmniBackbone, OmniBackboneConfig
 from ..models.losses import CompositeTradingLoss
 from .config import DataConfig, ExperimentConfig, ModelConfig, OptimizerConfig, TrainerConfig
@@ -37,6 +38,18 @@ class MarketLightningModule(pl.LightningModule):
                 conv_dilations=model_config.conv_dilations,
             )
             self.backbone = TemporalBackbone(backbone_config)
+        elif architecture in {"temporal_fusion", "tft"}:
+            fusion_config = TemporalFusionConfig(
+                feature_dim=model_config.feature_dim,
+                hidden_dim=model_config.model_dim,
+                num_heads=model_config.heads,
+                dropout=model_config.dropout,
+                num_encoder_layers=model_config.encoder_layers or model_config.depth,
+                num_decoder_layers=model_config.decoder_layers or model_config.depth,
+                horizon=model_config.horizon,
+                max_seq_len=model_config.max_seq_len,
+            )
+            self.backbone = TemporalFusionTransformer(fusion_config)
         elif architecture in {"omni", "omni_mixture", "omni_backbone"}:
             backbone_config = OmniBackboneConfig(
                 feature_dim=model_config.feature_dim,

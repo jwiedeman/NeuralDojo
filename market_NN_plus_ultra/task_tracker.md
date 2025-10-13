@@ -17,7 +17,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Seed registry with higher-moment statistics and spectral energy factors.
 
 ## 1. Deep Temporal Modelling
-- [ ] Implement TemporalFusionTransformer-style encoder with multi-horizon support.
+- [x] Implement TemporalFusionTransformer-style encoder with multi-horizon support.
 - [x] Add multi-resolution attention block mixing dilated convolutions and transformer layers.
 - [x] Integrate state-space (S4/SSM) module for long-context retention.
 - [ ] Benchmark omni-scale backbone versus hybrid baseline across multiple asset universes.

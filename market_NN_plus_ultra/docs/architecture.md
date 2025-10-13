@@ -57,6 +57,16 @@ dimension while preserving sequence length.
 `TemporalBackboneConfig` exposes all scaling knobs (depth, heads, dilations)
 through configuration files so experiments can scale up without touching code.
 
+### Temporal Fusion Variant
+
+The `TemporalFusionTransformer` backbone extends the stack with TFT-style
+variable selection networks and gated residual blocks. Historical context flows
+through a transformer encoder while a learned future context is decoded via
+multi-head attention, producing horizon-aware embeddings that still align with
+the standard policy head. Use `model.architecture: temporal_fusion` to select
+this option and tweak `encoder_layers` / `decoder_layers` to scale depth
+independently from the hybrid backbone.
+
 ### Omni-Scale Variant
 
 For experiments demanding even more capacity, the `MarketOmniBackbone`
