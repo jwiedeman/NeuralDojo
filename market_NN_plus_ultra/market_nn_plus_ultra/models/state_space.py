@@ -1,14 +1,14 @@
 """State-space backbone for Market NN Plus Ultra.
 
-This module provides a lightweight yet expressive approximation of structured
-state-space models (SSM) tailored for long-context financial sequences.  The
+This state-space inspired backbone targets ultra-long financial sequences and
+provides a lightweight yet expressive approximation of structured SSMs. The
 architecture follows a residual stack that alternates gated depthwise
 convolutions with feed-forward expansions, inspired by modern SSM literature
 (S4/S5, DSS) while keeping the implementation dependency free.
 
 The design intentionally mirrors the configuration knobs used by the other
 backbones so experiments can swap architectures without modifying training
-loops.  The mixer uses a learned gating mechanism to interpolate between the
+loops. The mixer uses a learned gating mechanism to interpolate between the
 previous state and the new convolutional response, providing stable gradients
 for extremely deep stacks.
 """
