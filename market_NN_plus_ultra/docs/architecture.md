@@ -18,7 +18,10 @@ single database file can power both batch research and live inference jobs.
 | `benchmarks` | (Planned) Reference indices for relative performance measurement.                          |
 
 `SQLiteMarketDataset` merges these tables into a panel with a hierarchical index
-`(timestamp, symbol)` before optional enrichment via the feature pipeline.
+`(timestamp, symbol)` before optional enrichment via the feature pipeline. Each
+extract is passed through Pandera schema validation so nulls, duplicate primary
+keys, or unsorted timestamps are surfaced immediately rather than propagating
+into the modelling stack.
 
 ### Feature Pipeline
 

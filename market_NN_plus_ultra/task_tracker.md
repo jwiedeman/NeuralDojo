@@ -4,15 +4,15 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 
 - [x] Finalise SQLite schema contract for `assets`, `series`, `indicators`, `trades`, and `benchmarks` tables (see `docs/sqlite_schema.md`).
 - [x] Implement feature registry with pluggable indicator computation (TA-Lib, spectral, macro, alternative data).
-- [ ] Add data validation suite (Great Expectations or pandera) to guarantee clean inputs.
+- [x] Add data validation suite (Great Expectations or pandera) to guarantee clean inputs.
 - [x] Define baseline experiment YAML files for different asset classes (equities, crypto, forex).
 - [x] Document canonical data flow in `docs/architecture.md` (extend with schema diagrams).
 - [x] Automate feature registry documentation export (Markdown generated from `FeaturePipeline.describe()`).
 - [x] Ship Lightning training and data modules with YAML-driven configuration loading.
 
 ### Immediate Implementation Plan (Sprint 0)
-- [ ] Harden SQLite ingestion with schema validation + null/duplicate checks.
-- [ ] Implement end-to-end smoke test that runs the Plus Ultra agent against a sample SQLite fixture.
+- [x] Harden SQLite ingestion with schema validation + null/duplicate checks.
+- [x] Implement end-to-end smoke test that runs the Plus Ultra agent against a sample SQLite fixture.
 - [ ] Wire evaluation metrics into the agent CLI output for faster iteration loops.
 - [ ] Profile omni-scale backbone throughput and memory on GPU/CPU to tune default hyperparameters.
 - [ ] Add CI job that exercises `python -m compileall` + unit stubs to protect against syntax drift.

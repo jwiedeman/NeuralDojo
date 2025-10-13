@@ -17,6 +17,8 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine
 
+from .validation import validate_indicator_frame, validate_price_frame
+
 
 @dataclass(slots=True)
 class SQLiteMarketSource:
@@ -31,7 +33,11 @@ class SQLiteMarketSource:
 
         uri = f"file:{self.path}?mode={'ro' if self.read_only else 'rwc'}"
         conn = sqlite3.connect(uri, uri=True, detect_types=sqlite3.PARSE_DECLTYPES)
-        for pragma in self.pragma_statements or ("journal_mode=WAL", "synchronous=NORMAL"):
+        default_pragmas = ("journal_mode=WAL", "synchronous=NORMAL")
+        pragmas = self.pragma_statements or default_pragmas
+        for pragma in pragmas:
+            if self.read_only and pragma.lower().startswith("journal_mode"):
+                continue
             conn.execute(f"PRAGMA {pragma}")
         return conn
 
@@ -65,12 +71,15 @@ class SQLiteMarketDataset:
     indicators: Optional[Mapping[str, str]] = None
     resample_rule: Optional[str] = None
     tz_convert: Optional[str] = None
+    validate: bool = True
 
     def load(self) -> pd.DataFrame:
         """Return a multi-indexed frame with OHLCV and indicator columns."""
 
         with contextlib.closing(self.source.connect()) as conn:
             price_df = pd.read_sql_query("SELECT * FROM series", conn, parse_dates=["timestamp"])
+            if self.validate:
+                price_df = validate_price_frame(price_df)
             if self.symbol_universe:
                 price_df = price_df[price_df["symbol"].isin(set(self.symbol_universe))]
 
@@ -83,6 +92,8 @@ class SQLiteMarketDataset:
             for name, table in (self.indicators or {}).items():
                 query = f"SELECT * FROM {table}" if " " not in table.lower() else table
                 ind_df = pd.read_sql_query(query, conn, parse_dates=["timestamp"])
+                if self.validate:
+                    ind_df = validate_indicator_frame(ind_df)
                 ind_df = ind_df.set_index(["timestamp", "symbol"]).sort_index()
                 indicator_frames.append(ind_df.add_prefix(f"{name}__"))
 
