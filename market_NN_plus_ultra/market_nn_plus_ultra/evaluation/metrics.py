@@ -7,6 +7,7 @@ from typing import Dict
 import numpy as np
 import pandas as pd
 
+
 def compute_equity_curve(returns: np.ndarray, initial_capital: float = 1.0) -> np.ndarray:
     """Return the cumulative equity curve for a sequence of returns."""
 
@@ -85,6 +86,28 @@ def expected_shortfall(returns: np.ndarray, alpha: float = 0.05) -> float:
     return float(tail.mean())
 
 
+def omega_ratio(returns: np.ndarray, threshold: float = 0.0, eps: float = 1e-6) -> float:
+    """Compute the Omega ratio relative to a return threshold."""
+
+    gains = np.maximum(returns - threshold, 0)
+    losses = np.maximum(threshold - returns, 0)
+    gain_sum = gains.sum()
+    loss_sum = losses.sum()
+    if loss_sum <= eps:
+        return float("inf" if gain_sum > 0 else 0.0)
+    return float(gain_sum / (loss_sum + eps))
+
+
+def profit_factor(returns: np.ndarray, eps: float = 1e-6) -> float:
+    """Return the ratio of gross profits to gross losses."""
+
+    positive = returns[returns > 0].sum()
+    negative = -returns[returns < 0].sum()
+    if negative <= eps:
+        return float("inf" if positive > 0 else 0.0)
+    return float(positive / (negative + eps))
+
+
 def risk_metrics(returns: np.ndarray, periods_per_year: int = 252) -> Dict[str, float]:
     """Return a suite of risk metrics for a stream of returns."""
 
@@ -99,6 +122,8 @@ def risk_metrics(returns: np.ndarray, periods_per_year: int = 252) -> Dict[str, 
     ulcer = ulcer_index(equity)
     var = value_at_risk(returns)
     cvar = expected_shortfall(returns)
+    omega = omega_ratio(returns)
+    pf = profit_factor(returns)
     return {
         "sharpe": sharpe,
         "sortino": sortino,
@@ -110,6 +135,8 @@ def risk_metrics(returns: np.ndarray, periods_per_year: int = 252) -> Dict[str, 
         "ulcer_index": ulcer,
         "value_at_risk": var,
         "expected_shortfall": cvar,
+        "omega_ratio": omega,
+        "profit_factor": pf,
     }
 
 
