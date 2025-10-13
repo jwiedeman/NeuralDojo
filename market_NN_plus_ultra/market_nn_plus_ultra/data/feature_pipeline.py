@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable, Dict, Iterable, List, MutableMapping, Optional
 
 import numpy as np
@@ -173,6 +174,54 @@ class FeatureRegistry:
         else:
             specs = [self._registry[name] for name in selected]
         return FeaturePipeline(specs)
+
+    def to_markdown(
+        self,
+        path: str | Path,
+        *,
+        title: str = "Market NN Plus Ultra Feature Registry",
+        include_timestamp: bool = True,
+    ) -> Path:
+        """Export the registry metadata to a Markdown table.
+
+        Parameters
+        ----------
+        path:
+            Target file path. Parent directories are created automatically.
+        title:
+            Optional heading to place at the top of the document.
+        include_timestamp:
+            Whether to include the generation timestamp in the document
+            preamble for auditability.
+        """
+
+        output_path = Path(path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        df = self.describe().sort_values("name")
+        lines: list[str] = []
+        if title:
+            lines.append(f"# {title}")
+            lines.append("")
+        if include_timestamp:
+            lines.append("_Auto-generated from the live registry. Update by running ``python scripts/export_features.py``._")
+            lines.append("")
+
+        headers = ["Name", "Depends On", "Tags", "Description"]
+        lines.append("| " + " | ".join(headers) + " |")
+        lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
+
+        if df.empty:
+            lines.append("| _(none)_ | - | - | Registry is currently empty. |")
+        else:
+            for _, row in df.iterrows():
+                depends_on = ", ".join(row["depends_on"]) if row["depends_on"] else "-"
+                tags = ", ".join(row["tags"]) if row["tags"] else "-"
+                description = row.get("description", "") or "-"
+                lines.append(f"| {row['name']} | {depends_on} | {tags} | {description} |")
+
+        output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return output_path
 
     @staticmethod
     def _fft_energy_ratio(close: pd.Series, window: int, top_k: int) -> pd.Series:

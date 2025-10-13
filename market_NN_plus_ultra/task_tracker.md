@@ -2,16 +2,16 @@
 
 This tracker organises the roadmap toward a production-ready "ultimate trader". Tasks are grouped by stage and prioritised for compounding ROI.
 
-- [ ] Finalise SQLite schema contract for `assets`, `series`, `indicators`, `trades`, and `benchmarks` tables.
+- [x] Finalise SQLite schema contract for `assets`, `series`, `indicators`, `trades`, and `benchmarks` tables (see `docs/sqlite_schema.md`).
 - [x] Implement feature registry with pluggable indicator computation (TA-Lib, spectral, macro, alternative data).
 - [ ] Add data validation suite (Great Expectations or pandera) to guarantee clean inputs.
 - [x] Define baseline experiment YAML files for different asset classes (equities, crypto, forex).
 - [x] Document canonical data flow in `docs/architecture.md` (extend with schema diagrams).
-- [ ] Automate feature registry documentation export (Markdown generated from `FeaturePipeline.describe()`).
+- [x] Automate feature registry documentation export (Markdown generated from `FeaturePipeline.describe()`).
 - [x] Ship Lightning training and data modules with YAML-driven configuration loading.
 
 ### Feature Registry Enhancements
-- [ ] Auto-generate documentation from `FeatureRegistry.describe()` into Markdown.
+- [x] Auto-generate documentation from `FeatureRegistry.describe()` into Markdown.
 - [ ] Add alternative data connectors (on-chain metrics, macro calendars) into the registry.
 - [ ] Surface dependency errors with structured logging for experiment reproducibility.
 - [x] Seed registry with higher-moment statistics and spectral energy factors.
