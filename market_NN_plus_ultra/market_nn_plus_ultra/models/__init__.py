@@ -8,6 +8,13 @@ from .moe_transformer import (
     MixtureOfExpertsConfig,
     initialise_moe_backbone,
 )
+from .state_space import (
+    StateSpaceBackbone,
+    StateSpaceBlock,
+    StateSpaceConfig,
+    StateSpaceMixer,
+    initialise_state_space_backbone,
+)
 from .losses import composite_trading_loss, sharpe_ratio_loss
 
 __all__ = [
@@ -24,6 +31,11 @@ __all__ = [
     "MixtureOfExpertsBackbone",
     "MixtureOfExpertsConfig",
     "initialise_moe_backbone",
+    "StateSpaceBackbone",
+    "StateSpaceBlock",
+    "StateSpaceMixer",
+    "StateSpaceConfig",
+    "initialise_state_space_backbone",
     "composite_trading_loss",
     "sharpe_ratio_loss",
 ]
