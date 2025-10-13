@@ -86,10 +86,12 @@ class SlidingWindowDataset(Dataset):
 
         window = self._normalise(window)
 
+        reference = sym_df.iloc[window_slice][-1:][self.target_columns].to_numpy(dtype=np.float32)
         return {
             "symbol": symbol,
             "features": torch.from_numpy(window),
             "targets": torch.from_numpy(targets),
+            "reference": torch.from_numpy(reference.squeeze(0)),
         }
 
     def get_metadata(self, idx: int) -> WindowMetadata:
