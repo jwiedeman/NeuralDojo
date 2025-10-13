@@ -15,7 +15,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Implement end-to-end smoke test that runs the Plus Ultra agent against a sample SQLite fixture.
 - [x] Wire evaluation metrics into the agent CLI output for faster iteration loops.
 - [x] Expose rich CLI overrides for training and pretraining scripts so researchers can tweak depth, devices, and optimisation knobs without editing YAML files.
-- [ ] Profile omni-scale backbone throughput and memory on GPU/CPU to tune default hyperparameters.
+- [x] Profile omni-scale backbone throughput and memory on GPU/CPU to tune default hyperparameters.
 - [ ] Add CI job that exercises `python -m compileall` + unit stubs to protect against syntax drift.
 
 ### Feature Registry Enhancements
