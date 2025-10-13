@@ -8,6 +8,7 @@ from typing import Any
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
+from torch import nn
 
 from ..models.omni_mixture import MarketOmniBackbone, OmniBackboneConfig
 from ..models.temporal_fusion import TemporalFusionConfig, TemporalFusionTransformer
@@ -15,6 +16,68 @@ from ..models.temporal_transformer import TemporalBackbone, TemporalBackboneConf
 from ..models.moe_transformer import MixtureOfExpertsBackbone, MixtureOfExpertsConfig
 from .config import ExperimentConfig, ModelConfig, OptimizerConfig, PretrainingConfig
 from .train_loop import MarketDataModule
+
+
+def _build_backbone(model_config: ModelConfig) -> nn.Module:
+    """Return the configured backbone for a given model configuration."""
+
+    architecture = model_config.architecture.lower()
+    if architecture in {"hybrid_transformer", "temporal_transformer"}:
+        backbone_config = TemporalBackboneConfig(
+            feature_dim=model_config.feature_dim,
+            model_dim=model_config.model_dim,
+            depth=model_config.depth,
+            heads=model_config.heads,
+            dropout=model_config.dropout,
+            conv_kernel_size=model_config.conv_kernel_size,
+            conv_dilations=model_config.conv_dilations,
+        )
+        return TemporalBackbone(backbone_config)
+    if architecture in {"temporal_fusion", "tft"}:
+        fusion_config = TemporalFusionConfig(
+            feature_dim=model_config.feature_dim,
+            hidden_dim=model_config.model_dim,
+            num_heads=model_config.heads,
+            dropout=model_config.dropout,
+            num_encoder_layers=model_config.encoder_layers or model_config.depth,
+            num_decoder_layers=model_config.decoder_layers or model_config.depth,
+            horizon=model_config.horizon,
+            max_seq_len=model_config.max_seq_len,
+        )
+        return TemporalFusionTransformer(fusion_config)
+    if architecture in {"moe", "moe_transformer", "mixture_of_experts"}:
+        moe_config = MixtureOfExpertsConfig(
+            feature_dim=model_config.feature_dim,
+            model_dim=model_config.model_dim,
+            depth=model_config.depth,
+            heads=model_config.heads,
+            dropout=model_config.dropout,
+            num_experts=model_config.num_experts,
+            ff_mult=model_config.ff_mult,
+            router_dropout=model_config.router_dropout,
+            conv_kernel_size=model_config.conv_kernel_size,
+            conv_dilations=model_config.conv_dilations,
+            max_seq_len=model_config.max_seq_len,
+        )
+        return MixtureOfExpertsBackbone(moe_config)
+    if architecture in {"omni", "omni_mixture", "omni_backbone"}:
+        omni_config = OmniBackboneConfig(
+            feature_dim=model_config.feature_dim,
+            model_dim=model_config.model_dim,
+            depth=model_config.depth,
+            heads=model_config.heads,
+            dropout=model_config.dropout,
+            ff_mult=model_config.ff_mult,
+            ssm_state_dim=model_config.ssm_state_dim,
+            ssm_kernel_size=model_config.ssm_kernel_size,
+            conv_kernel_size=model_config.conv_kernel_size,
+            conv_dilations=model_config.conv_dilations,
+            coarse_factor=model_config.coarse_factor,
+            cross_every=model_config.cross_every,
+            max_seq_len=model_config.max_seq_len,
+        )
+        return MarketOmniBackbone(omni_config)
+    raise ValueError(f"Unknown architecture '{model_config.architecture}'")
 
 
 class MaskedTimeSeriesLightningModule(pl.LightningModule):
@@ -38,70 +101,13 @@ class MaskedTimeSeriesLightningModule(pl.LightningModule):
         self.optimizer_config = optimizer_config
         self.pretraining_config = pretraining_config
 
-        architecture = model_config.architecture.lower()
-        if architecture in {"hybrid_transformer", "temporal_transformer"}:
-            backbone_config = TemporalBackboneConfig(
-                feature_dim=model_config.feature_dim,
-                model_dim=model_config.model_dim,
-                depth=model_config.depth,
-                heads=model_config.heads,
-                dropout=model_config.dropout,
-                conv_kernel_size=model_config.conv_kernel_size,
-                conv_dilations=model_config.conv_dilations,
-            )
-            self.backbone = TemporalBackbone(backbone_config)
-        elif architecture in {"temporal_fusion", "tft"}:
-            fusion_config = TemporalFusionConfig(
-                feature_dim=model_config.feature_dim,
-                hidden_dim=model_config.model_dim,
-                num_heads=model_config.heads,
-                dropout=model_config.dropout,
-                num_encoder_layers=model_config.encoder_layers or model_config.depth,
-                num_decoder_layers=model_config.decoder_layers or model_config.depth,
-                horizon=model_config.horizon,
-                max_seq_len=model_config.max_seq_len,
-            )
-            self.backbone = TemporalFusionTransformer(fusion_config)
-        elif architecture in {"moe", "moe_transformer", "mixture_of_experts"}:
-            moe_config = MixtureOfExpertsConfig(
-                feature_dim=model_config.feature_dim,
-                model_dim=model_config.model_dim,
-                depth=model_config.depth,
-                heads=model_config.heads,
-                dropout=model_config.dropout,
-                num_experts=model_config.num_experts,
-                ff_mult=model_config.ff_mult,
-                router_dropout=model_config.router_dropout,
-                conv_kernel_size=model_config.conv_kernel_size,
-                conv_dilations=model_config.conv_dilations,
-                max_seq_len=model_config.max_seq_len,
-            )
-            self.backbone = MixtureOfExpertsBackbone(moe_config)
-        elif architecture in {"omni", "omni_mixture", "omni_backbone"}:
-            omni_config = OmniBackboneConfig(
-                feature_dim=model_config.feature_dim,
-                model_dim=model_config.model_dim,
-                depth=model_config.depth,
-                heads=model_config.heads,
-                dropout=model_config.dropout,
-                ff_mult=model_config.ff_mult,
-                ssm_state_dim=model_config.ssm_state_dim,
-                ssm_kernel_size=model_config.ssm_kernel_size,
-                conv_kernel_size=model_config.conv_kernel_size,
-                conv_dilations=model_config.conv_dilations,
-                coarse_factor=model_config.coarse_factor,
-                cross_every=model_config.cross_every,
-                max_seq_len=model_config.max_seq_len,
-            )
-            self.backbone = MarketOmniBackbone(omni_config)
-        else:
-            raise ValueError(f"Unknown architecture '{model_config.architecture}'")
+        self.backbone = _build_backbone(model_config)
 
-        self.reconstruction_head = torch.nn.Sequential(
-            torch.nn.LayerNorm(model_config.model_dim),
-            torch.nn.Linear(model_config.model_dim, model_config.model_dim),
-            torch.nn.GELU(),
-            torch.nn.Linear(model_config.model_dim, model_config.feature_dim),
+        self.reconstruction_head = nn.Sequential(
+            nn.LayerNorm(model_config.model_dim),
+            nn.Linear(model_config.model_dim, model_config.model_dim),
+            nn.GELU(),
+            nn.Linear(model_config.model_dim, model_config.feature_dim),
         )
 
     def forward(self, masked_inputs: torch.Tensor) -> torch.Tensor:
@@ -139,8 +145,9 @@ class MaskedTimeSeriesLightningModule(pl.LightningModule):
         masked, mask = self._mask_inputs(features)
         recon = self(masked)
         loss = self._loss_fn(recon, features, mask)
-        self.log("train/pretrain_loss", loss, prog_bar=True)
-        self.log("train/mask_ratio", mask.float().mean())
+        if getattr(self, "_trainer", None) is not None:
+            self.log("train/pretrain_loss", loss, prog_bar=True)
+            self.log("train/mask_ratio", mask.float().mean())
         return loss
 
     def validation_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> None:
@@ -148,7 +155,8 @@ class MaskedTimeSeriesLightningModule(pl.LightningModule):
         masked, mask = self._mask_inputs(features)
         recon = self(masked)
         loss = self._loss_fn(recon, features, mask)
-        self.log("val/pretrain_loss", loss, prog_bar=True)
+        if getattr(self, "_trainer", None) is not None:
+            self.log("val/pretrain_loss", loss, prog_bar=True)
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
@@ -167,11 +175,159 @@ class MaskedTimeSeriesLightningModule(pl.LightningModule):
         }
 
 
-def instantiate_pretraining_module(config: ExperimentConfig) -> tuple[MaskedTimeSeriesLightningModule, MarketDataModule]:
+class ContrastiveTimeSeriesLightningModule(pl.LightningModule):
+    """Contrastive self-supervised objective inspired by TS2Vec."""
+
+    def __init__(
+        self,
+        model_config: ModelConfig,
+        optimizer_config: OptimizerConfig,
+        pretraining_config: PretrainingConfig,
+    ) -> None:
+        super().__init__()
+        self.save_hyperparameters(
+            {
+                "model": asdict(model_config),
+                "optimizer": asdict(optimizer_config),
+                "pretraining": asdict(pretraining_config),
+            }
+        )
+        self.model_config = model_config
+        self.optimizer_config = optimizer_config
+        self.pretraining_config = pretraining_config
+
+        self.backbone = _build_backbone(model_config)
+        projection_dim = pretraining_config.projection_dim
+        self.projection_head = nn.Sequential(
+            nn.LayerNorm(model_config.model_dim),
+            nn.Linear(model_config.model_dim, model_config.model_dim),
+            nn.GELU(),
+            nn.Linear(model_config.model_dim, projection_dim),
+        )
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        hidden = self.backbone(inputs)
+        pooled = hidden.mean(dim=1)
+        return self.projection_head(pooled)
+
+    # ------------------------------------------------------------------
+    # augmentations
+    # ------------------------------------------------------------------
+    def _apply_jitter(self, tensor: torch.Tensor) -> torch.Tensor:
+        std = float(self.pretraining_config.jitter_std)
+        if std <= 0:
+            return tensor
+        noise = torch.randn_like(tensor) * std
+        return tensor + noise
+
+    def _apply_scaling(self, tensor: torch.Tensor) -> torch.Tensor:
+        std = float(self.pretraining_config.scaling_std)
+        if std <= 0:
+            return tensor
+        scale = torch.randn(tensor.size(0), 1, 1, device=tensor.device, dtype=tensor.dtype) * std + 1.0
+        return tensor * scale
+
+    def _apply_time_mask(self, tensor: torch.Tensor) -> torch.Tensor:
+        ratio = float(self.pretraining_config.time_mask_ratio)
+        if ratio <= 0 or tensor.size(1) == 0:
+            return tensor
+        length = max(1, int(round(tensor.size(1) * ratio)))
+        if length >= tensor.size(1):
+            length = tensor.size(1)
+        starts = torch.randint(0, tensor.size(1) - length + 1, (tensor.size(0),), device=tensor.device)
+        time_indices = torch.arange(tensor.size(1), device=tensor.device).unsqueeze(0)
+        mask = (time_indices < starts.unsqueeze(1)) | (time_indices >= (starts + length).unsqueeze(1))
+        mask = mask.unsqueeze(-1)
+        fill_value = self.pretraining_config.time_mask_fill
+        if isinstance(fill_value, str) and fill_value == "mean":
+            fill = tensor.mean(dim=1, keepdim=True)
+        else:
+            fill = torch.full_like(tensor, float(fill_value))
+        return torch.where(mask, tensor, fill)
+
+    def _augment(self, tensor: torch.Tensor) -> torch.Tensor:
+        augmented = tensor
+        for name in self.pretraining_config.augmentations:
+            if name == "jitter":
+                augmented = self._apply_jitter(augmented)
+            elif name == "scaling":
+                augmented = self._apply_scaling(augmented)
+            elif name == "time_mask":
+                augmented = self._apply_time_mask(augmented)
+        return augmented
+
+    # ------------------------------------------------------------------
+    # objective
+    # ------------------------------------------------------------------
+    def _info_nce(self, z1: torch.Tensor, z2: torch.Tensor) -> torch.Tensor:
+        temperature = float(self.pretraining_config.temperature)
+        z1 = F.normalize(z1, dim=-1)
+        z2 = F.normalize(z2, dim=-1)
+        logits = torch.matmul(z1, z2.T) / max(temperature, 1e-6)
+        labels = torch.arange(z1.size(0), device=z1.device)
+        loss_a = F.cross_entropy(logits, labels)
+        loss_b = F.cross_entropy(logits.T, labels)
+        return 0.5 * (loss_a + loss_b)
+
+    def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
+        features = batch["features"]
+        view_a = self._augment(features)
+        view_b = self._augment(features)
+        proj_a = self(view_a)
+        proj_b = self(view_b)
+        loss = self._info_nce(proj_a, proj_b)
+        similarity = F.cosine_similarity(proj_a, proj_b, dim=-1).mean()
+        if getattr(self, "_trainer", None) is not None:
+            self.log("train/pretrain_loss", loss, prog_bar=True)
+            self.log("train/contrastive_similarity", similarity)
+        return loss
+
+    def validation_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> None:
+        features = batch["features"]
+        view_a = self._augment(features)
+        view_b = self._augment(features)
+        proj_a = self(view_a)
+        proj_b = self(view_b)
+        loss = self._info_nce(proj_a, proj_b)
+        similarity = F.cosine_similarity(proj_a, proj_b, dim=-1).mean()
+        if getattr(self, "_trainer", None) is not None:
+            self.log("val/pretrain_loss", loss, prog_bar=True)
+            self.log("val/contrastive_similarity", similarity)
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.AdamW(
+            self.parameters(),
+            lr=self.optimizer_config.lr,
+            weight_decay=self.optimizer_config.weight_decay,
+            betas=self.optimizer_config.betas,
+        )
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=500)
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "step",
+            },
+        }
+
+
+def instantiate_pretraining_module(
+    config: ExperimentConfig,
+) -> tuple[pl.LightningModule, MarketDataModule]:
     if config.pretraining is None:
         raise ValueError("ExperimentConfig.pretraining must be provided for pretraining runs")
     pl.seed_everything(config.seed)
-    module = MaskedTimeSeriesLightningModule(config.model, config.optimizer, config.pretraining)
+    objective = config.pretraining.objective.lower()
+    if objective in {"masked", "mask"}:
+        module: pl.LightningModule = MaskedTimeSeriesLightningModule(
+            config.model, config.optimizer, config.pretraining
+        )
+    elif objective in {"contrastive", "ts2vec"}:
+        module = ContrastiveTimeSeriesLightningModule(
+            config.model, config.optimizer, config.pretraining
+        )
+    else:
+        raise ValueError(f"Unknown pretraining objective '{config.pretraining.objective}'")
     data_module = MarketDataModule(config.data, config.trainer, seed=config.seed)
     return module, data_module
 
@@ -212,6 +368,7 @@ def run_pretraining(config: ExperimentConfig) -> dict[str, Any]:
 
 __all__ = [
     "MaskedTimeSeriesLightningModule",
+    "ContrastiveTimeSeriesLightningModule",
     "instantiate_pretraining_module",
     "run_pretraining",
 ]

@@ -57,4 +57,12 @@ pretraining:
   mask_prob: 0.25
   mask_value: 0.0
   loss: mse
+  objective: masked
+  temperature: 0.1
+  projection_dim: 256
+  augmentations: [jitter, scaling, time_mask]
+  jitter_std: 0.02
+  scaling_std: 0.1
+  time_mask_ratio: 0.2
+  time_mask_fill: mean
   monitor_metric: val/pretrain_loss

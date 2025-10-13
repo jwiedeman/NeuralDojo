@@ -131,15 +131,17 @@ hardware.
   and optimises the policy head against differentiable PnL with configurable
   trading costs.
 * **Self-supervised warm start** – `MaskedTimeSeriesLightningModule` performs
-  masked reconstruction pretraining so deep transformers and omni-scale models
-  see large context windows before supervised ROI optimisation. Use
-  `scripts/pretrain.py` with `configs/pretrain.yaml` to generate these
-  checkpoints.
+  masked reconstruction while `ContrastiveTimeSeriesLightningModule`
+  implements TS2Vec-style InfoNCE objectives. Both ship via
+  `scripts/pretrain.py`, letting researchers choose between in-filling and
+  view agreement to warm-start the omni-scale backbone before supervised ROI
+  optimisation.
 
 ## Extension Opportunities
 
-* **Self-supervised pretraining** – Implement masked time-series or contrastive
-  objectives that warm-start the backbone before task-specific fine-tuning.
+* **Self-supervised pretraining** – Experiment with additional augmentations,
+  multi-view contrastive heads, or distillation targets on top of the shipped
+  masked reconstruction and InfoNCE modules.
 * **Reinforcement learning** – Extend the shipped PPO module with curriculum
   schedules, multi-asset allocation heads, or off-policy improvements for even
   richer trading objectives.

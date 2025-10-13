@@ -228,7 +228,7 @@ class MarketDataModule(pl.LightningDataModule):
             batch_size=self.trainer_config.batch_size,
             shuffle=True,
             num_workers=self.trainer_config.num_workers,
-            pin_memory=True,
+            pin_memory=self.trainer_config.accelerator != "cpu",
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -238,7 +238,7 @@ class MarketDataModule(pl.LightningDataModule):
             batch_size=self.trainer_config.batch_size,
             shuffle=False,
             num_workers=self.trainer_config.num_workers,
-            pin_memory=True,
+            pin_memory=self.trainer_config.accelerator != "cpu",
         )
 
 
@@ -270,6 +270,16 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
     pretraining_cfg: PretrainingConfig | None = None
     if "pretraining" in raw:
         pretraining_section = dict(raw["pretraining"])
+        if "augmentations" in pretraining_section and pretraining_section["augmentations"] is not None:
+            pretraining_section["augmentations"] = tuple(
+                str(name).lower() for name in pretraining_section["augmentations"]
+            )
+        if "objective" in pretraining_section and pretraining_section["objective"] is not None:
+            pretraining_section["objective"] = str(pretraining_section["objective"]).lower()
+        if "mask_value" in pretraining_section:
+            pretraining_section["mask_value"] = pretraining_section["mask_value"]
+        if "time_mask_fill" in pretraining_section:
+            pretraining_section["time_mask_fill"] = pretraining_section["time_mask_fill"]
         pretraining_cfg = PretrainingConfig(**pretraining_section)
     reinforcement_cfg: ReinforcementConfig | None = None
     if "reinforcement" in raw:

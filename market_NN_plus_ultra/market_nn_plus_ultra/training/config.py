@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 from ..trading.pnl import TradingCosts
 
@@ -91,8 +91,16 @@ class PretrainingConfig:
     """Configuration for self-supervised pretraining tasks."""
 
     mask_prob: float = 0.25
-    mask_value: float = 0.0
+    mask_value: float | str = 0.0
     loss: str = "mse"
+    objective: str = "masked"
+    temperature: float = 0.1
+    projection_dim: int = 256
+    augmentations: Tuple[str, ...] = ("jitter", "scaling", "time_mask")
+    jitter_std: float = 0.02
+    scaling_std: float = 0.1
+    time_mask_ratio: float = 0.2
+    time_mask_fill: float | str = 0.0
     monitor_metric: str = "val/pretrain_loss"
 
 

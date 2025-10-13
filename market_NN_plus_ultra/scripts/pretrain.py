@@ -1,4 +1,4 @@
-"""CLI entrypoint for running masked time-series pretraining."""
+"""CLI entrypoint for running self-supervised pretraining."""
 
 from __future__ import annotations
 
@@ -54,10 +54,32 @@ def _apply_overrides(config, args) -> None:
                 pretrain.mask_value = args.mask_value
         if args.pretrain_loss is not None:
             pretrain.loss = args.pretrain_loss
+        if args.objective is not None:
+            pretrain.objective = args.objective.lower()
+        if args.temperature is not None:
+            pretrain.temperature = args.temperature
+        if args.projection_dim is not None:
+            pretrain.projection_dim = args.projection_dim
+        if args.augmentations is not None:
+            items = [item.strip().lower() for item in args.augmentations.split(",") if item.strip()]
+            pretrain.augmentations = tuple(items)
+        if args.jitter_std is not None:
+            pretrain.jitter_std = args.jitter_std
+        if args.scaling_std is not None:
+            pretrain.scaling_std = args.scaling_std
+        if args.time_mask_ratio is not None:
+            pretrain.time_mask_ratio = args.time_mask_ratio
+        if args.time_mask_fill is not None:
+            try:
+                pretrain.time_mask_fill = float(args.time_mask_fill)
+            except ValueError:
+                pretrain.time_mask_fill = args.time_mask_fill
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run masked time-series pretraining for Market NN Plus Ultra")
+    parser = argparse.ArgumentParser(
+        description="Run self-supervised pretraining (masked or contrastive) for Market NN Plus Ultra"
+    )
     parser.add_argument("--config", type=Path, required=True, help="Path to experiment YAML config")
     parser.add_argument("--seed", type=int, help="Override the experiment seed")
     parser.add_argument("--devices", help="Override the trainer device setting (int or 'auto')")
@@ -76,6 +98,22 @@ def parse_args() -> argparse.Namespace:
         help="Override the mask fill value (float or 'mean' to reuse window mean)",
     )
     parser.add_argument("--pretrain-loss", type=str, help="Override the pretraining loss type")
+    parser.add_argument("--objective", type=str, help="Choose the pretraining objective (masked|contrastive)")
+    parser.add_argument("--temperature", type=float, help="Override InfoNCE temperature for contrastive runs")
+    parser.add_argument("--projection-dim", type=int, help="Set contrastive projection head dimension")
+    parser.add_argument(
+        "--augmentations",
+        type=str,
+        help="Comma separated list of contrastive augmentations (jitter,scaling,time_mask)",
+    )
+    parser.add_argument("--jitter-std", type=float, help="Std-dev for additive noise augmentation")
+    parser.add_argument("--scaling-std", type=float, help="Std-dev for multiplicative scaling augmentation")
+    parser.add_argument("--time-mask-ratio", type=float, help="Fraction of timesteps to mask in time_mask augmentation")
+    parser.add_argument(
+        "--time-mask-fill",
+        type=str,
+        help="Fill value for masked timesteps (float or 'mean')",
+    )
     return parser.parse_args()
 
 

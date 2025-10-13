@@ -12,8 +12,8 @@ keeping the stack maintainable and research-friendly.
 
 ## Phase 1 — Representation Learning
 
-* Deliver masked reconstruction pretraining (shipped via `scripts/pretrain.py`) so deep transformers start from context-aware
-  weights before ROI fine-tuning.
+* Deliver masked reconstruction and contrastive InfoNCE pretraining (shipped via `scripts/pretrain.py`) so deep transformers start
+  from context-aware weights before ROI fine-tuning.
 * Experiment with hybrid backbones that combine multi-head attention, dilated temporal convolutions, and state-space mixers to
   stretch context windows into the multi-thousand timestep range.
 * Deploy the omni-scale backbone variant that layers cross-resolution attention and gated state-space mixers for experiments
