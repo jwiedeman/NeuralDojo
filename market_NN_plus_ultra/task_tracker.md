@@ -20,6 +20,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Implement TemporalFusionTransformer-style encoder with multi-horizon support.
 - [x] Add multi-resolution attention block mixing dilated convolutions and transformer layers.
 - [x] Integrate state-space (S4/SSM) module for long-context retention.
+- [x] Ship mixture-of-experts expansion for scaling feed-forward capacity without quadratic attention cost.
 - [ ] Benchmark omni-scale backbone versus hybrid baseline across multiple asset universes.
 - [x] Pretrain on masked time-series reconstruction before supervised fine-tuning (`scripts/pretrain.py`).
 - [ ] Benchmark pretraining checkpoints vs. scratch initialisation across asset classes.

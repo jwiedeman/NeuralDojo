@@ -3,6 +3,11 @@
 from .temporal_transformer import TemporalBackbone, TemporalBackboneConfig, TemporalPolicyHead, count_parameters
 from .temporal_fusion import TemporalFusionConfig, TemporalFusionTransformer, initialise_temporal_fusion
 from .omni_mixture import MarketOmniBackbone, OmniBackboneConfig, initialise_omni_backbone
+from .moe_transformer import (
+    MixtureOfExpertsBackbone,
+    MixtureOfExpertsConfig,
+    initialise_moe_backbone,
+)
 from .losses import composite_trading_loss, sharpe_ratio_loss
 
 __all__ = [
@@ -16,6 +21,9 @@ __all__ = [
     "MarketOmniBackbone",
     "OmniBackboneConfig",
     "initialise_omni_backbone",
+    "MixtureOfExpertsBackbone",
+    "MixtureOfExpertsConfig",
+    "initialise_moe_backbone",
     "composite_trading_loss",
     "sharpe_ratio_loss",
 ]
