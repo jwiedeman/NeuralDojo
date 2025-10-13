@@ -115,7 +115,7 @@ For a deeper discussion of the data flow, modular boundaries, and suggested exte
 5. **Iterate and evaluate**:
    * Use `market_nn_plus_ultra.evaluation.metrics` to compute risk-adjusted scores on trade logs.
    * Inspect checkpoints saved under `training.checkpoint_dir` and feed results back into the task tracker to prioritise the next steps.
-   * Deploy the new inference agent (`scripts/run_agent.py`) to mirror the classic market agent workflow on fresh SQLite dumps.
+   * Deploy the new inference agent (`scripts/run_agent.py`) to mirror the classic market agent workflow on fresh SQLite dumps. The CLI now streams a formatted risk dashboard to stdout and can persist metrics to JSON/CSV/Markdown via `--metrics-output`.
    * Regenerate feature documentation with `python scripts/export_features.py --output docs/generated_features.md` after extending the registry.
 
 ### Running the Inference Agent
