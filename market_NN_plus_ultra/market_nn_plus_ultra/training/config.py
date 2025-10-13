@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from ..trading.pnl import TradingCosts
+
 
 @dataclass(slots=True)
 class DataConfig:
@@ -81,6 +83,7 @@ class ExperimentConfig:
     wandb_project: Optional[str] = None
     notes: Optional[str] = None
     pretraining: Optional["PretrainingConfig"] = None
+    reinforcement: Optional["ReinforcementConfig"] = None
 
 
 @dataclass(slots=True)
@@ -91,4 +94,24 @@ class PretrainingConfig:
     mask_value: float = 0.0
     loss: str = "mse"
     monitor_metric: str = "val/pretrain_loss"
+
+
+@dataclass(slots=True)
+class ReinforcementConfig:
+    """Hyper-parameters controlling policy-gradient fine-tuning."""
+
+    total_updates: int = 50
+    steps_per_rollout: int = 256
+    policy_epochs: int = 4
+    minibatch_size: int = 32
+    gamma: float = 0.99
+    gae_lambda: float = 0.95
+    clip_ratio: float = 0.2
+    value_coef: float = 0.5
+    entropy_coef: float = 0.01
+    learning_rate: float = 3e-4
+    max_grad_norm: float = 1.0
+    targets_are_returns: bool = False
+    activation: str = "tanh"
+    costs: Optional[TradingCosts] = None
 

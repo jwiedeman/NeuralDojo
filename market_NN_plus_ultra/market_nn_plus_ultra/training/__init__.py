@@ -6,6 +6,7 @@ from .config import (
     ModelConfig,
     OptimizerConfig,
     PretrainingConfig,
+    ReinforcementConfig,
     TrainerConfig,
 )
 from .train_loop import (
@@ -20,6 +21,12 @@ from .pretrain_loop import (
     instantiate_pretraining_module,
     run_pretraining,
 )
+from .reinforcement import (
+    MarketPolicyNetwork,
+    ReinforcementRunResult,
+    ReinforcementUpdate,
+    run_reinforcement_finetuning,
+)
 
 __all__ = [
     "DataConfig",
@@ -28,6 +35,7 @@ __all__ = [
     "TrainerConfig",
     "ExperimentConfig",
     "PretrainingConfig",
+    "ReinforcementConfig",
     "MarketLightningModule",
     "MarketDataModule",
     "instantiate_modules",
@@ -36,4 +44,8 @@ __all__ = [
     "MaskedTimeSeriesLightningModule",
     "instantiate_pretraining_module",
     "run_pretraining",
+    "MarketPolicyNetwork",
+    "run_reinforcement_finetuning",
+    "ReinforcementRunResult",
+    "ReinforcementUpdate",
 ]

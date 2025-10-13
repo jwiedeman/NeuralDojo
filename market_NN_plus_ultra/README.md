@@ -62,6 +62,7 @@ Each module comes with docstrings explaining expected behaviour so future contri
 * **Rich feature engineering** — The feature registry encapsulates momentum, volatility, regime, and spectral features while remaining easily extensible. Adding new indicators only requires registering a `FeatureSpec` with dependency metadata inside `feature_pipeline.py`.
 * **Risk-aware optimisation** — Custom loss functions marry standard regression objectives with differentiable Sharpe and drawdown penalties, rewarding policies that maximise return while respecting risk budgets.
 * **Differentiable PnL simulator** — Training losses can now backpropagate through a cost-aware PnL stream that includes transaction, slippage, and holding penalties for realistic signal shaping.
+* **Reinforcement fine-tuning** — PPO-style policy optimisation on top of supervised checkpoints lets the agent learn directly from differentiable PnL trajectories with configurable trading costs.
 * **Automated evaluation** — The evaluation module exposes risk-adjusted metrics (Sharpe, Sortino, Calmar, drawdown) and trade-level analytics that plug directly into backtesting or live monitoring loops.
 * **Walk-forward harness** — `WalkForwardBacktester` enables regimented daily/weekly/monthly evaluation splits, automatically summarising ROI-focused metrics per regime.
 * **Research ergonomics** — YAML-driven experiment configs, dataclass-backed runtime configs, and a high-level trainer streamline iteration while keeping experiments reproducible.
@@ -133,11 +134,22 @@ python scripts/run_agent.py --config configs/default.yaml --checkpoint path/to/c
 Training runs accept the same style of overrides. For example, to train an omni backbone with 24 layers and a widened model dimension on a single GPU without touching the YAML:
 
 ```bash
-python scripts/train.py --config configs/default.yaml --devices 1 --architecture omni_mixture \
+ python scripts/train.py --config configs/default.yaml --devices 1 --architecture omni_mixture \
   --depth 24 --model-dim 1024 --batch-size 64 --learning-rate 0.0001
 ```
 
 The script orchestrates data loading, feature enrichment, sliding-window inference, and optional ROI evaluation if realised returns are present. Use `--no-eval` to skip metrics and `--return-column` to target a specific realised return column in the generated prediction frame.
+
+### Reinforcement Fine-Tuning
+
+When it's time to align the agent with ROI directly, kick off policy-gradient optimisation with PPO:
+
+```bash
+python scripts/rl_finetune.py --config configs/default.yaml --checkpoint path/to/supervised.ckpt \
+  --device cuda:0 --updates 25 --steps-per-rollout 512
+```
+
+The CLI mirrors the reinforcement config dataclass so you can override rollout size, discount factors, clipping ratios, and whether dataset targets are returns. Each update prints reward, policy loss, value loss, and entropy so you can track convergence at a glance.
 
 ## Model Highlights
 

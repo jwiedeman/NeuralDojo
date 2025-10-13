@@ -18,12 +18,14 @@ from ..models.temporal_fusion import TemporalFusionConfig, TemporalFusionTransfo
 from ..models.omni_mixture import MarketOmniBackbone, OmniBackboneConfig
 from ..models.moe_transformer import MixtureOfExpertsBackbone, MixtureOfExpertsConfig
 from ..models.losses import CompositeTradingLoss
+from ..trading.pnl import TradingCosts
 from .config import (
     DataConfig,
     ExperimentConfig,
     ModelConfig,
     OptimizerConfig,
     PretrainingConfig,
+    ReinforcementConfig,
     TrainerConfig,
 )
 
@@ -256,6 +258,14 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
     if "pretraining" in raw:
         pretraining_section = dict(raw["pretraining"])
         pretraining_cfg = PretrainingConfig(**pretraining_section)
+    reinforcement_cfg: ReinforcementConfig | None = None
+    if "reinforcement" in raw:
+        reinforcement_section = dict(raw["reinforcement"])
+        if "costs" in reinforcement_section and reinforcement_section["costs"] is not None:
+            costs_section = reinforcement_section["costs"]
+            if isinstance(costs_section, dict):
+                reinforcement_section["costs"] = TradingCosts(**costs_section)
+        reinforcement_cfg = ReinforcementConfig(**reinforcement_section)
     return ExperimentConfig(
         seed=raw.get("seed", 42),
         data=data_cfg,
@@ -265,6 +275,7 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
         wandb_project=raw.get("wandb_project"),
         notes=raw.get("notes"),
         pretraining=pretraining_cfg,
+        reinforcement=reinforcement_cfg,
     )
 
 
