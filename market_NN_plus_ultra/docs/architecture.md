@@ -87,6 +87,18 @@ This variant is controlled through the experiment configuration by setting
 `model.architecture: omni_mixture` and tweaking the `ssm_state_dim`,
 `coarse_factor`, and `cross_every` knobs.
 
+### State-Space Variant
+
+When the research focus is purely on structured sequence modelling without the
+cross-scale attention overhead, the `StateSpaceBackbone` provides a distilled
+stack of SSM-inspired layers. Each block projects features into a latent state
+space, applies a gated depthwise convolutional mixer, and follows with a GELU
+feed-forward expansion. Learned positional embeddings and dropout keep the
+model stable even when trained on multi-thousand timestep windows. Select this
+backbone with `model.architecture: state_space` and adjust the familiar
+`model.ssm_state_dim`, `model.ssm_kernel_size`, and `model.ff_mult` knobs to
+scale capacity.
+
 ### Mixture-of-Experts Variant
 
 Ultra-deep studies can switch to `model.architecture: moe_transformer`, which

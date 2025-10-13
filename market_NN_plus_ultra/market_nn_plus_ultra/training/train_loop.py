@@ -17,6 +17,7 @@ from ..models.temporal_transformer import TemporalBackbone, TemporalBackboneConf
 from ..models.temporal_fusion import TemporalFusionConfig, TemporalFusionTransformer
 from ..models.omni_mixture import MarketOmniBackbone, OmniBackboneConfig
 from ..models.moe_transformer import MixtureOfExpertsBackbone, MixtureOfExpertsConfig
+from ..models.state_space import StateSpaceBackbone, StateSpaceConfig
 from ..models.losses import CompositeTradingLoss
 from ..trading.pnl import TradingCosts
 from .config import (
@@ -92,6 +93,18 @@ class MarketLightningModule(pl.LightningModule):
                 max_seq_len=model_config.max_seq_len,
             )
             self.backbone = MarketOmniBackbone(backbone_config)
+        elif architecture in {"state_space", "ssm", "s4"}:
+            ssm_config = StateSpaceConfig(
+                feature_dim=model_config.feature_dim,
+                model_dim=model_config.model_dim,
+                depth=model_config.depth,
+                state_dim=model_config.ssm_state_dim,
+                kernel_size=model_config.ssm_kernel_size,
+                dropout=model_config.dropout,
+                ff_mult=model_config.ff_mult,
+                max_seq_len=model_config.max_seq_len,
+            )
+            self.backbone = StateSpaceBackbone(ssm_config)
         else:
             raise ValueError(f"Unknown architecture '{model_config.architecture}'")
         self.head = TemporalPolicyHead(model_config.model_dim, model_config.horizon, model_config.output_dim)
