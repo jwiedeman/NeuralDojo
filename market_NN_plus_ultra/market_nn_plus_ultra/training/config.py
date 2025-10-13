@@ -41,6 +41,8 @@ class ModelConfig:
     coarse_factor: int = 4
     cross_every: int = 2
     max_seq_len: int = 4096
+    encoder_layers: Optional[int] = None
+    decoder_layers: Optional[int] = None
 
 
 @dataclass(slots=True)
