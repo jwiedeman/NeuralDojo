@@ -1,3 +1,5 @@
+"""Risk and performance metrics for Market NN Plus Ultra predictions."""
+
 from __future__ import annotations
 
 from typing import Dict
@@ -60,6 +62,30 @@ def downside_deviation(returns: np.ndarray, eps: float = 1e-6) -> float:
     return float(np.sqrt(((downside**2).mean()) + eps))
 
 
+def ulcer_index(equity_curve: np.ndarray, eps: float = 1e-6) -> float:
+    """Return the Ulcer index, a severity-weighted drawdown measure."""
+
+    running_max = np.maximum.accumulate(equity_curve)
+    drawdowns = (equity_curve - running_max) / (running_max + eps)
+    return float(np.sqrt(np.mean(drawdowns**2)))
+
+
+def value_at_risk(returns: np.ndarray, alpha: float = 0.05) -> float:
+    """Compute the one-sided Value-at-Risk at the given confidence level."""
+
+    return float(np.quantile(returns, alpha))
+
+
+def expected_shortfall(returns: np.ndarray, alpha: float = 0.05) -> float:
+    """Return the Conditional Value-at-Risk (Expected Shortfall)."""
+
+    threshold = np.quantile(returns, alpha)
+    tail = returns[returns <= threshold]
+    if tail.size == 0:
+        return float(threshold)
+    return float(tail.mean())
+
+
 def risk_metrics(returns: np.ndarray, periods_per_year: int = 252) -> Dict[str, float]:
     """Return a suite of risk metrics for a stream of returns."""
 
@@ -71,6 +97,9 @@ def risk_metrics(returns: np.ndarray, periods_per_year: int = 252) -> Dict[str, 
     volatility = float(returns.std(ddof=0) * np.sqrt(periods_per_year))
     downside_dev = downside_deviation(returns)
     hit = hit_rate(returns)
+    ulcer = ulcer_index(equity)
+    var = value_at_risk(returns)
+    cvar = expected_shortfall(returns)
     return {
         "sharpe": sharpe,
         "sortino": sortino,
@@ -79,6 +108,9 @@ def risk_metrics(returns: np.ndarray, periods_per_year: int = 252) -> Dict[str, 
         "volatility": volatility,
         "downside_deviation": downside_dev,
         "hit_rate": hit,
+        "ulcer_index": ulcer,
+        "value_at_risk": var,
+        "expected_shortfall": cvar,
     }
 
 
