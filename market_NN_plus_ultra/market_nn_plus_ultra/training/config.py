@@ -36,6 +36,8 @@ class ModelConfig:
     output_dim: int = 3
     architecture: str = "hybrid_transformer"
     ff_mult: int = 4
+    num_experts: int = 8
+    router_dropout: float = 0.0
     ssm_state_dim: int = 256
     ssm_kernel_size: int = 16
     coarse_factor: int = 4

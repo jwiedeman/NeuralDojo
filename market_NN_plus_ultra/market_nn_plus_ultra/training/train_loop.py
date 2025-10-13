@@ -16,6 +16,7 @@ from ..data.sqlite_loader import SQLiteMarketSource
 from ..models.temporal_transformer import TemporalBackbone, TemporalBackboneConfig, TemporalPolicyHead
 from ..models.temporal_fusion import TemporalFusionConfig, TemporalFusionTransformer
 from ..models.omni_mixture import MarketOmniBackbone, OmniBackboneConfig
+from ..models.moe_transformer import MixtureOfExpertsBackbone, MixtureOfExpertsConfig
 from ..models.losses import CompositeTradingLoss
 from .config import (
     DataConfig,
@@ -57,6 +58,21 @@ class MarketLightningModule(pl.LightningModule):
                 max_seq_len=model_config.max_seq_len,
             )
             self.backbone = TemporalFusionTransformer(fusion_config)
+        elif architecture in {"moe", "moe_transformer", "mixture_of_experts"}:
+            moe_config = MixtureOfExpertsConfig(
+                feature_dim=model_config.feature_dim,
+                model_dim=model_config.model_dim,
+                depth=model_config.depth,
+                heads=model_config.heads,
+                dropout=model_config.dropout,
+                num_experts=model_config.num_experts,
+                ff_mult=model_config.ff_mult,
+                router_dropout=model_config.router_dropout,
+                conv_kernel_size=model_config.conv_kernel_size,
+                conv_dilations=model_config.conv_dilations,
+                max_seq_len=model_config.max_seq_len,
+            )
+            self.backbone = MixtureOfExpertsBackbone(moe_config)
         elif architecture in {"omni", "omni_mixture", "omni_backbone"}:
             backbone_config = OmniBackboneConfig(
                 feature_dim=model_config.feature_dim,

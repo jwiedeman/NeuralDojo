@@ -36,6 +36,7 @@ market_NN_plus_ultra/
     ├── models/
     │   ├── __init__.py
     │   ├── temporal_transformer.py # Hybrid transformer/state-space backbone
+    │   ├── moe_transformer.py      # Mixture-of-experts expansion of the hybrid stack
     │   ├── omni_mixture.py      # Omni-scale backbone with cross-resolution attention
     │   └── losses.py          # Custom loss functions for risk-aware optimisation
     ├── training/
@@ -57,6 +58,7 @@ Each module comes with docstrings explaining expected behaviour so future contri
 * **Deep temporal modelling** — The default backbone stacks sixteen hybrid transformer layers that mix global attention, dilated convolutions, and state-space inspired mixers for memory retention over thousands of timesteps. Patch embeddings and learned positional encodings are designed to support high-dimensional feature spaces out of the box.
 * **Temporal fusion option** — A Temporal Fusion Transformer style backbone mixes variable selection networks, gated residual blocks, and encoder-decoder attention to deliver high-capacity multi-horizon forecasting with a strong inductive bias for tabular time-series.
 * **Omni-scale backbone option** — The `omni_mixture` architecture fuses fine-grained transformer layers with coarse cross-scale attention, gated state-space mixers, and dilated convolutions to capture both microstructure and macro regime shifts in one model.
+* **Mixture-of-experts scalability** — The `moe_transformer` variant routes tokens through a bank of specialised feed-forward experts, unlocking extra capacity without ballooning quadratic attention cost.
 * **Rich feature engineering** — The feature registry encapsulates momentum, volatility, regime, and spectral features while remaining easily extensible. Adding new indicators only requires registering a `FeatureSpec` with dependency metadata inside `feature_pipeline.py`.
 * **Risk-aware optimisation** — Custom loss functions marry standard regression objectives with differentiable Sharpe and drawdown penalties, rewarding policies that maximise return while respecting risk budgets.
 * **Automated evaluation** — The evaluation module exposes risk-adjusted metrics (Sharpe, Sortino, Calmar, drawdown) and trade-level analytics that plug directly into backtesting or live monitoring loops.

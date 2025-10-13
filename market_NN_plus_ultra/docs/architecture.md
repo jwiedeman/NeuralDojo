@@ -84,6 +84,18 @@ This variant is controlled through the experiment configuration by setting
 `model.architecture: omni_mixture` and tweaking the `ssm_state_dim`,
 `coarse_factor`, and `cross_every` knobs.
 
+### Mixture-of-Experts Variant
+
+Ultra-deep studies can switch to `model.architecture: moe_transformer`, which
+replaces the standard feed-forward blocks with a dense mixture-of-experts
+layer. Each token is softly routed across a bank of specialised experts while
+retaining the hybrid attention + convolution structure. The additional knobs
+(`model.num_experts`, `model.router_dropout`, `model.ff_mult`) allow
+researchers to scale capacity aggressively without incurring quadratic memory
+growth from larger attention matrices. This makes it practical to explore
+thousands of features and prolonged context windows on modern accelerator
+hardware.
+
 ## Training Loop
 
 * **Risk-aware loss** – `CompositeTradingLoss` combines prediction error with
