@@ -1,4 +1,4 @@
-"""Risk and performance metrics for trading strategies."""
+"""Risk and performance metrics for Market NN Plus Ultra."""
 
 from __future__ import annotations
 
@@ -9,34 +9,44 @@ import pandas as pd
 
 
 def compute_equity_curve(returns: np.ndarray, initial_capital: float = 1.0) -> np.ndarray:
-    equity = np.cumsum(returns, axis=-1) + initial_capital
-    return equity
+    """Return the cumulative equity curve for a sequence of returns."""
+
+    return np.cumsum(returns, axis=-1) + initial_capital
 
 
 def sharpe_ratio(returns: np.ndarray, eps: float = 1e-6) -> float:
+    """Compute the (annualised) Sharpe ratio of the returns series."""
+
     return float(returns.mean() / (returns.std(ddof=0) + eps))
 
 
 def sortino_ratio(returns: np.ndarray, eps: float = 1e-6) -> float:
+    """Compute the Sortino ratio using downside deviation."""
+
     downside = returns[returns < 0]
-    downside_std = np.sqrt((downside ** 2).mean() + eps)
+    downside_std = np.sqrt((downside**2).mean() + eps)
     return float(returns.mean() / (downside_std + eps))
 
 
 def max_drawdown(equity_curve: np.ndarray, eps: float = 1e-6) -> float:
-    cumulative = equity_curve
-    running_max = np.maximum.accumulate(cumulative)
-    dd = (cumulative - running_max) / (running_max + eps)
-    return float(dd.min())
+    """Return the maximum drawdown of the equity curve (negative value)."""
+
+    running_max = np.maximum.accumulate(equity_curve)
+    drawdowns = (equity_curve - running_max) / (running_max + eps)
+    return float(drawdowns.min())
 
 
 def calmar_ratio(returns: np.ndarray, equity_curve: np.ndarray, eps: float = 1e-6) -> float:
+    """Compute the Calmar ratio using annualised return over max drawdown."""
+
     annualised_return = returns.mean() * 252
     max_dd = abs(max_drawdown(equity_curve, eps))
     return float(annualised_return / (max_dd + eps))
 
 
 def risk_metrics(returns: np.ndarray, periods_per_year: int = 252) -> Dict[str, float]:
+    """Return a suite of risk metrics for a stream of returns."""
+
     equity = compute_equity_curve(returns)
     sharpe = sharpe_ratio(returns)
     sortino = sortino_ratio(returns)
@@ -53,6 +63,7 @@ def risk_metrics(returns: np.ndarray, periods_per_year: int = 252) -> Dict[str, 
 
 
 def evaluate_trade_log(trades: pd.DataFrame) -> Dict[str, float]:
+    """Compute risk metrics for a trade log with a ``pnl`` column."""
+
     returns = trades["pnl"].to_numpy()
     return risk_metrics(returns)
-
