@@ -9,10 +9,10 @@ from typing import Callable, Dict, Iterable, List, MutableMapping, Optional
 
 import numpy as np
 import pandas as pd
-from ta.momentum import RSIIndicator
-from ta.trend import MACD
+from ta.momentum import RSIIndicator, StochasticOscillator, TSIIndicator
+from ta.trend import CCIIndicator, EMAIndicator, MACD
 from ta.volatility import BollingerBands
-from ta.volume import VolumeWeightedAveragePrice
+from ta.volume import ChaikinMoneyFlowIndicator, OnBalanceVolumeIndicator, VolumeWeightedAveragePrice
 
 FeatureFunction = Callable[[pd.DataFrame], pd.Series | pd.DataFrame]
 
@@ -65,6 +65,24 @@ class FeatureRegistry:
         )
         self.register(
             FeatureSpec(
+                name="ema_ratio_12_26",
+                function=lambda df: self._ema_ratio(df["close"], fast=12, slow=26),
+                depends_on=["close"],
+                description="Ratio between fast and slow exponential moving averages",
+                tags=["trend", "momentum"],
+            )
+        )
+        self.register(
+            FeatureSpec(
+                name="ema_distance_50",
+                function=lambda df: self._ema_distance(df["close"], window=50),
+                depends_on=["close"],
+                description="Normalised distance from the 50-period EMA",
+                tags=["mean_reversion", "momentum"],
+            )
+        )
+        self.register(
+            FeatureSpec(
                 name="vwap_ratio",
                 function=lambda df: df["close"] / VolumeWeightedAveragePrice(
                     high=df["high"], low=df["low"], close=df["close"], volume=df["volume"], window=20
@@ -72,6 +90,51 @@ class FeatureRegistry:
                 depends_on=["high", "low", "close", "volume"],
                 description="Price distance from VWAP",
                 tags=["volume", "intraday"],
+            )
+        )
+        self.register(
+            FeatureSpec(
+                name="stochastic_oscillator",
+                function=lambda df: self._stochastic_oscillator(df, window=14, smooth_window=3),
+                depends_on=["high", "low", "close"],
+                description="Stochastic oscillator %K/%D levels",
+                tags=["momentum", "bounded"],
+            )
+        )
+        self.register(
+            FeatureSpec(
+                name="chaikin_money_flow_20",
+                function=lambda df: self._chaikin_money_flow(df, window=20),
+                depends_on=["high", "low", "close", "volume"],
+                description="Chaikin money flow over a 20-period window",
+                tags=["volume", "breadth"],
+            )
+        )
+        self.register(
+            FeatureSpec(
+                name="on_balance_volume",
+                function=lambda df: self._on_balance_volume(df["close"], df["volume"]),
+                depends_on=["close", "volume"],
+                description="Cumulative On-Balance Volume series",
+                tags=["volume"],
+            )
+        )
+        self.register(
+            FeatureSpec(
+                name="true_strength_index",
+                function=lambda df: self._true_strength_index(df["close"], window_slow=25, window_fast=13),
+                depends_on=["close"],
+                description="True Strength Index for momentum confirmation",
+                tags=["momentum", "trend"],
+            )
+        )
+        self.register(
+            FeatureSpec(
+                name="commodity_channel_index_20",
+                function=lambda df: self._commodity_channel_index(df, window=20),
+                depends_on=["high", "low", "close"],
+                description="Commodity Channel Index highlighting cyclical extremes",
+                tags=["momentum", "mean_reversion"],
             )
         )
         self.register(
@@ -278,4 +341,67 @@ class FeaturePipeline:
             enriched_frames.append(enriched)
         enriched_panel = pd.concat(enriched_frames)
         return enriched_panel.reset_index().set_index(["timestamp", "symbol"]).sort_index()
+
+    @staticmethod
+    def _ema_ratio(close: pd.Series, *, fast: int, slow: int) -> pd.Series:
+        fast_ema = EMAIndicator(close=close, window=fast).ema_indicator()
+        slow_ema = EMAIndicator(close=close, window=slow).ema_indicator()
+        return fast_ema / (slow_ema + 1e-9)
+
+    @staticmethod
+    def _ema_distance(close: pd.Series, *, window: int) -> pd.Series:
+        ema = EMAIndicator(close=close, window=window).ema_indicator()
+        return (close - ema) / (ema + 1e-9)
+
+    @staticmethod
+    def _stochastic_oscillator(
+        df: pd.DataFrame,
+        *,
+        window: int,
+        smooth_window: int,
+    ) -> pd.DataFrame:
+        oscillator = StochasticOscillator(
+            high=df["high"],
+            low=df["low"],
+            close=df["close"],
+            window=window,
+            smooth_window=smooth_window,
+        )
+        return pd.DataFrame(
+            {
+                "stoch_k": oscillator.stoch(),
+                "stoch_d": oscillator.stoch_signal(),
+            }
+        )
+
+    @staticmethod
+    def _chaikin_money_flow(df: pd.DataFrame, *, window: int) -> pd.Series:
+        indicator = ChaikinMoneyFlowIndicator(
+            high=df["high"],
+            low=df["low"],
+            close=df["close"],
+            volume=df["volume"],
+            window=window,
+        )
+        return indicator.chaikin_money_flow()
+
+    @staticmethod
+    def _on_balance_volume(close: pd.Series, volume: pd.Series) -> pd.Series:
+        indicator = OnBalanceVolumeIndicator(close=close, volume=volume)
+        return indicator.on_balance_volume()
+
+    @staticmethod
+    def _true_strength_index(close: pd.Series, *, window_slow: int, window_fast: int) -> pd.Series:
+        indicator = TSIIndicator(close=close, window_slow=window_slow, window_fast=window_fast)
+        return indicator.tsi()
+
+    @staticmethod
+    def _commodity_channel_index(df: pd.DataFrame, *, window: int) -> pd.Series:
+        indicator = CCIIndicator(
+            high=df["high"],
+            low=df["low"],
+            close=df["close"],
+            window=window,
+        )
+        return indicator.cci()
 
