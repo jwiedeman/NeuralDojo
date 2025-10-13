@@ -12,6 +12,7 @@ import torch
 from ..data import FeatureRegistry, SQLiteMarketDataset, SlidingWindowDataset
 from ..data.sqlite_loader import SQLiteMarketSource
 from ..evaluation.metrics import risk_metrics
+from ..utils.reporting import sanitize_metrics
 from ..training import ExperimentConfig, MarketLightningModule
 
 
@@ -173,7 +174,8 @@ class MarketNNPlusUltraAgent:
         if return_column not in predictions:
             raise ValueError(f"Column '{return_column}' not found in predictions DataFrame")
         returns = predictions[return_column].to_numpy()
-        return risk_metrics(returns)
+        metrics = risk_metrics(returns)
+        return sanitize_metrics(metrics)
 
     def run(self, evaluate: bool = True, return_column: str = "realised_return") -> AgentRunResult:
         """Convenience wrapper that prepares data, generates signals, and evaluates."""

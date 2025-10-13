@@ -13,7 +13,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 ### Immediate Implementation Plan (Sprint 0)
 - [x] Harden SQLite ingestion with schema validation + null/duplicate checks.
 - [x] Implement end-to-end smoke test that runs the Plus Ultra agent against a sample SQLite fixture.
-- [ ] Wire evaluation metrics into the agent CLI output for faster iteration loops.
+- [x] Wire evaluation metrics into the agent CLI output for faster iteration loops.
 - [ ] Profile omni-scale backbone throughput and memory on GPU/CPU to tune default hyperparameters.
 - [ ] Add CI job that exercises `python -m compileall` + unit stubs to protect against syntax drift.
 

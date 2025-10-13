@@ -15,6 +15,7 @@ from market_nn_plus_ultra.training.config import (
     OptimizerConfig,
     TrainerConfig,
 )
+from market_nn_plus_ultra.utils import format_metrics_table, write_metrics_report
 
 
 def _build_sqlite_fixture(path: Path, *, rows: int = 64) -> None:
@@ -93,4 +94,13 @@ def test_agent_smoke(tmp_path: Path) -> None:
     assert not result.predictions.empty
     assert result.metrics is not None
     assert "sharpe" in result.metrics
+
+    table = format_metrics_table(result.metrics, precision=4)
+    assert "Metric" in table and "Value" in table
+    assert "sharpe" in table
+
+    metrics_path = tmp_path / "metrics.json"
+    write_metrics_report(result.metrics, metrics_path)
+    payload = metrics_path.read_text(encoding="utf-8")
+    assert "sharpe" in payload
 
