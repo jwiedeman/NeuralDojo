@@ -1,4 +1,4 @@
-"""Dataset utilities for sliding market windows."""
+"""Sliding window dataset utilities for temporal market modelling."""
 
 from __future__ import annotations
 
@@ -13,6 +13,8 @@ from torch.utils.data import Dataset
 
 @dataclass(slots=True)
 class WindowSpec:
+    """Specification for window extraction parameters."""
+
     window_size: int
     horizon: int
     stride: int = 1

@@ -1,4 +1,4 @@
-"""Omni-scale backbone that fuses attention, convolutions, and state-space mixers."""
+"""Omni-scale backbone mixing attention, state-space mixers, and convolutions."""
 
 from __future__ import annotations
 

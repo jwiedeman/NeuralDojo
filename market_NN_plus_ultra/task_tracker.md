@@ -10,6 +10,13 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Automate feature registry documentation export (Markdown generated from `FeaturePipeline.describe()`).
 - [x] Ship Lightning training and data modules with YAML-driven configuration loading.
 
+### Immediate Implementation Plan (Sprint 0)
+- [ ] Harden SQLite ingestion with schema validation + null/duplicate checks.
+- [ ] Implement end-to-end smoke test that runs the Plus Ultra agent against a sample SQLite fixture.
+- [ ] Wire evaluation metrics into the agent CLI output for faster iteration loops.
+- [ ] Profile omni-scale backbone throughput and memory on GPU/CPU to tune default hyperparameters.
+- [ ] Add CI job that exercises `python -m compileall` + unit stubs to protect against syntax drift.
+
 ### Feature Registry Enhancements
 - [x] Auto-generate documentation from `FeatureRegistry.describe()` into Markdown.
 - [ ] Add alternative data connectors (on-chain metrics, macro calendars) into the registry.
