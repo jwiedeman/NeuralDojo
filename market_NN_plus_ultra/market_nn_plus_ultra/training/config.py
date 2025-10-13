@@ -20,6 +20,7 @@ class DataConfig:
     horizon: int = 5
     stride: int = 1
     normalise: bool = True
+    val_fraction: float = 0.2
 
 
 @dataclass(slots=True)
@@ -61,6 +62,9 @@ class TrainerConfig:
     precision: str = "bf16-mixed"
     log_every_n_steps: int = 50
     checkpoint_dir: Path = Path("checkpoints")
+    monitor_metric: str = "val/loss"
+    monitor_mode: str = "min"
+    save_top_k: int = 1
 
 
 @dataclass(slots=True)
