@@ -66,7 +66,7 @@ Each module comes with docstrings explaining expected behaviour so future contri
 
 ## Data Flow Overview
 
-1. **SQLite ingestion** — `SQLiteMarketDataset` loads OHLCV candles, merges optional indicator tables, and restricts the universe to configured symbols.
+1. **SQLite ingestion** — `SQLiteMarketDataset` loads OHLCV candles, merges optional indicator tables, and restricts the universe to configured symbols while running Pandera-backed schema checks to catch nulls, duplicates, or unsorted timestamps before they pollute training runs.
 2. **Feature augmentation** — `FeaturePipeline` executes the registered feature functions, automatically skipping features when dependencies are missing and appending results to the panel.
 3. **Windowing & normalisation** — `SlidingWindowDataset` converts the multi-indexed panel into sliding windows with optional z-score normalisation, surfacing tensors ready for GPU training.
 4. **Model forward pass** — `TemporalBackbone` consumes windows, applies patch embeddings, and processes sequences through the hybrid temporal stack to forecast multi-step actions/returns.
