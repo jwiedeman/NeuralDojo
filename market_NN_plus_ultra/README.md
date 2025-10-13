@@ -61,6 +61,7 @@ Each module comes with docstrings explaining expected behaviour so future contri
 * **Mixture-of-experts scalability** — The `moe_transformer` variant routes tokens through a bank of specialised feed-forward experts, unlocking extra capacity without ballooning quadratic attention cost.
 * **Rich feature engineering** — The feature registry encapsulates momentum, volatility, regime, and spectral features while remaining easily extensible. Adding new indicators only requires registering a `FeatureSpec` with dependency metadata inside `feature_pipeline.py`.
 * **Risk-aware optimisation** — Custom loss functions marry standard regression objectives with differentiable Sharpe and drawdown penalties, rewarding policies that maximise return while respecting risk budgets.
+* **Differentiable PnL simulator** — Training losses can now backpropagate through a cost-aware PnL stream that includes transaction, slippage, and holding penalties for realistic signal shaping.
 * **Automated evaluation** — The evaluation module exposes risk-adjusted metrics (Sharpe, Sortino, Calmar, drawdown) and trade-level analytics that plug directly into backtesting or live monitoring loops.
 * **Research ergonomics** — YAML-driven experiment configs, dataclass-backed runtime configs, and a high-level trainer streamline iteration while keeping experiments reproducible.
 

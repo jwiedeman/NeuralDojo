@@ -119,13 +119,15 @@ class MarketLightningModule(pl.LightningModule):
     def training_step(self, batch: Dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
         preds = self(batch["features"])
         targets = batch["targets"]
-        loss = self.loss_fn(preds, targets)
+        reference = batch.get("reference")
+        loss = self.loss_fn(preds, targets, reference=reference)
         self.log("train/loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch: Dict[str, torch.Tensor], batch_idx: int) -> None:
         preds = self(batch["features"])
-        loss = self.loss_fn(preds, batch["targets"])
+        reference = batch.get("reference")
+        loss = self.loss_fn(preds, batch["targets"], reference=reference)
         self.log("val/loss", loss, prog_bar=True)
 
     def configure_optimizers(self):

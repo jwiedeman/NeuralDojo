@@ -102,7 +102,8 @@ hardware.
 ## Training Loop
 
 * **Risk-aware loss** – `CompositeTradingLoss` combines prediction error with
-  Sharpe and drawdown penalties.
+  Sharpe and drawdown penalties while backpropagating through a differentiable,
+  cost-aware PnL stream.
 * **Optimisation** – AdamW with cosine annealing, gradient clipping, and mixed
   precision. The configuration scales to long training runs on modern GPUs while
   remaining viable on CPU for prototyping.
