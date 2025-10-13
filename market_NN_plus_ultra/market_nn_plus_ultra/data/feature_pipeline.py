@@ -5,7 +5,10 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, MutableMapping, Optional
+from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, MutableMapping, Optional
+
+from collections import defaultdict
+import logging
 
 import numpy as np
 import pandas as pd
@@ -15,6 +18,20 @@ from ta.volatility import BollingerBands
 from ta.volume import ChaikinMoneyFlowIndicator, OnBalanceVolumeIndicator, VolumeWeightedAveragePrice
 
 FeatureFunction = Callable[[pd.DataFrame], pd.Series | pd.DataFrame]
+
+
+if TYPE_CHECKING:
+    from ..utils.logging import StructuredLogger
+
+
+class FeatureDependencyError(RuntimeError):
+    """Raised when required feature dependencies are missing in strict mode."""
+
+    def __init__(self, feature: str, missing: Iterable[str]) -> None:
+        message = f"Feature '{feature}' is missing dependencies: {', '.join(sorted(missing))}"
+        super().__init__(message)
+        self.feature = feature
+        self.missing = tuple(sorted(missing))
 
 
 @dataclass(slots=True)
@@ -231,12 +248,18 @@ class FeatureRegistry:
             )
         return pd.DataFrame.from_records(records)
 
-    def build_pipeline(self, selected: Optional[Iterable[str]] = None) -> "FeaturePipeline":
+    def build_pipeline(
+        self,
+        selected: Optional[Iterable[str]] = None,
+        *,
+        strict: bool = False,
+        logger: Optional[logging.Logger | "StructuredLogger"] = None,
+    ) -> "FeaturePipeline":
         if selected is None:
             specs = list(self._registry.values())
         else:
             specs = [self._registry[name] for name in selected]
-        return FeaturePipeline(specs)
+        return FeaturePipeline(specs, strict=strict, logger=logger)
 
     def to_markdown(
         self,
@@ -302,16 +325,40 @@ class FeatureRegistry:
 class FeaturePipeline:
     """Execute a list of feature engineering steps on market panels."""
 
-    def __init__(self, features: Iterable[FeatureSpec]) -> None:
+    def __init__(
+        self,
+        features: Iterable[FeatureSpec],
+        *,
+        strict: bool = False,
+        logger: Optional[logging.Logger | "StructuredLogger"] = None,
+    ) -> None:
+        from ..utils.logging import StructuredLogger, get_structured_logger
+
         self.features: List[FeatureSpec] = list(features)
+        self.strict = strict
+        if isinstance(logger, StructuredLogger):
+            self.logger = logger.bind(stage="feature_pipeline")
+        else:
+            base_logger = logger or logging.getLogger("market_nn_plus_ultra.feature_pipeline")
+            if not base_logger.handlers:
+                # Default to structured console logging if nothing is configured yet.
+                structured = get_structured_logger(base_logger.name)
+                self.logger = structured.bind(stage="feature_pipeline")
+            else:
+                self.logger = StructuredLogger(base_logger).bind(stage="feature_pipeline")
+        self.missing_dependencies: dict[str, set[str]] = {}
 
     def transform(self, df: pd.DataFrame) -> pd.DataFrame:
         """Return a frame with engineered features appended."""
 
         feature_columns: MutableMapping[str, pd.Series | pd.DataFrame] = {}
+        local_missing: dict[str, set[str]] = defaultdict(set)
         for spec in self.features:
             missing = [col for col in spec.depends_on if col not in df.columns]
             if missing:
+                self._record_missing(local_missing, spec.name, missing)
+                if self.strict:
+                    raise FeatureDependencyError(spec.name, missing)
                 continue
             values = spec.function(df)
             if isinstance(values, pd.DataFrame):
@@ -320,6 +367,7 @@ class FeaturePipeline:
             else:
                 feature_columns[spec.name] = values
         if not feature_columns:
+            self.missing_dependencies = local_missing
             return df
         feature_df = pd.concat(feature_columns, axis=1)
         if isinstance(feature_df.columns, pd.MultiIndex):
@@ -327,6 +375,7 @@ class FeaturePipeline:
                 "__".join([str(level) for level in col if str(level)])
                 for col in feature_df.columns.to_list()
             ]
+        self.missing_dependencies = local_missing
         return pd.concat([df, feature_df], axis=1)
 
     def transform_panel(self, panel: pd.DataFrame) -> pd.DataFrame:
@@ -334,13 +383,33 @@ class FeaturePipeline:
 
         symbols = panel.index.get_level_values("symbol").unique()
         enriched_frames: List[pd.DataFrame] = []
+        aggregated_missing: dict[str, set[str]] = defaultdict(set)
         for symbol in symbols:
             df = panel.xs(symbol, level="symbol").copy()
             enriched = self.transform(df)
             enriched["symbol"] = symbol
             enriched_frames.append(enriched)
+            for feature, columns in self.missing_dependencies.items():
+                aggregated_missing[feature].update(columns)
         enriched_panel = pd.concat(enriched_frames)
+        self.missing_dependencies = aggregated_missing
         return enriched_panel.reset_index().set_index(["timestamp", "symbol"]).sort_index()
+
+    def get_missing_dependencies(self) -> Dict[str, List[str]]:
+        """Return a snapshot of missing dependencies from the last transform."""
+
+        return {feature: sorted(columns) for feature, columns in self.missing_dependencies.items()}
+
+    def _record_missing(
+        self,
+        missing_map: MutableMapping[str, set[str]],
+        feature: str,
+        missing: Iterable[str],
+    ) -> None:
+        columns = set(missing)
+        missing_map[feature].update(columns)
+        payload = {"feature": feature, "missing_columns": sorted(columns)}
+        self.logger.warning("feature_missing_dependency", **payload)
 
     @staticmethod
     def _ema_ratio(close: pd.Series, *, fast: int, slow: int) -> pd.Series:
