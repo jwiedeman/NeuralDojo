@@ -1,4 +1,4 @@
-"""Risk and performance metrics for Market NN Plus Ultra predictions."""
+"""Risk and performance metrics for the Market NN Plus Ultra stack."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ from typing import Dict
 
 import numpy as np
 import pandas as pd
-
 
 def compute_equity_curve(returns: np.ndarray, initial_capital: float = 1.0) -> np.ndarray:
     """Return the cumulative equity curve for a sequence of returns."""
