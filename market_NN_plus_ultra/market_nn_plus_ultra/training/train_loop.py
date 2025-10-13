@@ -17,7 +17,14 @@ from ..models.temporal_transformer import TemporalBackbone, TemporalBackboneConf
 from ..models.temporal_fusion import TemporalFusionConfig, TemporalFusionTransformer
 from ..models.omni_mixture import MarketOmniBackbone, OmniBackboneConfig
 from ..models.losses import CompositeTradingLoss
-from .config import DataConfig, ExperimentConfig, ModelConfig, OptimizerConfig, TrainerConfig
+from .config import (
+    DataConfig,
+    ExperimentConfig,
+    ModelConfig,
+    OptimizerConfig,
+    PretrainingConfig,
+    TrainerConfig,
+)
 
 
 class MarketLightningModule(pl.LightningModule):
@@ -226,6 +233,11 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
     if "checkpoint_dir" in trainer_section:
         trainer_section["checkpoint_dir"] = Path(trainer_section["checkpoint_dir"])
     trainer_cfg = TrainerConfig(**trainer_section)
+
+    pretraining_cfg: PretrainingConfig | None = None
+    if "pretraining" in raw:
+        pretraining_section = dict(raw["pretraining"])
+        pretraining_cfg = PretrainingConfig(**pretraining_section)
     return ExperimentConfig(
         seed=raw.get("seed", 42),
         data=data_cfg,
@@ -234,6 +246,7 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
         trainer=trainer_cfg,
         wandb_project=raw.get("wandb_project"),
         notes=raw.get("notes"),
+        pretraining=pretraining_cfg,
     )
 
 

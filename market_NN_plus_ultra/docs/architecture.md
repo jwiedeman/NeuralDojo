@@ -98,6 +98,11 @@ This variant is controlled through the experiment configuration by setting
 * **Inference agent** – `MarketNNPlusUltraAgent` mirrors the NeuralDojo market
   agent loop, restoring checkpoints, running sliding-window inference over
   SQLite data, and emitting prediction frames plus risk analytics.
+* **Self-supervised warm start** – `MaskedTimeSeriesLightningModule` performs
+  masked reconstruction pretraining so deep transformers and omni-scale models
+  see large context windows before supervised ROI optimisation. Use
+  `scripts/pretrain.py` with `configs/pretrain.yaml` to generate these
+  checkpoints.
 
 ## Extension Opportunities
 
