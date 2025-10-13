@@ -114,6 +114,10 @@ hardware.
 * **Inference agent** – `MarketNNPlusUltraAgent` mirrors the NeuralDojo market
   agent loop, restoring checkpoints, running sliding-window inference over
   SQLite data, and emitting prediction frames plus risk analytics.
+* **PPO fine-tuning** – `run_reinforcement_finetuning` spins up a PPO loop that
+  reuses the supervised backbone, samples batched scenarios from the dataset,
+  and optimises the policy head against differentiable PnL with configurable
+  trading costs.
 * **Self-supervised warm start** – `MaskedTimeSeriesLightningModule` performs
   masked reconstruction pretraining so deep transformers and omni-scale models
   see large context windows before supervised ROI optimisation. Use
@@ -124,9 +128,9 @@ hardware.
 
 * **Self-supervised pretraining** – Implement masked time-series or contrastive
   objectives that warm-start the backbone before task-specific fine-tuning.
-* **Reinforcement learning** – Integrate differentiable market simulators and
-  policy gradient fine-tuning to optimise directly for ROI under trading
-  constraints.
+* **Reinforcement learning** – Extend the shipped PPO module with curriculum
+  schedules, multi-asset allocation heads, or off-policy improvements for even
+  richer trading objectives.
 * **Alternative data** – Expand the feature registry with macro, on-chain, or
   textual embeddings to capture orthogonal alpha sources.
 * **Deployment** – Containerise the training/inference stack and expose service

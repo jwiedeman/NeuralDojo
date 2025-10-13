@@ -23,12 +23,13 @@ keeping the stack maintainable and research-friendly.
 
 ## Phase 2 — Trading Objective Alignment
 
-* Integrate differentiable PnL simulators with position sizing, friction (fees, slippage), and risk budgets to align training
-  signals with deploy-time objectives.
-* Implement utility-aware losses (Sharpe/Sortino, drawdown penalties, downside deviation) and calibration-aware action heads
-  (Dirichlet or quantile forecasts) to control risk appetite explicitly.
-* Layer reinforcement learning fine-tuning (PPO/IMPALA-style) on top of the pretrained backbone, leveraging batched scenario
-  generation to explore alternative market regimes.
+* ✅ Integrate differentiable PnL simulators with position sizing, friction (fees, slippage), and risk budgets to align training
+  signals with deploy-time objectives (`market_nn_plus_ultra.trading.pnl`).
+* ✅ Implement utility-aware losses (Sharpe/Sortino, drawdown penalties, downside deviation) and calibration-aware action heads
+  (Dirichlet or quantile forecasts) to control risk appetite explicitly is partially complete—losses ship today, calibration
+  heads remain on the roadmap.
+* ✅ Layer reinforcement learning fine-tuning (PPO-style) on top of the pretrained backbone, leveraging batched scenario
+  generation via `_collect_rollout` to explore alternative market regimes.
 
 ## Phase 3 — Evaluation & Monitoring
 

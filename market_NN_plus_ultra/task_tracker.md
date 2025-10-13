@@ -36,10 +36,10 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [ ] Introduce curriculum over window sizes and horizons to stabilise very deep models.
 
 ## 2. Trading Objective & Reinforcement Learning
-- [ ] Add differentiable PnL simulator with position sizing, transaction costs, and slippage.
+- [x] Add differentiable PnL simulator with position sizing, transaction costs, and slippage.
 - [x] Implement utility-aware losses (Sharpe, Sortino, drawdown penalties) in `models.losses`.
-- [ ] Wrap policy gradient (PPO/IMPALA) fine-tuning on top of the supervised forecaster.
-- [ ] Support batched scenario simulations to stress-test policies.
+- [x] Wrap policy gradient (PPO/IMPALA) fine-tuning on top of the supervised forecaster.
+- [x] Support batched scenario simulations to stress-test policies.
 - [ ] Explore calibration-aware heads (Dirichlet / quantile) for action confidence.
 
 ## 3. Evaluation & Monitoring
