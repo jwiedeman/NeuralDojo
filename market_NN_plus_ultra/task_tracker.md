@@ -46,7 +46,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Build evaluation harness for daily/weekly backtests with walk-forward splits.
 - [x] Compute ROI, max drawdown, Calmar, hit rate, and tail risk metrics by default.
 - [x] Ship inference agent + CLI to produce prediction frames from SQLite sources.
-- [ ] Generate Markdown/HTML reports with charts for quick inspection.
+- [x] Generate Markdown/HTML reports with charts for quick inspection.
 - [ ] Wire up experiment tracking (Weights & Biases or MLflow) for metadata and artefacts.
 - [ ] Add automated guardrail metrics (exposure, turnover, tail percentiles) for live trading readiness.
 - [ ] Publish automated run reports referencing the research agenda milestones.

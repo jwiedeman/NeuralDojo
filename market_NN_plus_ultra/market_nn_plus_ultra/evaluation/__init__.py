@@ -14,6 +14,12 @@ from .metrics import (
     ulcer_index,
     value_at_risk,
 )
+from .reporting import (
+    ReportSummary,
+    generate_html_report,
+    generate_markdown_report,
+    generate_report,
+)
 from .walkforward import (
     WalkForwardBacktester,
     WalkForwardConfig,
@@ -34,6 +40,10 @@ __all__ = [
     "sortino_ratio",
     "ulcer_index",
     "value_at_risk",
+    "ReportSummary",
+    "generate_markdown_report",
+    "generate_html_report",
+    "generate_report",
     "WalkForwardBacktester",
     "WalkForwardConfig",
     "WalkForwardSplit",
