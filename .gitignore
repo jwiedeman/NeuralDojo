@@ -1,0 +1,33 @@
+__pycache__/
+*.py[cod]
+*.so
+*.dylib
+*.pyd
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Test & cache artifacts
+.pytest_cache/
+.mypy_cache/
+.pyre/
+pytestdebug.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Tooling
+.cache/
+.coverage
+htmlcov/
