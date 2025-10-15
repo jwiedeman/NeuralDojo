@@ -23,6 +23,7 @@ class DataConfig:
     stride: int = 1
     normalise: bool = True
     val_fraction: float = 0.2
+    curriculum: Optional["CurriculumConfig"] = None
 
 
 @dataclass(slots=True)
@@ -122,4 +123,24 @@ class ReinforcementConfig:
     targets_are_returns: bool = False
     activation: str = "tanh"
     costs: Optional[TradingCosts] = None
+
+
+@dataclass(slots=True)
+class CurriculumStage:
+    """One stage within a curriculum schedule."""
+
+    start_epoch: int
+    window_size: Optional[int] = None
+    horizon: Optional[int] = None
+    stride: Optional[int] = None
+    normalise: Optional[bool] = None
+
+
+@dataclass(slots=True)
+class CurriculumConfig:
+    """Configuration controlling staged window/horizon schedules."""
+
+    stages: list[CurriculumStage]
+    repeat_final: bool = True
+
 
