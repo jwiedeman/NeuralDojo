@@ -18,8 +18,8 @@ keeping the stack maintainable and research-friendly.
   stretch context windows into the multi-thousand timestep range.
 * Deploy the omni-scale backbone variant that layers cross-resolution attention and gated state-space mixers for experiments
   targeting extreme horizon lengths and dense feature sets.
-* Add curriculum schedules for window lengths and forecast horizons to encourage the model to learn both micro and macro
-  structures without destabilising optimisation.
+* ✅ Add curriculum schedules for window lengths and forecast horizons to encourage the model to learn both micro and macro
+  structures without destabilising optimisation (`data.curriculum` + training `CurriculumCallback`).
 
 ## Phase 2 — Trading Objective Alignment
 

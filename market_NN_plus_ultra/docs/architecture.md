@@ -123,6 +123,12 @@ hardware.
   are persisted for offline analysis. The evaluation module exposes ROI metrics
   (Sharpe, Sortino, drawdown, Calmar, volatility) suitable for leaderboards and
   automatic reporting.
+* **Curriculum scheduler** – `CurriculumScheduler` gradually increases window
+  size, stride, and forecast horizon across epochs. The schedule is configured
+  in YAML via `data.curriculum`, automatically re-partitioning the
+  `SlidingWindowDataset` and refreshing the policy head through a Lightning
+  callback. Early epochs therefore train on shorter horizons for stability
+  before expanding to the full Plus Ultra context.
 * **Inference agent** – `MarketNNPlusUltraAgent` mirrors the NeuralDojo market
   agent loop, restoring checkpoints, running sliding-window inference over
   SQLite data, and emitting prediction frames plus risk analytics.

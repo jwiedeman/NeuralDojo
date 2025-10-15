@@ -21,6 +21,8 @@ from ..models.state_space import StateSpaceBackbone, StateSpaceConfig
 from ..models.losses import CompositeTradingLoss
 from ..trading.pnl import TradingCosts
 from .config import (
+    CurriculumConfig,
+    CurriculumStage,
     DataConfig,
     ExperimentConfig,
     ModelConfig,
@@ -29,6 +31,11 @@ from .config import (
     ReinforcementConfig,
     TrainerConfig,
 )
+from .curriculum import (
+    CurriculumCallback,
+    CurriculumParameters,
+    CurriculumScheduler,
+)
 
 
 class MarketLightningModule(pl.LightningModule):
@@ -36,6 +43,7 @@ class MarketLightningModule(pl.LightningModule):
 
     def __init__(self, model_config: ModelConfig, optimizer_config: OptimizerConfig) -> None:
         super().__init__()
+        self.model_config = model_config
         self.save_hyperparameters({"model": asdict(model_config), "optimizer": asdict(optimizer_config)})
         architecture = model_config.architecture.lower()
         if architecture in {"hybrid_transformer", "temporal_transformer"}:
@@ -114,6 +122,20 @@ class MarketLightningModule(pl.LightningModule):
         hidden = self.backbone(features)
         return self.head(hidden)
 
+    def update_horizon(self, horizon: int) -> None:
+        """Refresh the policy head when the training horizon changes."""
+
+        if horizon == self.model_config.horizon:
+            return
+        self.model_config.horizon = horizon
+        self.hparams["model"]["horizon"] = horizon
+        new_head = TemporalPolicyHead(
+            self.model_config.model_dim,
+            horizon,
+            self.model_config.output_dim,
+        )
+        self.head = new_head.to(self.device)
+
     @classmethod
     def from_checkpoint(
         cls,
@@ -173,6 +195,11 @@ class MarketDataModule(pl.LightningDataModule):
         self.registry = FeatureRegistry()
         self.train_dataset: SlidingWindowDataset | None = None
         self.val_dataset: SlidingWindowDataset | None = None
+        self.curriculum_scheduler: CurriculumScheduler | None = None
+        self.current_curriculum: CurriculumParameters | None = None
+        self._enriched_panel = None
+        self._feature_columns: list[str] = []
+        self._target_columns: list[str] = []
 
     def setup(self, stage: str | None = None) -> None:
         source = SQLiteMarketSource(path=str(self.data_config.sqlite_path))
@@ -190,23 +217,45 @@ class MarketDataModule(pl.LightningDataModule):
             available = [f for f in self.data_config.feature_set if f in enriched.columns]
         else:
             available = [c for c in enriched.columns if c not in ("symbol",)]
-        full_dataset = SlidingWindowDataset(
-            panel=enriched,
-            feature_columns=available,
-            target_columns=self.data_config.target_columns,
-            window_size=self.data_config.window_size,
-            horizon=self.data_config.horizon,
-            stride=self.data_config.stride,
-            normalise=self.data_config.normalise,
+        self._enriched_panel = enriched
+        self._feature_columns = available
+        self._target_columns = list(self.data_config.target_columns)
+
+        if self.data_config.curriculum is not None:
+            self.curriculum_scheduler = CurriculumScheduler(self.data_config, self.data_config.curriculum)
+            params = self.curriculum_scheduler.parameters_for_epoch(0)
+        else:
+            params = CurriculumParameters(
+                window_size=self.data_config.window_size,
+                horizon=self.data_config.horizon,
+                stride=self.data_config.stride,
+                normalise=self.data_config.normalise,
+            )
+
+        self.apply_curriculum(params)
+
+    def _build_dataset(self, params: CurriculumParameters) -> SlidingWindowDataset:
+        if self._enriched_panel is None:
+            raise RuntimeError("DataModule.setup must be called before building datasets")
+        return SlidingWindowDataset(
+            panel=self._enriched_panel,
+            feature_columns=self._feature_columns,
+            target_columns=self._target_columns,
+            window_size=params.window_size,
+            horizon=params.horizon,
+            stride=params.stride,
+            normalise=params.normalise,
         )
-        dataset_length = len(full_dataset)
+
+    def _assign_splits(self, dataset: SlidingWindowDataset) -> None:
+        dataset_length = len(dataset)
         if dataset_length == 0:
             raise ValueError("SlidingWindowDataset is empty. Check window size, horizon, and data availability.")
 
         val_fraction = max(0.0, min(1.0, self.data_config.val_fraction))
         if val_fraction == 0.0 or dataset_length < 2:
-            self.train_dataset = full_dataset
-            self.val_dataset = full_dataset
+            self.train_dataset = dataset
+            self.val_dataset = dataset
             return
 
         val_len = int(round(dataset_length * val_fraction))
@@ -217,9 +266,27 @@ class MarketDataModule(pl.LightningDataModule):
         train_len = dataset_length - val_len
 
         generator = torch.Generator().manual_seed(self.seed)
-        train_subset, val_subset = random_split(full_dataset, lengths=[train_len, val_len], generator=generator)
+        train_subset, val_subset = random_split(dataset, lengths=[train_len, val_len], generator=generator)
         self.train_dataset = train_subset
         self.val_dataset = val_subset
+
+    def apply_curriculum(self, params: CurriculumParameters) -> None:
+        dataset = self._build_dataset(params)
+        self._assign_splits(dataset)
+        self.current_curriculum = params
+
+    def step_curriculum(self, epoch: int) -> CurriculumParameters | None:
+        if self.curriculum_scheduler is None:
+            return None
+        params = self.curriculum_scheduler.parameters_for_epoch(epoch)
+        if self.current_curriculum == params:
+            return None
+        self.apply_curriculum(params)
+        return params
+
+    @property
+    def has_curriculum(self) -> bool:
+        return self.curriculum_scheduler is not None
 
     def train_dataloader(self) -> DataLoader:
         assert self.train_dataset is not None
@@ -251,6 +318,25 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
         data_section["symbol_universe"] = list(data_section["symbol_universe"])
     if data_section.get("feature_set") is not None:
         data_section["feature_set"] = list(data_section["feature_set"])
+    if data_section.get("curriculum") is not None:
+        curriculum_section = dict(data_section["curriculum"])
+        stages_data = curriculum_section.get("stages") or []
+        stages: list[CurriculumStage] = []
+        for stage in stages_data:
+            stage_dict = dict(stage)
+            stages.append(
+                CurriculumStage(
+                    start_epoch=int(stage_dict["start_epoch"]),
+                    window_size=stage_dict.get("window_size"),
+                    horizon=stage_dict.get("horizon"),
+                    stride=stage_dict.get("stride"),
+                    normalise=stage_dict.get("normalise"),
+                )
+            )
+        data_section["curriculum"] = CurriculumConfig(
+            stages=stages,
+            repeat_final=curriculum_section.get("repeat_final", True),
+        )
     data_cfg = DataConfig(**data_section)
 
     model_section = dict(raw["model"])
@@ -324,6 +410,21 @@ def run_training(config: ExperimentConfig) -> dict[str, Any]:
         auto_insert_metric_name=False,
     )
     lr_monitor = pl.callbacks.LearningRateMonitor(logging_interval="step")
+    if config.data.curriculum is not None:
+        initial_params = CurriculumScheduler(config.data, config.data.curriculum).parameters_for_epoch(0)
+    else:
+        initial_params = CurriculumParameters(
+            window_size=config.data.window_size,
+            horizon=config.data.horizon,
+            stride=config.data.stride,
+            normalise=config.data.normalise,
+        )
+    module.update_horizon(initial_params.horizon)
+
+    callbacks: list[pl.Callback] = [checkpoint_callback, lr_monitor]
+    if config.data.curriculum is not None:
+        callbacks.append(CurriculumCallback())
+
     trainer = pl.Trainer(
         accelerator=config.trainer.accelerator,
         devices=config.trainer.devices,
@@ -333,7 +434,7 @@ def run_training(config: ExperimentConfig) -> dict[str, Any]:
         precision=config.trainer.precision,
         log_every_n_steps=config.trainer.log_every_n_steps,
         default_root_dir=str(checkpoint_dir),
-        callbacks=[checkpoint_callback, lr_monitor],
+        callbacks=callbacks,
         deterministic=True,
     )
     trainer.fit(module, datamodule=data_module)

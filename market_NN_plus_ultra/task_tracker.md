@@ -33,7 +33,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Pretrain on masked time-series reconstruction before supervised fine-tuning (`scripts/pretrain.py`).
 - [ ] Benchmark pretraining checkpoints vs. scratch initialisation across asset classes.
 - [x] Extend pretraining tasks with contrastive (TS2Vec-style) objectives for regime discrimination.
-- [ ] Introduce curriculum over window sizes and horizons to stabilise very deep models.
+- [x] Introduce curriculum over window sizes and horizons to stabilise very deep models. (See `CurriculumScheduler`)
 
 ## 2. Trading Objective & Reinforcement Learning
 - [x] Add differentiable PnL simulator with position sizing, transaction costs, and slippage.

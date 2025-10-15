@@ -1,6 +1,8 @@
 """Training utilities for Market NN Plus Ultra."""
 
 from .config import (
+    CurriculumConfig,
+    CurriculumStage,
     DataConfig,
     ExperimentConfig,
     ModelConfig,
@@ -15,6 +17,11 @@ from .train_loop import (
     instantiate_modules,
     load_experiment_from_file,
     run_training,
+)
+from .curriculum import (
+    CurriculumCallback,
+    CurriculumParameters,
+    CurriculumScheduler,
 )
 from .pretrain_loop import (
     ContrastiveTimeSeriesLightningModule,
@@ -37,6 +44,11 @@ __all__ = [
     "ExperimentConfig",
     "PretrainingConfig",
     "ReinforcementConfig",
+    "CurriculumConfig",
+    "CurriculumStage",
+    "CurriculumScheduler",
+    "CurriculumParameters",
+    "CurriculumCallback",
     "MarketLightningModule",
     "MarketDataModule",
     "instantiate_modules",
