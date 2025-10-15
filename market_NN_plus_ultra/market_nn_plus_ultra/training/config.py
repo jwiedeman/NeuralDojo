@@ -82,6 +82,10 @@ class ExperimentConfig:
     optimizer: OptimizerConfig = field(default_factory=OptimizerConfig)
     trainer: TrainerConfig = field(default_factory=TrainerConfig)
     wandb_project: Optional[str] = None
+    wandb_entity: Optional[str] = None
+    wandb_run_name: Optional[str] = None
+    wandb_tags: tuple[str, ...] = field(default_factory=tuple)
+    wandb_offline: bool = False
     notes: Optional[str] = None
     pretraining: Optional["PretrainingConfig"] = None
     reinforcement: Optional["ReinforcementConfig"] = None

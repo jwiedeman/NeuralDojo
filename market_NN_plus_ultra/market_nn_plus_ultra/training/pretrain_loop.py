@@ -15,6 +15,7 @@ from ..models.temporal_fusion import TemporalFusionConfig, TemporalFusionTransfo
 from ..models.temporal_transformer import TemporalBackbone, TemporalBackboneConfig
 from ..models.moe_transformer import MixtureOfExpertsBackbone, MixtureOfExpertsConfig
 from .config import ExperimentConfig, ModelConfig, OptimizerConfig, PretrainingConfig
+from ..utils.wandb import maybe_create_wandb_logger
 from .train_loop import MarketDataModule
 
 
@@ -347,6 +348,20 @@ def run_pretraining(config: ExperimentConfig) -> dict[str, Any]:
         auto_insert_metric_name=False,
     )
     lr_monitor = pl.callbacks.LearningRateMonitor(logging_interval="step")
+    loggers: list[pl.loggers.logger.Logger] = []
+    wandb_logger = maybe_create_wandb_logger(config, run_kind="pretrain")
+    if wandb_logger is not None:
+        wandb_logger.watch(module, log="gradients", log_freq=100, log_graph=False)
+        loggers.append(wandb_logger)
+
+    trainer_logger: pl.loggers.logger.Logger | list[pl.loggers.logger.Logger] | bool
+    if not loggers:
+        trainer_logger = True
+    elif len(loggers) == 1:
+        trainer_logger = loggers[0]
+    else:
+        trainer_logger = loggers
+
     trainer = pl.Trainer(
         accelerator=config.trainer.accelerator,
         devices=config.trainer.devices,
@@ -357,6 +372,7 @@ def run_pretraining(config: ExperimentConfig) -> dict[str, Any]:
         log_every_n_steps=config.trainer.log_every_n_steps,
         default_root_dir=str(checkpoint_dir),
         callbacks=[checkpoint_callback, lr_monitor],
+        logger=trainer_logger,
         deterministic=True,
     )
     trainer.fit(module, datamodule=data_module)

@@ -35,8 +35,8 @@ keeping the stack maintainable and research-friendly.
 
 * Stand up a walk-forward evaluation harness covering daily, weekly, and monthly cadences with rolling retraining windows.
 * Produce auto-generated Markdown/HTML reports that chart ROI, drawdowns, turnover, and regime attribution for every run.
-* Stream experiment telemetry to an observability stack (Weights & Biases, MLflow, Prometheus) to keep the research flywheel
-  transparent.
+* ✅ Stream experiment telemetry to Weights & Biases so every Plus Ultra experiment carries searchable configs, metrics, and
+  artefacts. Offline logging is available for air-gapped studies.
 
 ## Phase 4 — Automation & Deployment
 

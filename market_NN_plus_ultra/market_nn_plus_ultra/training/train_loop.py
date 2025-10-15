@@ -20,6 +20,7 @@ from ..models.moe_transformer import MixtureOfExpertsBackbone, MixtureOfExpertsC
 from ..models.state_space import StateSpaceBackbone, StateSpaceConfig
 from ..models.losses import CompositeTradingLoss
 from ..trading.pnl import TradingCosts
+from ..utils.wandb import maybe_create_wandb_logger
 from .config import (
     CurriculumConfig,
     CurriculumStage,
@@ -375,6 +376,11 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
             if isinstance(costs_section, dict):
                 reinforcement_section["costs"] = TradingCosts(**costs_section)
         reinforcement_cfg = ReinforcementConfig(**reinforcement_section)
+    wandb_tags = raw.get("wandb_tags")
+    if wandb_tags is None:
+        tags_tuple: tuple[str, ...] = ()
+    else:
+        tags_tuple = tuple(str(tag) for tag in wandb_tags)
     return ExperimentConfig(
         seed=raw.get("seed", 42),
         data=data_cfg,
@@ -382,6 +388,10 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
         optimizer=optimizer_cfg,
         trainer=trainer_cfg,
         wandb_project=raw.get("wandb_project"),
+        wandb_entity=raw.get("wandb_entity"),
+        wandb_run_name=raw.get("wandb_run_name"),
+        wandb_tags=tags_tuple,
+        wandb_offline=bool(raw.get("wandb_offline", False)),
         notes=raw.get("notes"),
         pretraining=pretraining_cfg,
         reinforcement=reinforcement_cfg,
@@ -425,6 +435,20 @@ def run_training(config: ExperimentConfig) -> dict[str, Any]:
     if config.data.curriculum is not None:
         callbacks.append(CurriculumCallback())
 
+    loggers: list[pl.loggers.logger.Logger] = []
+    wandb_logger = maybe_create_wandb_logger(config, run_kind="train")
+    if wandb_logger is not None:
+        wandb_logger.watch(module, log="gradients", log_freq=100, log_graph=False)
+        loggers.append(wandb_logger)
+
+    trainer_logger: pl.loggers.logger.Logger | list[pl.loggers.logger.Logger] | bool
+    if not loggers:
+        trainer_logger = True
+    elif len(loggers) == 1:
+        trainer_logger = loggers[0]
+    else:
+        trainer_logger = loggers
+
     trainer = pl.Trainer(
         accelerator=config.trainer.accelerator,
         devices=config.trainer.devices,
@@ -435,6 +459,7 @@ def run_training(config: ExperimentConfig) -> dict[str, Any]:
         log_every_n_steps=config.trainer.log_every_n_steps,
         default_root_dir=str(checkpoint_dir),
         callbacks=callbacks,
+        logger=trainer_logger,
         deterministic=True,
     )
     trainer.fit(module, datamodule=data_module)

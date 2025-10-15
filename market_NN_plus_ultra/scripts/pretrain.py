@@ -75,6 +75,18 @@ def _apply_overrides(config, args) -> None:
             except ValueError:
                 pretrain.time_mask_fill = args.time_mask_fill
 
+    if args.wandb_project is not None:
+        config.wandb_project = args.wandb_project
+    if args.wandb_entity is not None:
+        config.wandb_entity = args.wandb_entity
+    if args.wandb_run_name is not None:
+        config.wandb_run_name = args.wandb_run_name
+    if args.wandb_tags is not None:
+        tags = [tag.strip() for tag in args.wandb_tags.split(",") if tag.strip()]
+        config.wandb_tags = tuple(tags)
+    if args.wandb_offline:
+        config.wandb_offline = True
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -113,6 +125,19 @@ def parse_args() -> argparse.Namespace:
         "--time-mask-fill",
         type=str,
         help="Fill value for masked timesteps (float or 'mean')",
+    )
+    parser.add_argument("--wandb-project", type=str, help="Weights & Biases project name")
+    parser.add_argument("--wandb-entity", type=str, help="Weights & Biases entity/username")
+    parser.add_argument("--wandb-run-name", type=str, help="Explicit Weights & Biases run name")
+    parser.add_argument(
+        "--wandb-tags",
+        type=str,
+        help="Comma separated list of tags to attach to the Weights & Biases run",
+    )
+    parser.add_argument(
+        "--wandb-offline",
+        action="store_true",
+        help="Force Weights & Biases into offline mode for air-gapped experiments",
     )
     return parser.parse_args()
 
