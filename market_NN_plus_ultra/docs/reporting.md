@@ -32,6 +32,17 @@ Reports automatically create a sibling folder (e.g. `latest_assets/`) that store
 chart images referenced by the Markdown or HTML output. Both formats are
 designed to drop directly into research notebooks, investor letters, or PRDs.
 
+### Experiment Tracking
+
+Training and pretraining runs can stream metrics directly to Weights & Biases.
+Set `wandb_project` (and optionally `wandb_entity`, `wandb_run_name`, or
+`wandb_tags`) in your experiment YAML or pass overrides such as
+`--wandb-project plus-ultra --wandb-tags curriculum,long-context` to the CLI.
+Offline environments are supported via `wandb_offline: true` or the
+`--wandb-offline` flag, which stores run artefacts locally until they are synced.
+Each run automatically receives the full experiment configuration so dashboards
+are reproducible and searchable.
+
 ### Guardrail Diagnostics
 
 The evaluation package now exposes `guardrail_metrics`, which surfaces
