@@ -122,6 +122,7 @@ For a deeper discussion of the data flow, modular boundaries, and suggested exte
    * Inspect checkpoints saved under `training.checkpoint_dir` and feed results back into the task tracker to prioritise the next steps.
    * Deploy the new inference agent (`scripts/run_agent.py`) to mirror the classic market agent workflow on fresh SQLite dumps. The CLI now streams a formatted risk dashboard to stdout and can persist metrics to JSON/CSV/Markdown via `--metrics-output`.
    * Profile backbone throughput and memory with `scripts/profile_backbone.py --architecture omni_mixture --seq-len 1024 --batch-size 32` to validate hyper-parameters against available hardware before launching long experiments.
+   * Run `python scripts/ci_compile.py --quiet` as a lightning-fast syntax smoke test before longer training or linting cycles. The command wraps `compileall` so it is trivial to drop into CI.
    * Produce investor-ready performance summaries with `scripts/generate_report.py --predictions outputs/predictions.parquet --output reports/latest.html`. The command renders Markdown or HTML, complete with risk metrics and charts, for rapid experiment reviews.
    * Regenerate feature documentation with `python scripts/export_features.py --output docs/generated_features.md` after extending the registry.
 
