@@ -49,7 +49,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Ship inference agent + CLI to produce prediction frames from SQLite sources.
 - [x] Generate Markdown/HTML reports with charts for quick inspection.
 - [ ] Wire up experiment tracking (Weights & Biases or MLflow) for metadata and artefacts.
-- [ ] Add automated guardrail metrics (exposure, turnover, tail percentiles) for live trading readiness.
+- [x] Add automated guardrail metrics (exposure, turnover, tail percentiles) for live trading readiness.
 - [ ] Publish automated run reports referencing the research agenda milestones.
 
 ## 4. Automation & Deployment

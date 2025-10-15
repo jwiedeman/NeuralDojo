@@ -214,3 +214,118 @@ def evaluate_trade_log(trades: pd.DataFrame) -> Dict[str, float]:
 
     returns = trades["pnl"].to_numpy(dtype=np.float64)
     return risk_metrics(returns)
+
+
+def guardrail_metrics(
+    trades: pd.DataFrame,
+    *,
+    timestamp_col: str = "timestamp",
+    symbol_col: str = "symbol",
+    notional_col: str = "notional",
+    position_col: str = "position",
+    price_col: str = "price",
+    return_col: str = "pnl",
+    capital_base: float = 1.0,
+    tail_percentile: float = 5.0,
+) -> Dict[str, float]:
+    """Compute guardrail diagnostics for a trade log.
+
+    Parameters
+    ----------
+    trades:
+        DataFrame containing at least a timestamp column and either a
+        notional exposure column or both position and price columns.
+    timestamp_col, symbol_col:
+        Column names describing trade timestamps and symbols.
+    notional_col, position_col, price_col:
+        Exposure column names. When ``notional_col`` is missing the notional is
+        derived as ``position * price``.
+    return_col:
+        Column describing realised returns or PnL for tail analysis.
+    capital_base:
+        Reference capital used to normalise exposure and turnover metrics.
+    tail_percentile:
+        Percentile (0–100) used to compute downside tail statistics.
+
+    Returns
+    -------
+    dict
+        Dictionary containing exposure, turnover, and tail risk diagnostics.
+    """
+
+    if timestamp_col not in trades:
+        raise ValueError(f"Column '{timestamp_col}' is required for guardrail metrics")
+
+    df = trades.copy()
+    if notional_col not in df.columns:
+        if position_col not in df.columns or price_col not in df.columns:
+            raise ValueError(
+                "Guardrail metrics require either a notional column or both"
+                f" position ('{position_col}') and price ('{price_col}') columns"
+            )
+        df[notional_col] = df[position_col] * df[price_col]
+
+    df = df.dropna(subset=[timestamp_col])
+    if df.empty:
+        return {
+            "gross_exposure_peak": 0.0,
+            "gross_exposure_mean": 0.0,
+            "net_exposure_mean": 0.0,
+            "net_exposure_peak": 0.0,
+            "turnover_rate": 0.0,
+            "tail_return_quantile": 0.0,
+            "tail_return_mean": 0.0,
+            "tail_event_frequency": 0.0,
+            "max_symbol_exposure": 0.0,
+        }
+
+    df = df.sort_values(timestamp_col)
+    capital = float(capital_base) if capital_base not in (None, 0) else 1.0
+
+    grouped = df.groupby(timestamp_col)
+    gross_series = grouped[notional_col].apply(lambda values: np.abs(values).sum())
+    net_series = grouped[notional_col].sum()
+
+    gross_peak = float(gross_series.max() / capital) if not gross_series.empty else 0.0
+    gross_mean = float(gross_series.mean() / capital) if not gross_series.empty else 0.0
+    net_mean = float(net_series.mean() / capital) if not net_series.empty else 0.0
+    net_peak = float(net_series.abs().max() / capital) if not net_series.empty else 0.0
+
+    if len(net_series) > 1:
+        turnover = float(net_series.diff().abs().fillna(0.0).mean() / capital)
+    else:
+        turnover = 0.0
+
+    tail_cut = 0.0
+    tail_mean = 0.0
+    tail_frequency = 0.0
+    if return_col in df.columns:
+        returns_by_time = grouped[return_col].sum()
+        if not returns_by_time.empty:
+            tail_cut = float(
+                np.percentile(
+                    returns_by_time.to_numpy(dtype=np.float64),
+                    float(np.clip(tail_percentile, 0.0, 100.0)),
+                )
+            )
+            tail_values = returns_by_time[returns_by_time <= tail_cut]
+            tail_mean = float(tail_values.mean()) if not tail_values.empty else tail_cut
+            tail_frequency = float(len(tail_values) / len(returns_by_time))
+
+    max_symbol_exposure = 0.0
+    if symbol_col in df.columns:
+        symbol_exposure = df.groupby(symbol_col)[notional_col].apply(lambda values: np.abs(values).max())
+        if not symbol_exposure.empty:
+            max_symbol_exposure = float(symbol_exposure.max() / capital)
+
+    return {
+        "gross_exposure_peak": gross_peak,
+        "gross_exposure_mean": gross_mean,
+        "net_exposure_mean": net_mean,
+        "net_exposure_peak": net_peak,
+        "turnover_rate": turnover,
+        "tail_return_quantile": tail_cut,
+        "tail_return_mean": tail_mean,
+        "tail_event_frequency": tail_frequency,
+        "max_symbol_exposure": max_symbol_exposure,
+    }

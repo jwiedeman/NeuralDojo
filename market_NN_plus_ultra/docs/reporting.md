@@ -32,6 +32,22 @@ Reports automatically create a sibling folder (e.g. `latest_assets/`) that store
 chart images referenced by the Markdown or HTML output. Both formats are
 designed to drop directly into research notebooks, investor letters, or PRDs.
 
+### Guardrail Diagnostics
+
+The evaluation package now exposes `guardrail_metrics`, which surfaces
+exposure, turnover, and tail-risk diagnostics from trade logs. These metrics
+are ideal for automated run checks before promoting a strategy:
+
+```python
+from market_nn_plus_ultra.evaluation import guardrail_metrics
+
+guardrails = guardrail_metrics(trade_log_df, capital_base=5_000_000)
+print(guardrails["gross_exposure_peak"], guardrails["tail_return_quantile"])
+```
+
+Combine guardrails with the standard ROI metrics to build dashboards that catch
+over-levered policies or fat-tailed behaviour before they reach production.
+
 ## Python API
 
 For programmatic access import the helper from the evaluation package:
