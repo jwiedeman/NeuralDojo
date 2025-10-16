@@ -46,6 +46,8 @@ class ModelConfig:
     coarse_factor: int = 4
     cross_every: int = 2
     max_seq_len: int = 4096
+    use_rotary_embeddings: bool = True
+    rope_theta: float = 10000.0
     encoder_layers: Optional[int] = None
     decoder_layers: Optional[int] = None
 

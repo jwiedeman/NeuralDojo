@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 import torch
 from einops import rearrange
@@ -26,6 +26,9 @@ class TemporalBackboneConfig:
         16,
         32,
     )
+    max_seq_len: int = 4096
+    use_rotary_embeddings: bool = True
+    rope_theta: float = 10000.0
 
 
 class PatchEmbedding(nn.Module):
@@ -57,10 +60,113 @@ class TemporalConvMixer(nn.Module):
         return self.norm(x + residual)
 
 
-class TemporalBlock(nn.Module):
-    def __init__(self, dim: int, heads: int, dropout: float, kernel_size: int, dilation: int) -> None:
+def _rotate_half(x: torch.Tensor) -> torch.Tensor:
+    x1, x2 = x[..., ::2], x[..., 1::2]
+    return torch.stack((-x2, x1), dim=-1).reshape_as(x)
+
+
+class RotaryEmbedding(nn.Module):
+    """Rotary positional embedding cache supporting dynamic sequence lengths."""
+
+    def __init__(self, dim: int, max_seq_len: int, base: float = 10000.0) -> None:
         super().__init__()
-        self.attn = nn.MultiheadAttention(embed_dim=dim, num_heads=heads, dropout=dropout, batch_first=True)
+        if dim % 2 != 0:
+            raise ValueError("Rotary embedding dimension must be even")
+        self.dim = dim
+        self.max_seq_len = max_seq_len
+        inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float() / dim))
+        self.register_buffer("inv_freq", inv_freq, persistent=False)
+        self.register_buffer("cos_cached", torch.empty(0), persistent=False)
+        self.register_buffer("sin_cached", torch.empty(0), persistent=False)
+
+    def _build_cache(self, seq_len: int, device: torch.device, dtype: torch.dtype) -> None:
+        max_seq = max(seq_len, self.max_seq_len)
+        t = torch.arange(max_seq, device=device, dtype=self.inv_freq.dtype)
+        freqs = torch.einsum("i,j->ij", t, self.inv_freq)
+        emb = torch.cat((freqs, freqs), dim=-1)
+        cos = emb.cos().to(dtype)
+        sin = emb.sin().to(dtype)
+        self.cos_cached = cos[None, None, :, :]
+        self.sin_cached = sin[None, None, :, :]
+
+    def forward(self, q: torch.Tensor, k: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        seq_len = max(q.size(-2), k.size(-2))
+        if self.cos_cached.numel() == 0 or self.cos_cached.size(-2) < seq_len:
+            self._build_cache(seq_len, q.device, q.dtype)
+        cos = self.cos_cached[..., :seq_len, :]
+        sin = self.sin_cached[..., :seq_len, :]
+        q = (q * cos) + (_rotate_half(q) * sin)
+        k = (k * cos) + (_rotate_half(k) * sin)
+        return q, k
+
+
+class TemporalAttention(nn.Module):
+    """Multi-head self-attention with optional rotary embeddings."""
+
+    def __init__(
+        self,
+        dim: int,
+        heads: int,
+        dropout: float,
+        *,
+        use_rotary: bool,
+        max_seq_len: int,
+        rope_theta: float,
+    ) -> None:
+        super().__init__()
+        if dim % heads != 0:
+            raise ValueError("model_dim must be divisible by heads")
+        self.heads = heads
+        self.head_dim = dim // heads
+        self.scale = self.head_dim ** -0.5
+        self.qkv = nn.Linear(dim, dim * 3, bias=False)
+        self.out = nn.Linear(dim, dim)
+        self.dropout = nn.Dropout(dropout)
+        self.use_rotary = use_rotary
+        self.rotary: Optional[RotaryEmbedding]
+        if use_rotary:
+            self.rotary = RotaryEmbedding(self.head_dim, max_seq_len=max_seq_len, base=rope_theta)
+        else:
+            self.rotary = None
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        qkv = self.qkv(x)
+        q, k, v = qkv.chunk(3, dim=-1)
+        q = rearrange(q, "b t (h d) -> b h t d", h=self.heads)
+        k = rearrange(k, "b t (h d) -> b h t d", h=self.heads)
+        v = rearrange(v, "b t (h d) -> b h t d", h=self.heads)
+        if self.rotary is not None:
+            q, k = self.rotary(q, k)
+        scores = torch.matmul(q, k.transpose(-1, -2)) * self.scale
+        attn = torch.softmax(scores, dim=-1)
+        attn = self.dropout(attn)
+        out = torch.matmul(attn, v)
+        out = rearrange(out, "b h t d -> b t (h d)")
+        return self.out(out)
+
+
+class TemporalBlock(nn.Module):
+    def __init__(
+        self,
+        dim: int,
+        heads: int,
+        dropout: float,
+        kernel_size: int,
+        dilation: int,
+        *,
+        use_rotary: bool,
+        max_seq_len: int,
+        rope_theta: float,
+    ) -> None:
+        super().__init__()
+        self.attn = TemporalAttention(
+            dim,
+            heads,
+            dropout,
+            use_rotary=use_rotary,
+            max_seq_len=max_seq_len,
+            rope_theta=rope_theta,
+        )
         self.attn_norm = nn.LayerNorm(dim)
         self.ff = nn.Sequential(
             nn.LayerNorm(dim),
@@ -73,7 +179,7 @@ class TemporalBlock(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         residual = x
-        attn_out, _ = self.attn(x, x, x)
+        attn_out = self.attn(x)
         x = self.attn_norm(attn_out + residual)
         x = x + self.ff(x)
         x = self.conv(x)
@@ -87,7 +193,7 @@ class TemporalBackbone(nn.Module):
         super().__init__()
         self.config = config
         self.embed = PatchEmbedding(config.feature_dim, config.model_dim)
-        self.positional_encoding = nn.Parameter(torch.zeros(1, 4096, config.model_dim))
+        self.positional_encoding = nn.Parameter(torch.zeros(1, config.max_seq_len, config.model_dim))
         self.dropout = nn.Dropout(config.dropout)
         blocks = []
         for i in range(config.depth):
@@ -99,6 +205,9 @@ class TemporalBackbone(nn.Module):
                     dropout=config.dropout,
                     kernel_size=config.conv_kernel_size,
                     dilation=dilation,
+                    use_rotary=config.use_rotary_embeddings,
+                    max_seq_len=config.max_seq_len,
+                    rope_theta=config.rope_theta,
                 )
             )
         self.blocks = nn.ModuleList(blocks)

@@ -159,6 +159,7 @@ The CLI mirrors the reinforcement config dataclass so you can override rollout s
 ## Model Highlights
 
 * **Hybrid temporal backbone** — stacks multi-head attention, dilated temporal convolutions, and state-space mixers for long-term memory. A heavier `MarketOmniBackbone` pushes context even further with cross-resolution attention and gated state-space mixers.
+* **Rotary-aware attention** — the hybrid backbone now ships with configurable rotary positional embeddings and an extendable `max_seq_len`, keeping extremely long price histories numerically stable while avoiding quadratic memory blow-ups.
 * **Rich data preprocessing** — SQLite ingestion joins OHLCV, indicators, and on-the-fly engineered features with z-score normalisation.
 * **Risk-aware objectives** — differentiable Sharpe/drawdown penalties baked into the default loss encourage ROI-focussed behaviour.
 * **Self-supervised warm start** — Masked reconstruction and contrastive InfoNCE pretraining (`scripts/pretrain.py`) prime the backbone on vast context windows before ROI-optimised fine-tuning.

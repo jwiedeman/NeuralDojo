@@ -59,6 +59,9 @@ dimension while preserving sequence length.
 
 `TemporalBackboneConfig` exposes all scaling knobs (depth, heads, dilations)
 through configuration files so experiments can scale up without touching code.
+The latest revision adds configurable rotary positional embeddings and
+`max_seq_len` so ultra-long sequences (8k+ timesteps) remain stable without
+rewriting the backbone.
 
 ### Temporal Fusion Variant
 
