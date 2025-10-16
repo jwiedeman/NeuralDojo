@@ -16,7 +16,7 @@ from ..models.temporal_transformer import TemporalBackbone, TemporalBackboneConf
 from ..models.moe_transformer import MixtureOfExpertsBackbone, MixtureOfExpertsConfig
 from .config import ExperimentConfig, ModelConfig, OptimizerConfig, PretrainingConfig
 from ..utils.wandb import maybe_create_wandb_logger
-from .train_loop import MarketDataModule
+from .train_loop import MarketDataModule, ensure_feature_dim_alignment
 
 
 def _build_backbone(model_config: ModelConfig) -> nn.Module:
@@ -322,6 +322,9 @@ def instantiate_pretraining_module(
         raise ValueError("ExperimentConfig.pretraining must be provided for pretraining runs")
     pl.seed_everything(config.seed)
     objective = config.pretraining.objective.lower()
+    data_module = MarketDataModule(config.data, config.trainer, seed=config.seed)
+    ensure_feature_dim_alignment(config, data_module)
+
     if objective in {"masked", "mask"}:
         module: pl.LightningModule = MaskedTimeSeriesLightningModule(
             config.model, config.optimizer, config.pretraining
@@ -332,7 +335,6 @@ def instantiate_pretraining_module(
         )
     else:
         raise ValueError(f"Unknown pretraining objective '{config.pretraining.objective}'")
-    data_module = MarketDataModule(config.data, config.trainer, seed=config.seed)
     return module, data_module
 
 
