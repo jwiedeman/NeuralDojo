@@ -28,17 +28,9 @@ dependencies = [
     "pandera>=0.17"
 ]
 
-[tool.setuptools]
-package-dir = {"" = "market_nn_plus_ultra"}
-packages = [
-    "market_nn_plus_ultra",
-    "market_nn_plus_ultra.data",
-    "market_nn_plus_ultra.models",
-    "market_nn_plus_ultra.training",
-    "market_nn_plus_ultra.trading",
-    "market_nn_plus_ultra.evaluation",
-    "market_nn_plus_ultra.utils"
-]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["market_nn_plus_ultra*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
