@@ -11,6 +11,8 @@ from __future__ import annotations
 import contextlib
 import sqlite3
 from dataclasses import dataclass
+from pathlib import Path
+from urllib.parse import urlparse, unquote
 from typing import Iterable, Mapping, Optional
 
 import numpy as np
@@ -28,10 +30,61 @@ class SQLiteMarketSource:
     read_only: bool = True
     pragma_statements: Optional[Iterable[str]] = None
 
+    def _resolve_path_candidates(self, raw_path: Path) -> list[Path]:
+        candidates: list[Path] = []
+        if raw_path.is_absolute():
+            candidates.append(raw_path)
+        else:
+            candidates.append((Path.cwd() / raw_path).resolve())
+            project_root = (Path(__file__).resolve().parents[2] / raw_path).resolve()
+            if project_root not in candidates:
+                candidates.append(project_root)
+        return candidates
+
+    def _ensure_filesystem_path(self, raw_path: Path) -> Path:
+        candidates = self._resolve_path_candidates(raw_path.expanduser())
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+
+        if not self.read_only and candidates:
+            target = candidates[0]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            return target
+
+        tried = ", ".join(str(c) for c in candidates) or str(raw_path)
+        raise FileNotFoundError(
+            "Could not locate the SQLite database. Checked: "
+            f"{tried}. Provide a database at that location or update your "
+            "configuration (see README.md step 'Provide market data')."
+        )
+
+    def _prepare_connection(self) -> tuple[str, Optional[Path]]:
+        """Return a connection URI and resolved filesystem path (if any)."""
+
+        if self.path == ":memory:":
+            return self.path, None
+
+        if self.path.startswith("sqlite:") or self.path.startswith("sqlite+"):
+            return self.path, None
+
+        if self.path.startswith("file:"):
+            parsed = urlparse(self.path)
+            path_str = parsed.path or parsed.netloc
+            if not path_str:
+                return self.path, None
+            fs_path = self._ensure_filesystem_path(Path(unquote(path_str)))
+            return self.path, fs_path
+
+        fs_path = self._ensure_filesystem_path(Path(self.path))
+        mode = "ro" if self.read_only else "rwc"
+        uri = f"file:{fs_path.as_posix()}?mode={mode}"
+        return uri, fs_path
+
     def connect(self) -> sqlite3.Connection:
         """Return a SQLite connection with pragmas applied."""
 
-        uri = f"file:{self.path}?mode={'ro' if self.read_only else 'rwc'}"
+        uri, _ = self._prepare_connection()
         conn = sqlite3.connect(uri, uri=True, detect_types=sqlite3.PARSE_DECLTYPES)
         default_pragmas = ("journal_mode=WAL", "synchronous=NORMAL")
         pragmas = self.pragma_statements or default_pragmas
@@ -44,8 +97,7 @@ class SQLiteMarketSource:
     def engine(self):
         """Return a SQLAlchemy engine for vectorised queries."""
 
-        mode = "ro" if self.read_only else "rw"
-        return create_engine(f"sqlite+pysqlite:///{self.path}?mode={mode}")
+        return create_engine("sqlite+pysqlite://", creator=self.connect)
 
 
 @dataclass(slots=True)
