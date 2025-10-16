@@ -25,7 +25,15 @@ The commands below take you from a fresh clone to running both training and infe
 
 2. **Provide market data**
 
-   Copy a SQLite database that matches the schema documented in [`docs/sqlite_schema.md`](./docs/sqlite_schema.md) into `data/market.db`, or update the `data.sqlite_path` entry in your config YAML to point at your file. At minimum the database should contain `assets`, `series`, and any indicator tables you reference in the config.
+   The quickest path is to run the bundled bootstrap script which downloads OHLCV candles for a basket of liquid ETFs and seeds the SQLite database::
+
+   ```bash
+   python scripts/bootstrap_sqlite.py --db-path data/market.db \
+       --tickers SPY QQQ VTI IWM EFA EEM XLK XLF XLY XLP \
+       --start 2000-01-01 --end 2025-01-01
+   ```
+
+   The script is idempotent; re-run it to refresh data or pass `--overwrite` to rebuild the tables. Alternatively copy a SQLite database that matches the schema documented in [`docs/sqlite_schema.md`](./docs/sqlite_schema.md) into `data/market.db`, or update the `data.sqlite_path` entry in your config YAML to point at your file. At minimum the database should contain `assets`, `series`, and any indicator tables you reference in the config.
 
    To sanity check connectivity, drop into a Python shell and load the first few rows:
 
