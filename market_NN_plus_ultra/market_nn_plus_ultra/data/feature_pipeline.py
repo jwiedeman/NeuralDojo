@@ -34,6 +34,81 @@ class FeatureDependencyError(RuntimeError):
         self.missing = tuple(sorted(missing))
 
 
+def _compute_ema_ratio(close: pd.Series, *, fast: int, slow: int) -> pd.Series:
+    fast_ema = EMAIndicator(close=close, window=fast).ema_indicator()
+    slow_ema = EMAIndicator(close=close, window=slow).ema_indicator()
+    return fast_ema / (slow_ema + 1e-9)
+
+
+def _compute_ema_distance(close: pd.Series, *, window: int) -> pd.Series:
+    ema = EMAIndicator(close=close, window=window).ema_indicator()
+    return (close - ema) / (ema + 1e-9)
+
+
+def _compute_stochastic_oscillator(
+    df: pd.DataFrame,
+    *,
+    window: int,
+    smooth_window: int,
+) -> pd.DataFrame:
+    oscillator = StochasticOscillator(
+        high=df["high"],
+        low=df["low"],
+        close=df["close"],
+        window=window,
+        smooth_window=smooth_window,
+    )
+    return pd.DataFrame(
+        {
+            "stoch_k": oscillator.stoch(),
+            "stoch_d": oscillator.stoch_signal(),
+        }
+    )
+
+
+def _compute_chaikin_money_flow(df: pd.DataFrame, *, window: int) -> pd.Series:
+    indicator = ChaikinMoneyFlowIndicator(
+        high=df["high"],
+        low=df["low"],
+        close=df["close"],
+        volume=df["volume"],
+        window=window,
+    )
+    return indicator.chaikin_money_flow()
+
+
+def _compute_on_balance_volume(close: pd.Series, volume: pd.Series) -> pd.Series:
+    indicator = OnBalanceVolumeIndicator(close=close, volume=volume)
+    return indicator.on_balance_volume()
+
+
+def _compute_true_strength_index(close: pd.Series, *, window_slow: int, window_fast: int) -> pd.Series:
+    indicator = TSIIndicator(close=close, window_slow=window_slow, window_fast=window_fast)
+    return indicator.tsi()
+
+
+def _compute_commodity_channel_index(df: pd.DataFrame, *, window: int) -> pd.Series:
+    indicator = CCIIndicator(
+        high=df["high"],
+        low=df["low"],
+        close=df["close"],
+        window=window,
+    )
+    return indicator.cci()
+
+
+def _compute_fft_energy_ratio(close: pd.Series, *, window: int, top_k: int) -> pd.Series:
+    def _energy(segment: np.ndarray) -> float:
+        spectrum = np.abs(np.fft.rfft(segment - segment.mean()))
+        total = np.sum(spectrum)
+        if total == 0:
+            return 0.0
+        top = np.sum(np.sort(spectrum)[-top_k:])
+        return float(top / total)
+
+    return close.rolling(window).apply(lambda x: _energy(np.asarray(x)), raw=False)
+
+
 @dataclass(slots=True)
 class FeatureSpec:
     """Metadata for a single engineered feature."""
@@ -83,7 +158,7 @@ class FeatureRegistry:
         self.register(
             FeatureSpec(
                 name="ema_ratio_12_26",
-                function=lambda df: self._ema_ratio(df["close"], fast=12, slow=26),
+                function=lambda df: _compute_ema_ratio(df["close"], fast=12, slow=26),
                 depends_on=["close"],
                 description="Ratio between fast and slow exponential moving averages",
                 tags=["trend", "momentum"],
@@ -92,7 +167,7 @@ class FeatureRegistry:
         self.register(
             FeatureSpec(
                 name="ema_distance_50",
-                function=lambda df: self._ema_distance(df["close"], window=50),
+                function=lambda df: _compute_ema_distance(df["close"], window=50),
                 depends_on=["close"],
                 description="Normalised distance from the 50-period EMA",
                 tags=["mean_reversion", "momentum"],
@@ -112,7 +187,7 @@ class FeatureRegistry:
         self.register(
             FeatureSpec(
                 name="stochastic_oscillator",
-                function=lambda df: self._stochastic_oscillator(df, window=14, smooth_window=3),
+                function=lambda df: _compute_stochastic_oscillator(df, window=14, smooth_window=3),
                 depends_on=["high", "low", "close"],
                 description="Stochastic oscillator %K/%D levels",
                 tags=["momentum", "bounded"],
@@ -121,7 +196,7 @@ class FeatureRegistry:
         self.register(
             FeatureSpec(
                 name="chaikin_money_flow_20",
-                function=lambda df: self._chaikin_money_flow(df, window=20),
+                function=lambda df: _compute_chaikin_money_flow(df, window=20),
                 depends_on=["high", "low", "close", "volume"],
                 description="Chaikin money flow over a 20-period window",
                 tags=["volume", "breadth"],
@@ -130,7 +205,7 @@ class FeatureRegistry:
         self.register(
             FeatureSpec(
                 name="on_balance_volume",
-                function=lambda df: self._on_balance_volume(df["close"], df["volume"]),
+                function=lambda df: _compute_on_balance_volume(df["close"], df["volume"]),
                 depends_on=["close", "volume"],
                 description="Cumulative On-Balance Volume series",
                 tags=["volume"],
@@ -139,7 +214,7 @@ class FeatureRegistry:
         self.register(
             FeatureSpec(
                 name="true_strength_index",
-                function=lambda df: self._true_strength_index(df["close"], window_slow=25, window_fast=13),
+                function=lambda df: _compute_true_strength_index(df["close"], window_slow=25, window_fast=13),
                 depends_on=["close"],
                 description="True Strength Index for momentum confirmation",
                 tags=["momentum", "trend"],
@@ -148,7 +223,7 @@ class FeatureRegistry:
         self.register(
             FeatureSpec(
                 name="commodity_channel_index_20",
-                function=lambda df: self._commodity_channel_index(df, window=20),
+                function=lambda df: _compute_commodity_channel_index(df, window=20),
                 depends_on=["high", "low", "close"],
                 description="Commodity Channel Index highlighting cyclical extremes",
                 tags=["momentum", "mean_reversion"],
@@ -220,7 +295,7 @@ class FeatureRegistry:
         self.register(
             FeatureSpec(
                 name="fft_energy_ratio",
-                function=lambda df: self._fft_energy_ratio(df["close"], window=128, top_k=5),
+                function=lambda df: _compute_fft_energy_ratio(df["close"], window=128, top_k=5),
                 depends_on=["close"],
                 description="Ratio of high-frequency FFT energy to total energy over 128 steps",
                 tags=["spectral"],
@@ -311,15 +386,7 @@ class FeatureRegistry:
 
     @staticmethod
     def _fft_energy_ratio(close: pd.Series, window: int, top_k: int) -> pd.Series:
-        def _energy(segment: np.ndarray) -> float:
-            spectrum = np.abs(np.fft.rfft(segment - segment.mean()))
-            total = np.sum(spectrum)
-            if total == 0:
-                return 0.0
-            top = np.sum(np.sort(spectrum)[-top_k:])
-            return float(top / total)
-
-        return close.rolling(window).apply(lambda x: _energy(np.asarray(x)), raw=False)
+        return _compute_fft_energy_ratio(close, window=window, top_k=top_k)
 
 
 class FeaturePipeline:
@@ -413,14 +480,11 @@ class FeaturePipeline:
 
     @staticmethod
     def _ema_ratio(close: pd.Series, *, fast: int, slow: int) -> pd.Series:
-        fast_ema = EMAIndicator(close=close, window=fast).ema_indicator()
-        slow_ema = EMAIndicator(close=close, window=slow).ema_indicator()
-        return fast_ema / (slow_ema + 1e-9)
+        return _compute_ema_ratio(close, fast=fast, slow=slow)
 
     @staticmethod
     def _ema_distance(close: pd.Series, *, window: int) -> pd.Series:
-        ema = EMAIndicator(close=close, window=window).ema_indicator()
-        return (close - ema) / (ema + 1e-9)
+        return _compute_ema_distance(close, window=window)
 
     @staticmethod
     def _stochastic_oscillator(
@@ -429,48 +493,21 @@ class FeaturePipeline:
         window: int,
         smooth_window: int,
     ) -> pd.DataFrame:
-        oscillator = StochasticOscillator(
-            high=df["high"],
-            low=df["low"],
-            close=df["close"],
-            window=window,
-            smooth_window=smooth_window,
-        )
-        return pd.DataFrame(
-            {
-                "stoch_k": oscillator.stoch(),
-                "stoch_d": oscillator.stoch_signal(),
-            }
-        )
+        return _compute_stochastic_oscillator(df, window=window, smooth_window=smooth_window)
 
     @staticmethod
     def _chaikin_money_flow(df: pd.DataFrame, *, window: int) -> pd.Series:
-        indicator = ChaikinMoneyFlowIndicator(
-            high=df["high"],
-            low=df["low"],
-            close=df["close"],
-            volume=df["volume"],
-            window=window,
-        )
-        return indicator.chaikin_money_flow()
+        return _compute_chaikin_money_flow(df, window=window)
 
     @staticmethod
     def _on_balance_volume(close: pd.Series, volume: pd.Series) -> pd.Series:
-        indicator = OnBalanceVolumeIndicator(close=close, volume=volume)
-        return indicator.on_balance_volume()
+        return _compute_on_balance_volume(close, volume)
 
     @staticmethod
     def _true_strength_index(close: pd.Series, *, window_slow: int, window_fast: int) -> pd.Series:
-        indicator = TSIIndicator(close=close, window_slow=window_slow, window_fast=window_fast)
-        return indicator.tsi()
+        return _compute_true_strength_index(close, window_slow=window_slow, window_fast=window_fast)
 
     @staticmethod
     def _commodity_channel_index(df: pd.DataFrame, *, window: int) -> pd.Series:
-        indicator = CCIIndicator(
-            high=df["high"],
-            low=df["low"],
-            close=df["close"],
-            window=window,
-        )
-        return indicator.cci()
+        return _compute_commodity_channel_index(df, window=window)
 
