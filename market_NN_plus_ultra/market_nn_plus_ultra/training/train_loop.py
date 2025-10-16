@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+import logging
 from pathlib import Path
 from typing import Any, Dict
 
@@ -37,6 +38,9 @@ from .curriculum import (
     CurriculumParameters,
     CurriculumScheduler,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class MarketLightningModule(pl.LightningModule):
@@ -312,6 +316,16 @@ class MarketDataModule(pl.LightningDataModule):
             pin_memory=self.trainer_config.accelerator != "cpu",
         )
 
+    @property
+    def feature_columns(self) -> list[str]:
+        return list(self._feature_columns)
+
+    @property
+    def feature_dim(self) -> int:
+        if not self._feature_columns:
+            raise RuntimeError("DataModule.setup must populate feature columns before access")
+        return len(self._feature_columns)
+
 
 def load_experiment_from_file(path: Path) -> ExperimentConfig:
     with path.open("r") as fp:
@@ -401,10 +415,35 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
     )
 
 
+def ensure_feature_dim_alignment(
+    config: ExperimentConfig, data_module: MarketDataModule
+) -> None:
+    """Synchronise the model feature dimension with the engineered features."""
+
+    try:
+        inferred_dim = data_module.feature_dim
+    except RuntimeError:
+        # Setup has not been called yet – build once to reveal the engineered columns.
+        data_module.setup(stage="fit")
+        inferred_dim = data_module.feature_dim
+
+    if inferred_dim <= 0:
+        raise ValueError("No features available after preprocessing; check the feature pipeline configuration.")
+
+    if config.model.feature_dim != inferred_dim:
+        logger.info(
+            "Adjusting model feature dimension from %s to match engineered features (%s columns)",
+            config.model.feature_dim,
+            inferred_dim,
+        )
+        config.model.feature_dim = inferred_dim
+
+
 def instantiate_modules(config: ExperimentConfig) -> tuple[MarketLightningModule, MarketDataModule]:
     pl.seed_everything(config.seed)
-    lightning_module = MarketLightningModule(config.model, config.optimizer)
     data_module = MarketDataModule(config.data, config.trainer, seed=config.seed)
+    ensure_feature_dim_alignment(config, data_module)
+    lightning_module = MarketLightningModule(config.model, config.optimizer)
     return lightning_module, data_module
 
 
