@@ -8,6 +8,64 @@ Market NN Plus Ultra is a research playground dedicated to building the most cap
 
 This folder provides an initial scaffold, documentation, and technical roadmap for delivering an "ultimate" trader that can be supplied with a SQLite database and autonomously analyse, decide, and iterate on strategies.
 
+## Quickstart
+
+The commands below take you from a fresh clone to running both training and inference. They assume you are inside the `market_NN_plus_ultra/` directory.
+
+1. **Create a virtual environment and install the package**
+
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   python -m pip install --upgrade pip
+   pip install -e .
+   ```
+
+   Installing in editable mode registers the `market_nn_plus_ultra` package and pulls in required dependencies such as PyTorch Lightning, pandas, and SQLAlchemy. This resolves the `ModuleNotFoundError` errors you would see when running the scripts without installing the project first.
+
+2. **Provide market data**
+
+   Copy a SQLite database that matches the schema documented in [`docs/sqlite_schema.md`](./docs/sqlite_schema.md) into `data/market.db`, or update the `data.sqlite_path` entry in your config YAML to point at your file. At minimum the database should contain `assets`, `series`, and any indicator tables you reference in the config.
+
+   To sanity check connectivity, drop into a Python shell and load the first few rows:
+
+   ```bash
+   python - <<'PY'
+   from market_nn_plus_ultra.data.sqlite_loader import SQLiteMarketDataset, SQLiteMarketSource
+
+   dataset = SQLiteMarketDataset(SQLiteMarketSource(path="data/market.db"), validate=False)
+   frame = dataset.load()
+   print(frame.head())
+   PY
+   ```
+
+3. **(Optional) Warm start with self-supervised pretraining**
+
+   ```bash
+   python scripts/pretrain.py --config configs/pretrain.yaml --accelerator cpu --devices 1 --max-epochs 1
+   ```
+
+   Adjust the overrides (e.g. `--accelerator gpu`, `--devices 1`) to match your hardware. The command saves checkpoints under `checkpoints/pretrain/` by default.
+
+4. **Train the supervised model**
+
+   ```bash
+   python scripts/train.py --config configs/default.yaml --accelerator cpu --devices 1 --max-epochs 1
+   ```
+
+   Remove or change the CLI overrides once you are ready to run a full GPU-backed training session. Checkpoints land in `checkpoints/default/`.
+
+5. **Run the inference agent**
+
+   ```bash
+   python scripts/run_agent.py --config configs/default.yaml \
+     --checkpoint checkpoints/default/last.ckpt \
+     --device cpu \
+     --output outputs/predictions.parquet
+   ```
+
+   Swap in the path to the checkpoint you want to evaluate (`last.ckpt`, `best.ckpt`, etc.) and, if desired, request GPU execution with `--device cuda:0`. The script writes predictions to the requested parquet (or CSV) file and prints evaluation metrics when realised returns are available.
+
 ## Vision
 
 1. **Rich Market Memory** — ingest long price histories, technical indicators, and curated features with minimal friction.
