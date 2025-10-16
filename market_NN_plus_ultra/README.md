@@ -88,6 +88,8 @@ The default configuration is intentionally overprovisioned to unlock a rich hypo
 * **Extension points** — Swap in Temporal Fusion Transformer modules, S4-style state-space layers, or reinforcement learning policy heads without changing the trainer API.
 
 For a deeper discussion of the data flow, modular boundaries, and suggested extensions see [`docs/architecture.md`](./docs/architecture.md).
+The high-level multi-phase execution plan lives in [`docs/implementation_plan.md`](./docs/implementation_plan.md) and maps the
+task tracker backlog into chronological milestones.
 
 ## Getting Started
 
