@@ -32,6 +32,9 @@ def _build_backbone(model_config: ModelConfig) -> nn.Module:
             dropout=model_config.dropout,
             conv_kernel_size=model_config.conv_kernel_size,
             conv_dilations=model_config.conv_dilations,
+            max_seq_len=model_config.max_seq_len,
+            use_rotary_embeddings=model_config.use_rotary_embeddings,
+            rope_theta=model_config.rope_theta,
         )
         return TemporalBackbone(backbone_config)
     if architecture in {"temporal_fusion", "tft"}:
