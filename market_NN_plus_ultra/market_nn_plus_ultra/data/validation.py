@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 try:
-    import pandera as pa  # type: ignore
+    import pandera.pandas as pa  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover - optional dependency fallback
     pa = None
 

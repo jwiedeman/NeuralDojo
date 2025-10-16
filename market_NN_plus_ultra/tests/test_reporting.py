@@ -18,7 +18,7 @@ matplotlib.use("Agg")
 
 def _sample_predictions() -> pd.DataFrame:
     rng = np.random.default_rng(1234)
-    timestamps = pd.date_range("2024-01-01", periods=64, freq="H")
+    timestamps = pd.date_range("2024-01-01", periods=64, freq="h")
     returns = rng.normal(0.001, 0.01, size=64)
     symbols = ["BTC", "ETH"] * 32
     data = {
