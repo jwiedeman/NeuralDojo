@@ -84,6 +84,7 @@ def _build_backbone(model_config: ModelConfig) -> nn.Module:
             coarse_factor=model_config.coarse_factor,
             cross_every=model_config.cross_every,
             max_seq_len=model_config.max_seq_len,
+            gradient_checkpointing=model_config.gradient_checkpointing,
         )
         return MarketOmniBackbone(omni_config)
     raise ValueError(f"Unknown architecture '{model_config.architecture}'")
@@ -127,13 +128,13 @@ class MaskedTimeSeriesLightningModule(pl.LightningModule):
         mask_prob = self.pretraining_config.mask_prob
         mask = torch.rand(features.shape[:2], device=features.device) < mask_prob
         mask = mask.unsqueeze(-1)
-        masked = features.clone()
+        mask_expanded = mask.expand_as(features)
         mask_value = self.pretraining_config.mask_value
         if mask_value == "mean":
-            fill_value = features.mean(dim=1, keepdim=True)
-            masked = torch.where(mask, fill_value, masked)
+            fill_value = features.mean(dim=1, keepdim=True).expand_as(features)
+            masked = torch.where(mask_expanded, fill_value, features)
         else:
-            masked = masked.masked_fill(mask, float(mask_value))
+            masked = features.masked_fill(mask_expanded, float(mask_value))
         return masked, mask
 
     def _loss_fn(self, predictions: torch.Tensor, targets: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:

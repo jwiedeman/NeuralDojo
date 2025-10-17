@@ -9,6 +9,7 @@ import torch
 import torch.nn.functional as F
 from einops import rearrange
 from torch import nn
+from torch.utils.checkpoint import checkpoint
 
 from .temporal_transformer import TemporalConvMixer
 
@@ -38,6 +39,7 @@ class OmniBackboneConfig:
     coarse_factor: int = 4
     cross_every: int = 2
     max_seq_len: int = 4096
+    gradient_checkpointing: bool = False
 
 
 class StateSpaceMixer(nn.Module):
@@ -82,7 +84,7 @@ class CrossScaleAttention(nn.Module):
         self.norm = nn.LayerNorm(dim)
 
     def forward(self, fine: torch.Tensor, coarse: torch.Tensor) -> torch.Tensor:
-        attn_out, _ = self.attn(fine, coarse, coarse)
+        attn_out, _ = self.attn(fine, coarse, coarse, need_weights=False)
         return self.norm(fine + attn_out)
 
 
@@ -134,7 +136,7 @@ class OmniBlock(nn.Module):
 
     def forward(self, fine: torch.Tensor, coarse: torch.Tensor | None) -> torch.Tensor:
         residual = fine
-        attn_out, _ = self.attn(fine, fine, fine)
+        attn_out, _ = self.attn(fine, fine, fine, need_weights=False)
         fine = self.attn_norm(attn_out + residual)
         fine = self.ff(fine)
         fine = self.state_mixer(fine)
@@ -180,6 +182,7 @@ class MarketOmniBackbone(nn.Module):
         self.blocks = nn.ModuleList(blocks)
         self.cross_schedule = schedule
         self.norm = nn.LayerNorm(config.model_dim)
+        self.use_gradient_checkpointing = config.gradient_checkpointing
 
     def _downsample(self, x: torch.Tensor) -> torch.Tensor:
         if self.config.coarse_factor <= 1:
@@ -209,7 +212,13 @@ class MarketOmniBackbone(nn.Module):
 
         for block, use_cross in zip(self.blocks, self.cross_schedule):
             context = coarse if use_cross else None
-            fine = block(fine, context)
+            if self.use_gradient_checkpointing and self.training:
+                if context is None:
+                    fine = checkpoint(lambda inp: block(inp, None), fine)
+                else:
+                    fine = checkpoint(lambda inp, ctx: block(inp, ctx), fine, context)
+            else:
+                fine = block(fine, context)
             if use_cross:
                 coarse = self._downsample(fine)
                 coarse_len = coarse.size(1)

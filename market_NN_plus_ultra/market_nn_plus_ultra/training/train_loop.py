@@ -118,6 +118,7 @@ class MarketLightningModule(pl.LightningModule):
                 coarse_factor=model_config.coarse_factor,
                 cross_every=model_config.cross_every,
                 max_seq_len=model_config.max_seq_len,
+                gradient_checkpointing=model_config.gradient_checkpointing,
             )
             self.backbone = MarketOmniBackbone(backbone_config)
         elif architecture in {"state_space", "ssm", "s4"}:
