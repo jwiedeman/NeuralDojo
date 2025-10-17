@@ -133,3 +133,22 @@ def test_contrastive_pretraining_training_step(tmp_path: Path) -> None:
     # InfoNCE loss should be non-negative
     assert float(loss.detach().cpu()) >= 0.0
 
+
+def test_windows_disables_persistent_workers(tmp_path: Path, monkeypatch) -> None:
+    config = _base_configs(tmp_path, objective="masked")
+    config.trainer.num_workers = 2
+    config.trainer.persistent_workers = True
+
+    from market_nn_plus_ultra.training import train_loop as train_loop_module
+
+    monkeypatch.setattr(train_loop_module, "_IS_WINDOWS", True, raising=False)
+
+    _, data_module = instantiate_pretraining_module(config)
+    data_module.setup("fit")
+    loader = data_module.train_dataloader()
+
+    assert loader.num_workers == 2
+    assert loader.persistent_workers is False
+    # Subsequent dataloaders should reuse the cached decision
+    assert data_module.val_dataloader().persistent_workers is False
+
