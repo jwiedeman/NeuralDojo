@@ -20,7 +20,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 
 from .alternative_data import AlternativeDataConnector, AlternativeDataSpec
-from .validation import validate_indicator_frame, validate_price_frame
+from .validation import validate_assets_frame, validate_indicator_frame, validate_price_frame
 
 
 @dataclass(slots=True)
@@ -127,13 +127,25 @@ class SQLiteMarketDataset:
     tz_convert: Optional[str] = None
     validate: bool = True
 
+    def _table_exists(self, conn: sqlite3.Connection, table: str) -> bool:
+        cursor = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+            (table,),
+        )
+        return cursor.fetchone() is not None
+
     def load(self) -> pd.DataFrame:
         """Return a multi-indexed frame with OHLCV and indicator columns."""
 
         with contextlib.closing(self.source.connect()) as conn:
+            assets_df: pd.DataFrame | None = None
+            if self.validate and self._table_exists(conn, "assets"):
+                assets_df = pd.read_sql_query("SELECT * FROM assets", conn)
+                assets_df = validate_assets_frame(assets_df)
+
             price_df = pd.read_sql_query("SELECT * FROM series", conn, parse_dates=["timestamp"])
             if self.validate:
-                price_df = validate_price_frame(price_df)
+                price_df = validate_price_frame(price_df, assets=assets_df)
             if self.symbol_universe:
                 price_df = price_df[price_df["symbol"].isin(set(self.symbol_universe))]
 
@@ -147,7 +159,7 @@ class SQLiteMarketDataset:
                 query = f"SELECT * FROM {table}" if " " not in table.lower() else table
                 ind_df = pd.read_sql_query(query, conn, parse_dates=["timestamp"])
                 if self.validate:
-                    ind_df = validate_indicator_frame(ind_df)
+                    ind_df = validate_indicator_frame(ind_df, assets=assets_df)
                 ind_df = ind_df.set_index(["timestamp", "symbol"]).sort_index()
                 indicator_frames.append(ind_df.add_prefix(f"{name}__"))
 
