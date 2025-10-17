@@ -24,7 +24,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 ### Feature Registry Enhancements
 - [x] Auto-generate documentation from `FeatureRegistry.describe()` into Markdown.
 - [x] Add alternative data connectors (on-chain metrics, macro calendars) into the registry. (See `market_nn_plus_ultra.data.alternative_data` and regression coverage in `tests/test_alternative_data.py`.)
-- [ ] Document signal coverage expansion that pairs alternative data with technical indicators for long-horizon experiments.
+- [ ] Document signal coverage expansion that pairs alternative data with technical indicators for long-horizon experiments. — Status: Drafting outline that captures cross-asset feature view requirements from the implementation plan.
 - [x] Surface dependency errors with structured logging for experiment reproducibility. (PR TBD)
 - [x] Seed registry with higher-moment statistics and spectral energy factors.
 
@@ -33,14 +33,14 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Add multi-resolution attention block mixing dilated convolutions and transformer layers.
 - [x] Integrate state-space (S4/SSM) module for long-context retention.
 - [x] Ship mixture-of-experts expansion for scaling feed-forward capacity without quadratic attention cost.
-- [ ] Benchmark omni-scale backbone versus hybrid baseline across multiple asset universes with 4090 VRAM profiling.
+- [ ] Benchmark omni-scale backbone versus hybrid baseline across multiple asset universes with 4090 VRAM profiling. — Notes: Awaiting benchmark harness scaffolding (Implementation Plan Phase 2, Milestone 1).
 - [x] Pretrain on masked time-series reconstruction before supervised fine-tuning (`scripts/pretrain.py`).
-- [ ] Benchmark pretraining checkpoints vs. scratch initialisation across asset classes.
+- [ ] Benchmark pretraining checkpoints vs. scratch initialisation across asset classes. — Notes: Will run after schema enforcement lands to guarantee clean fixtures.
 - [x] Extend pretraining tasks with contrastive (TS2Vec-style) objectives for regime discrimination.
 - [x] Introduce curriculum over window sizes and horizons to stabilise very deep models. (See `CurriculumScheduler`)
-- [ ] Automate architecture sweeps over depth, horizon, and dilation for omni-scale, MoE, transformer, and state-space backbones.
-- [ ] Add gradient-noise diagnostics and calibration drift alerts to the training loop telemetry.
-- [ ] Integrate calibration-aware (Dirichlet/quantile) heads for safe scaling to deeper models.
+- [ ] Automate architecture sweeps over depth, horizon, and dilation for omni-scale, MoE, transformer, and state-space backbones. — Notes: Planned to extend the benchmark harness CLI once baseline sweeps are in place.
+- [ ] Add gradient-noise diagnostics and calibration drift alerts to the training loop telemetry. — Notes: Aligning with Phase 2 stability tooling design before implementation.
+- [ ] Integrate calibration-aware (Dirichlet/quantile) heads for safe scaling to deeper models. — Notes: Pending concentration prior research captured in the implementation plan.
 
 ## 2. Trading Objective & Reinforcement Learning
 - [x] Add differentiable PnL simulator with position sizing, transaction costs, and slippage.
@@ -58,16 +58,22 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Generate Markdown/HTML reports with charts for quick inspection.
 - [x] Wire up experiment tracking (Weights & Biases or MLflow) for metadata and artefacts.
 - [x] Add automated guardrail metrics (exposure, turnover, tail percentiles) for live trading readiness.
-- [ ] Publish automated run reports referencing the research agenda milestones.
-- [ ] Automate profitability summaries (ROI, Sharpe, drawdown) for every long training session.
+- [ ] Publish automated run reports referencing the research agenda milestones. — Notes: Will piggyback on Phase 4 reporting upgrades after telemetry contracts stabilise.
+- [ ] Automate profitability summaries (ROI, Sharpe, drawdown) for every long training session. — Notes: Targeting the same reporting stack as Phase 4 Milestone 1.
 
 ## 4. Automation & Deployment
-- [ ] Containerise training + inference pipelines with GPU support.
-- [ ] Expose REST/gRPC service that mirrors the existing market agent API but uses the new brain.
-- [ ] Schedule continuous retraining jobs triggered by new data arrival.
-- [ ] Set up online monitoring for live performance and drift detection.
-- [ ] Build playbook for human-in-the-loop overrides and risk manager approvals.
-- [ ] Integrate live monitoring, automated reporting, and risk guardrails into a single operations playbook for extend/branch decisions.
+- [ ] Containerise training + inference pipelines with GPU support. — Notes: Blocked until simulator + service interface prototypes settle.
+- [ ] Expose REST/gRPC service that mirrors the existing market agent API but uses the new brain. — Notes: Capturing parity requirements while Phase 3 service scaffold is planned.
+- [ ] Schedule continuous retraining jobs triggered by new data arrival. — Notes: Will reuse orchestration DAG from Phase 3 Milestone 4 once prototyped.
+- [ ] Set up online monitoring for live performance and drift detection. — Notes: Pending telemetry surface defined in Phase 4 Milestone 2.
+- [ ] Build playbook for human-in-the-loop overrides and risk manager approvals. — Notes: Drafting outline alongside analyst feedback tooling requirements.
+- [ ] Integrate live monitoring, automated reporting, and risk guardrails into a single operations playbook for extend/branch decisions. — Notes: Will consolidate once reporting, monitoring, and guardrail milestones reach MVP.
+
+### Active Work Log — 2024-02-24
+
+* Schema enforcement (Phase 1 Milestone 2) kicked off — Pandera models under design for `assets`, `series`, and `indicators` tables prior to CLI integration.
+* Market-regime labelling (Phase 1 Milestone 4) discovery underway — collecting volatility/liquidity heuristics and alternative data touchpoints.
+* Cross-asset feature view planning (Phase 1 Milestone 5) started — assessing ETF sector panel alignment strategies for SQLite-friendly joins.
 
 ---
 
