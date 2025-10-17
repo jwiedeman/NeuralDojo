@@ -15,6 +15,7 @@ import yaml
 from torch.utils.data import DataLoader, random_split
 
 from ..data import FeatureRegistry, SQLiteMarketDataset, SlidingWindowDataset
+from ..data.alternative_data import AlternativeDataSpec
 from ..data.sqlite_loader import SQLiteMarketSource
 from ..models.temporal_transformer import TemporalBackbone, TemporalBackboneConfig, TemporalPolicyHead
 from ..models.temporal_fusion import TemporalFusionConfig, TemporalFusionTransformer
@@ -228,6 +229,7 @@ class MarketDataModule(pl.LightningDataModule):
             source=source,
             symbol_universe=self.data_config.symbol_universe,
             indicators=self.data_config.indicators,
+            alternative_data=self.data_config.alternative_data,
             resample_rule=self.data_config.resample_rule,
             tz_convert=self.data_config.tz_convert,
         )
@@ -404,6 +406,35 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
             stages=stages,
             repeat_final=curriculum_section.get("repeat_final", True),
         )
+    if data_section.get("alternative_data") is not None:
+        alt_specs: list[AlternativeDataSpec] = []
+        for entry in data_section["alternative_data"] or []:
+            entry_dict = dict(entry)
+            name = entry_dict["name"]
+            table = entry_dict["table"]
+            join_columns = tuple(entry_dict.get("join_columns") or ("timestamp", "symbol"))
+            columns = entry_dict.get("columns")
+            filters = {
+                key: tuple(value)
+                for key, value in (entry_dict.get("filters") or {}).items()
+            }
+            parse_dates = entry_dict.get("parse_dates")
+            alt_specs.append(
+                AlternativeDataSpec(
+                    name=name,
+                    table=table,
+                    join_columns=join_columns,
+                    columns=tuple(columns) if columns is not None else None,
+                    prefix=entry_dict.get("prefix"),
+                    fill_forward=entry_dict.get("fill_forward", True),
+                    fill_backward=entry_dict.get("fill_backward", False),
+                    filters=filters,
+                    parse_dates=tuple(parse_dates) if parse_dates is not None else None,
+                )
+            )
+        data_section["alternative_data"] = alt_specs
+    else:
+        data_section["alternative_data"] = []
     data_cfg = DataConfig(**data_section)
 
     model_section = dict(raw["model"])

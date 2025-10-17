@@ -166,6 +166,15 @@ regime labels into a single SQLite database. The generator follows these steps:
 5. **Asset metadata** – seed the `assets` table with synthetic entries so
    foreign keys remain consistent across joins.
 
+Alternative data tables (macro calendars, funding rates, sentiment snapshots,
+corporate actions) can now be declared in experiment YAML under
+`data.alternative_data`. Each entry maps to an
+`AlternativeDataSpec`/`AlternativeDataConnector` pair that automatically joins
+the SQLite table on the requested columns, applies optional filters, and
+forward/back-fills values so every training window sees a consistent view of
+external signals. See `market_nn_plus_ultra.tests.test_alternative_data` for a
+minimal example that fuses macro and funding series into the model panel.
+
 Run the generator from the project root to create a GPU-saturating fixture with
 30k+ candles per symbol:
 
