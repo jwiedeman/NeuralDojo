@@ -102,6 +102,8 @@ The commands below take you from a fresh clone to running both training and infe
 
    Remove or change the CLI overrides once you are ready to run a full GPU-backed training session. Checkpoints land in `checkpoints/default/`.
 
+   > 💡 Running into GPU memory pressure on a consumer card? Swap in `configs/default_desktop.yaml` for a lighter-weight architecture (`--config configs/default_desktop.yaml`). The desktop preset trims the model depth, attention width, and batch size, and disables persistent dataloader workers so training stays responsive on Windows.
+
 5. **Run the inference agent**
 
    ```bash
