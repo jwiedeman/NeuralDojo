@@ -26,6 +26,7 @@ dependencies = [
     "einops>=0.7",
     "wandb>=0.16",
     "pandera>=0.17",
+    "pyarrow>=14.0",
     "yfinance>=0.2.48"
 ]
 

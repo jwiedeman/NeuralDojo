@@ -33,7 +33,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Add multi-resolution attention block mixing dilated convolutions and transformer layers.
 - [x] Integrate state-space (S4/SSM) module for long-context retention.
 - [x] Ship mixture-of-experts expansion for scaling feed-forward capacity without quadratic attention cost.
-- [ ] Benchmark omni-scale backbone versus hybrid baseline across multiple asset universes with 4090 VRAM profiling. — Notes: Awaiting benchmark harness scaffolding (Implementation Plan Phase 2, Milestone 1).
+- [ ] Benchmark omni-scale backbone versus hybrid baseline across multiple asset universes with 4090 VRAM profiling. — Notes: Harness scaffolding shipped via `scripts/benchmarks/architecture_sweep.py`; awaiting GPU allocation to run full comparisons.
 - [x] Pretrain on masked time-series reconstruction before supervised fine-tuning (`scripts/pretrain.py`).
 - [ ] Benchmark pretraining checkpoints vs. scratch initialisation across asset classes. — Notes: Will run after schema enforcement lands to guarantee clean fixtures.
 - [x] Extend pretraining tasks with contrastive (TS2Vec-style) objectives for regime discrimination.
