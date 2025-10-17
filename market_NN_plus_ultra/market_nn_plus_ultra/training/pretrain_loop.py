@@ -398,6 +398,17 @@ def _ensure_supported_accelerator(config: ExperimentConfig) -> None:
 
 def run_pretraining(config: ExperimentConfig) -> dict[str, Any]:
     _ensure_supported_accelerator(config)
+    matmul_precision = config.trainer.matmul_precision
+    if matmul_precision:
+        try:
+            torch.set_float32_matmul_precision(matmul_precision)
+            logger.info("Set float32 matmul precision to '%s'", matmul_precision)
+        except (TypeError, ValueError) as exc:
+            warnings.warn(
+                f"Invalid matmul precision '{matmul_precision}' requested: {exc}. Skipping configuration.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
     module, data_module = instantiate_pretraining_module(config)
     if data_module.train_dataset is None or data_module.val_dataset is None:
         data_module.setup(stage="fit")
