@@ -30,6 +30,15 @@ class WindowMetadata:
     target_timestamps: pd.Index
 
 
+@dataclass(slots=True)
+class _SymbolData:
+    """Cached per-symbol arrays to avoid repeated pandas slicing."""
+
+    features: np.ndarray
+    targets: np.ndarray
+    index: pd.Index
+
+
 class SlidingWindowDataset(Dataset):
     """Turn a multi-indexed market panel into sliding windows."""
 
@@ -54,13 +63,29 @@ class SlidingWindowDataset(Dataset):
         self.stride = stride
         self.normalise = normalise
 
+        self._symbol_data: dict[str, _SymbolData] = self._precompute_symbol_data()
         self._indices: list[Tuple[str, int]] = self._build_indices()
+
+    def _precompute_symbol_data(self) -> dict[str, _SymbolData]:
+        symbol_data: dict[str, _SymbolData] = {}
+        for symbol in self.panel.index.get_level_values("symbol").unique():
+            sym_df = self.panel.xs(symbol, level="symbol")
+            feature_array = sym_df[self.feature_columns].to_numpy(dtype=np.float32, copy=True)
+            target_array = sym_df[self.target_columns].to_numpy(dtype=np.float32, copy=True)
+            symbol_data[symbol] = _SymbolData(
+                features=feature_array,
+                targets=target_array,
+                index=sym_df.index,
+            )
+        return symbol_data
 
     def _build_indices(self) -> list[Tuple[str, int]]:
         indices: list[Tuple[str, int]] = []
-        for symbol in self.panel.index.get_level_values("symbol").unique():
-            sym_df = self.panel.xs(symbol, level="symbol")
-            for start in range(0, len(sym_df) - self.window_size - self.horizon + 1, self.stride):
+        for symbol, data in self._symbol_data.items():
+            max_start = data.features.shape[0] - self.window_size - self.horizon + 1
+            if max_start <= 0:
+                continue
+            for start in range(0, max_start, self.stride):
                 indices.append((symbol, start))
         return indices
 
@@ -76,35 +101,35 @@ class SlidingWindowDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         symbol, start = self._indices[idx]
-        sym_df = self.panel.xs(symbol, level="symbol")
+        data = self._symbol_data[symbol]
 
         window_slice = slice(start, start + self.window_size)
         target_slice = slice(start + self.window_size, start + self.window_size + self.horizon)
 
-        window = sym_df.iloc[window_slice][self.feature_columns].to_numpy(dtype=np.float32)
-        targets = sym_df.iloc[target_slice][self.target_columns].to_numpy(dtype=np.float32)
+        window = data.features[window_slice]
+        targets = data.targets[target_slice]
 
         window = self._normalise(window)
 
-        reference = sym_df.iloc[window_slice][-1:][self.target_columns].to_numpy(dtype=np.float32)
+        reference = data.targets[start + self.window_size - 1]
         return {
             "symbol": symbol,
-            "features": torch.from_numpy(window),
-            "targets": torch.from_numpy(targets),
-            "reference": torch.from_numpy(reference.squeeze(0)),
+            "features": torch.from_numpy(window.copy()),
+            "targets": torch.from_numpy(targets.copy()),
+            "reference": torch.from_numpy(reference.copy()),
         }
 
     def get_metadata(self, idx: int) -> WindowMetadata:
         """Return metadata for a specific window without disturbing training."""
 
         symbol, start = self._indices[idx]
-        sym_df = self.panel.xs(symbol, level="symbol")
+        data = self._symbol_data[symbol]
         window_slice = slice(start, start + self.window_size)
         target_slice = slice(start + self.window_size, start + self.window_size + self.horizon)
         return WindowMetadata(
             symbol=symbol,
             start_index=start,
-            input_timestamps=sym_df.iloc[window_slice].index,
-            target_timestamps=sym_df.iloc[target_slice].index,
+            input_timestamps=data.index[window_slice],
+            target_timestamps=data.index[target_slice],
         )
 
