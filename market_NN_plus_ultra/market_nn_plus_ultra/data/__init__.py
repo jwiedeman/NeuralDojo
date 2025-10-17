@@ -3,6 +3,7 @@
 from .sqlite_loader import SQLiteMarketSource, SQLiteMarketDataset
 from .alternative_data import AlternativeDataConnector, AlternativeDataSpec
 from .feature_pipeline import FeatureDependencyError, FeatureRegistry, FeaturePipeline, FeatureSpec
+from .cross_asset import CrossAssetViewResult, CrossAssetViewStats, build_cross_asset_view
 from .labelling import (
     LiquidityRegimeConfig,
     MarketRegimeLabellingConfig,
@@ -28,6 +29,9 @@ __all__ = [
     "FeatureRegistry",
     "FeaturePipeline",
     "FeatureSpec",
+    "CrossAssetViewResult",
+    "CrossAssetViewStats",
+    "build_cross_asset_view",
     "MarketRegimeLabellingConfig",
     "AlternativeDataSpec",
     "AlternativeDataConnector",

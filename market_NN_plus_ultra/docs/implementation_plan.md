@@ -14,6 +14,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * **2025-10-17 — Regime labelling pipeline:** Added deterministic volatility/liquidity/rotation labellers in `market_nn_plus_ultra.data.labelling`, wiring them into fixture generation and shipping regression tests for reproducibility.
 * **2025-10-20 — Regime CLI wiring:** Delivered the dataset-build CLI with strict validation toggles, quantile overrides, regression coverage, and documentation updates so operational teams can regenerate labels without bespoke notebooks.
 * **2025-10-21 — Sprint 3 kickoff:** Locked optimisation focus on landing cross-asset feature views, establishing profiling harnesses for the new joins, and translating telemetry requirements into concrete instrumentation tickets ahead of the Phase 2 simulator work. Sequenced deliverables so documentation, fixtures, and CLI toggles evolve together without blocking PPO upgrades.
+* **2025-10-22 — Cross-asset alignment landing:** Implemented the alignment engine in `market_nn_plus_ultra.data.cross_asset`, wired the `--cross-asset-view` CLI flag with validation and structured logging, published the accompanying Pandera schema, and added the `scripts/benchmarks/cross_asset_profile.py` probe so profiling runs capture fill rates, dropped rows, and feature breadth for every dataset refresh.
 
 ## Phase 1 — Data & Feature Depth (Weeks 1-2)
 
@@ -43,13 +44,14 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
    - *Next sprint goals (2025-10-18):* ✅ (1) Expose labelling toggles via `market_nn_plus_ultra.cli.dataset_build --regime-labels`, ✅ (2) extend regression fixtures to cover mixed-asset panels with label integrity checks, and ✅ (3) publish troubleshooting guidance in `docs/sqlite_schema.md` for mismatched label cardinality or stale quantile caches.
    - *In-flight planning (2025-10-19):* ✅ Finalised CLI surface design (`--regime-labels`, `--regime-bands`) and regression coverage that exercises single-asset, multi-asset, and stale-cache scenarios so documentation updates can include concrete error-handling playbooks once the toggles land.
    - *CLI integration (2025-10-20):* Landed the dataset-build CLI with quantile overrides, strict validation toggles, regression-backed multi-asset fixtures, and README/`docs/sqlite_schema.md` troubleshooting playbooks.
-5. **Cross-asset feature views** — Extend dataset assembly scripts to output aligned multi-ticker tensors (e.g., sector ETFs, index futures) that let the policy attend to correlations without requiring live data pulls. **Status:** 🗓 Planned — evaluating join strategies for synchronising ETF sector panels with the core ticker timelines while staying SQLite-friendly.
+5. **Cross-asset feature views** — Extend dataset assembly scripts to output aligned multi-ticker tensors (e.g., sector ETFs, index futures) that let the policy attend to correlations without requiring live data pulls. **Status:** ✅ Completed — cross-asset alignment now lives in `market_nn_plus_ultra.data.cross_asset`, integrates with the dataset-build CLI, and ships with regression coverage plus documentation updates describing the new SQLite table and troubleshooting flow.
    - *Preparation (2024-02-25):* Documenting join performance benchmarks required for the optimisation sweep harness so we can measure feature-assembly cost versus training throughput.
    - *Preparation extension (2024-03-05):* Begin profiling candidate join strategies against regenerated fixtures, capture latency + memory metrics for the implementation log, and earmark config toggles so benchmarking sweeps can enable/disable cross-asset tensors cheaply.
     - *Profiling hook (2024-03-08):* Use the stricter validation outputs to seed multi-ticker fixture builds, recording join timings and memory in the optimisation log for next sprint planning.
     - *Benchmark checklist (2025-10-18):* (a) Collect baseline join timings for equities + ETF baskets on the refreshed fixtures, (b) document acceptable latency/regression thresholds for inclusion in benchmarking sweeps, and (c) stage a `--cross-asset-view` toggle in the CLI with a guardrail that enforces aligned calendars before merging.
    - *Instrumentation plan (2025-10-19):* Defining profiling hooks (memory snapshots, wall-clock timings, alignment-violation counts) and drafting fixture variations (sector ETF + equity basket, crypto + funding rates) so the benchmarking sweep captures stress cases before the CLI toggle ships.
    - *Implementation breakdown (2025-10-21):* (1) Finalise schema contracts for joined cross-asset tensors using the existing Pandera validators as templates, (2) prototype the alignment engine inside `market_nn_plus_ultra.data.feature_pipeline` with synthetic fixtures covering mixed frequencies, (3) wire the `--cross-asset-view` toggle through `market_nn_plus_ultra.cli.dataset_build` with validation-aware error messaging, (4) capture benchmark scripts under `scripts/benchmarks/` that emit wall-clock + peak-memory telemetry, and (5) schedule documentation updates in `docs/sqlite_schema.md` describing alignment failure remediation.
+   - *Completion (2025-10-22):* Delivered `market_nn_plus_ultra.data.cross_asset` with fill-rate statistics, persisted the new `cross_asset_views` table via the CLI flag (including strict Pandera validation), added `scripts/benchmarks/cross_asset_profile.py` for reproducible profiling, and expanded `docs/sqlite_schema.md` with usage examples plus troubleshooting guidance covering fill limits and dropped rows.
 
 **Exit Criteria**
 
@@ -174,6 +176,13 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * Added regression tests that exercise multi-asset fixtures through the CLI, verifying label cardinality and invalid-argument handling to guard against stale quantile caches.
 * Expanded README and `docs/sqlite_schema.md` with troubleshooting guidance covering strict-mode failures, label integrity checks, and practical CLI invocation patterns.
 * Itemised telemetry schema needs (gradient noise, calibration drift, throughput) so stability tooling and reporting milestones inherit a consistent metric contract.
+
+### Progress Notes — 2025-10-22
+
+* Implemented the cross-asset alignment engine in `market_nn_plus_ultra.data.cross_asset`, exposing rich fill-rate/dropped-row statistics for downstream profiling.
+* Added `--cross-asset-view`/`--cross-asset-columns`/`--cross-asset-fill-limit` flags to the dataset-build CLI, persisting the new `cross_asset_views` table with strict validation and structured logging for instrumentation.
+* Published `CROSS_ASSET_VIEW_SCHEMA` and `validate_cross_asset_view_frame` so strict mode treats the new table as a first-class citizen alongside assets, indicators, regimes, and benchmarks.
+* Documented the table contract and troubleshooting guidance in `docs/sqlite_schema.md`, and introduced `scripts/benchmarks/cross_asset_profile.py` for reproducible telemetry snapshots during dataset refreshes.
 
 ### Progress Notes — 2024-02-24
 

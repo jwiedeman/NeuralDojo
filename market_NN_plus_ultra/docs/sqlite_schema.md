@@ -95,6 +95,18 @@ alpha sources.
 
 *Primary key:* (`timestamp`, `symbol`)
 
+### `cross_asset_views`
+
+| Column      | Type     | Notes                                                                                     |
+|-------------|----------|-------------------------------------------------------------------------------------------|
+| `timestamp` | DATETIME | UTC timestamp aligned with the master series timeline.                                    |
+| `feature`   | TEXT     | Feature identifier composed of `<field>__<symbol>` (e.g., `close__SPY`, `log_return_1__QQQ`). |
+| `value`     | REAL     | Aligned feature value for the corresponding timestamp/feature pair.                       |
+| `universe`  | TEXT     | Optional description of the asset universe that produced the row (comma-separated list).  |
+| `metadata`  | JSON     | JSON payload describing the feature (field, symbol) for downstream tooling.               |
+
+*Primary key:* (`timestamp`, `feature`)
+
 ## Integrity & Validation
 
 * Enforce foreign key relationships: `series.symbol`, `indicators.symbol`, and
@@ -205,6 +217,14 @@ python -m market_nn_plus_ultra.cli.dataset_build data/market.db \
     --regime-bands liquidity:0.2,0.8
 ```
 
+Generate aligned multi-symbol tensors alongside validation by adding the cross-asset flag:
+
+```bash
+python -m market_nn_plus_ultra.cli.dataset_build data/market.db \
+    --cross-asset-view --cross-asset-columns close volume \
+    --cross-asset-fill-limit 32
+```
+
 Key troubleshooting tips:
 
 * **Mismatched label counts** – When the CLI detects duplicate or missing
@@ -221,4 +241,8 @@ Key troubleshooting tips:
   failures include structured samples in the log output so you can reconcile the
   offending rows directly in SQLite or regenerate fixtures via
   `scripts/make_fixture.py` before rerunning the CLI.
+* **Cross-asset fill limits** – When `--cross-asset-fill-limit` is low and
+  source tables contain gaps, the CLI logs `cross_asset_view_written` events that
+  include `dropped_rows`/`dropped_features`. Use higher limits or refresh
+  fixtures to recover the missing points when the view must remain dense.
 

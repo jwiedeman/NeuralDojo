@@ -2,6 +2,11 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+import json
+import sqlite3
+from datetime import datetime
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
@@ -30,6 +35,11 @@ def synthetic_db(tmp_path: Path) -> Path:
 def _load_regimes(db_path: Path) -> pd.DataFrame:
     with sqlite3.connect(db_path) as conn:
         return pd.read_sql_query("SELECT * FROM regimes", conn, parse_dates=["timestamp"])
+
+
+def _load_cross_asset_view(db_path: Path) -> pd.DataFrame:
+    with sqlite3.connect(db_path) as conn:
+        return pd.read_sql_query("SELECT * FROM cross_asset_views", conn, parse_dates=["timestamp"])
 
 
 def test_dataset_build_cli_populates_regimes_table(synthetic_db: Path) -> None:
@@ -95,3 +105,29 @@ def test_dataset_build_cli_rejects_invalid_band_string(synthetic_db: Path) -> No
         ]
     )
     assert exit_code == 2
+
+
+def test_dataset_build_cli_generates_cross_asset_view(synthetic_db: Path) -> None:
+    exit_code = dataset_build_main(
+        [
+            str(synthetic_db),
+            "--cross-asset-view",
+            "--cross-asset-columns",
+            "close",
+            "volume",
+        ]
+    )
+    assert exit_code == 0
+
+    view = _load_cross_asset_view(synthetic_db)
+    assert not view.empty
+    assert {"timestamp", "feature", "value"}.issubset(view.columns)
+    assert not view.duplicated(["timestamp", "feature"]).any()
+
+    features = set(view["feature"].unique())
+    assert any(feature.startswith("close__") for feature in features)
+    assert any(feature.startswith("volume__") for feature in features)
+
+    metadata = view["metadata"].dropna().iloc[0]
+    payload = json.loads(metadata)
+    assert "symbol" in payload and payload["symbol"]
