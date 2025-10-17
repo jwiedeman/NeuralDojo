@@ -93,6 +93,14 @@ class CurriculumCallback(pl.Callback):
         if hasattr(pl_module, "update_horizon"):
             pl_module.update_horizon(params.horizon)  # type: ignore[attr-defined]
 
+        # Ensure dataloaders pick up the newly constructed datasets for the epoch.
+        reset_train = getattr(trainer, "reset_train_dataloader", None)
+        if callable(reset_train):
+            reset_train()
+        reset_val = getattr(trainer, "reset_val_dataloader", None)
+        if callable(reset_val):
+            reset_val()
+
         if hasattr(pl_module, "log"):
             pl_module.log("curriculum/window_size", float(params.window_size), prog_bar=True, logger=True)
             pl_module.log("curriculum/horizon", float(params.horizon), prog_bar=True, logger=True)

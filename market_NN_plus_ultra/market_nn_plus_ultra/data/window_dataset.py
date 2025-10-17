@@ -104,16 +104,27 @@ class SlidingWindowDataset(Dataset):
         if not self.normalise:
             return _nan_to_num(window)
 
-        clean = np.array(window, copy=True)
-        clean = clean.astype(np.float32, copy=False)
-        clean = np.where(np.isfinite(clean), clean, np.nan)
+        clean = np.array(window, copy=True, dtype=np.float32)
+        mask = np.isfinite(clean)
 
-        mean = np.nanmean(clean, axis=0, keepdims=True)
-        std = np.nanstd(clean, axis=0, keepdims=True)
-        mean = np.nan_to_num(mean, nan=0.0)
-        std = np.nan_to_num(std, nan=0.0) + 1e-6
+        if not mask.any():
+            return np.zeros_like(clean, dtype=np.float32)
 
-        filled = np.where(np.isnan(clean), mean, clean)
+        safe_counts = mask.sum(axis=0, keepdims=True)
+        safe_counts = np.maximum(safe_counts, 1)
+
+        sums = np.where(mask, clean, 0.0).sum(axis=0, keepdims=True)
+        mean = sums / safe_counts
+
+        centred = np.where(mask, clean - mean, 0.0)
+        sq_sums = np.square(centred).sum(axis=0, keepdims=True)
+        variance = sq_sums / safe_counts
+        std = np.sqrt(variance).astype(np.float32, copy=False)
+        column_mask = mask.any(axis=0, keepdims=True)
+        std = np.where(column_mask, std, 1.0).astype(np.float32, copy=False)
+        std = np.maximum(std, 1e-6)
+
+        filled = np.where(mask, clean, mean)
         normalised = (filled - mean) / std
         return _nan_to_num(normalised)
 

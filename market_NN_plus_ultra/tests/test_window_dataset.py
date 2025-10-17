@@ -1,9 +1,10 @@
 """Tests for the sliding window dataset utilities."""
 
-from __future__ import annotations
+import warnings
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from market_nn_plus_ultra.data.window_dataset import SlidingWindowDataset
 
@@ -43,3 +44,26 @@ def test_dataset_returns_finite_tensors() -> None:
     assert sample["features"].isfinite().all(), "features should not contain NaNs or infinities"
     assert sample["targets"].isfinite().all(), "targets should not contain NaNs or infinities"
     assert sample["reference"].isfinite().all(), "reference should not contain NaNs or infinities"
+
+
+def test_normalisation_handles_all_nan_feature_column() -> None:
+    panel = _build_panel()
+    panel["feature_a"] = np.nan
+    dataset = SlidingWindowDataset(
+        panel,
+        feature_columns=["feature_a", "feature_b"],
+        target_columns=["close"],
+        window_size=4,
+        horizon=2,
+        stride=1,
+        normalise=True,
+    )
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        sample = dataset[0]
+
+    assert not caught, "normalisation should not emit warnings for all-NaN columns"
+    feature_a = sample["features"][:, 0]
+    assert feature_a.isfinite().all()
+    assert feature_a.abs().max().item() == pytest.approx(0.0)
