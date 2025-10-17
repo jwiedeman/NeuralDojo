@@ -1,6 +1,4 @@
 from pathlib import Path
-from types import SimpleNamespace
-
 import pytest
 
 from market_nn_plus_ultra.training import (
@@ -84,7 +82,7 @@ class DummyModule:
 
 def test_curriculum_callback_triggers_updates():
     callback = CurriculumCallback()
-    trainer = SimpleNamespace(datamodule=DummyDataModule(), current_epoch=1)
+    trainer = DummyTrainer()
     module = DummyModule()
 
     callback.on_train_epoch_start(trainer, module)
@@ -93,3 +91,19 @@ def test_curriculum_callback_triggers_updates():
     assert module.updated == [7]
     assert module.logged["curriculum/window_size"] == pytest.approx(256.0)
     assert module.logged["curriculum/horizon"] == pytest.approx(7.0)
+    assert trainer.reset_train_calls == 1
+    assert trainer.reset_val_calls == 1
+
+
+class DummyTrainer:
+    def __init__(self) -> None:
+        self.datamodule = DummyDataModule()
+        self.current_epoch = 1
+        self.reset_train_calls = 0
+        self.reset_val_calls = 0
+
+    def reset_train_dataloader(self) -> None:
+        self.reset_train_calls += 1
+
+    def reset_val_dataloader(self) -> None:
+        self.reset_val_calls += 1
