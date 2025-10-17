@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Tuple
 
+from ..data.alternative_data import AlternativeDataSpec
 from ..trading.pnl import TradingCosts
 
 
@@ -14,6 +15,7 @@ class DataConfig:
     sqlite_path: Path
     symbol_universe: Optional[list[str]] = None
     indicators: dict[str, str] = field(default_factory=dict)
+    alternative_data: list[AlternativeDataSpec] = field(default_factory=list)
     resample_rule: Optional[str] = None
     tz_convert: Optional[str] = None
     feature_set: Optional[list[str]] = None

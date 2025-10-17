@@ -5,6 +5,7 @@ data:
   sqlite_path: data/market.db
   symbol_universe: []
   indicators: {}
+  alternative_data: []
   resample_rule: null
   tz_convert: null
   feature_set: null

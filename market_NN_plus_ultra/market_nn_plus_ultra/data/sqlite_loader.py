@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine
 
+from .alternative_data import AlternativeDataConnector, AlternativeDataSpec
 from .validation import validate_indicator_frame, validate_price_frame
 
 
@@ -121,6 +122,7 @@ class SQLiteMarketDataset:
     source: SQLiteMarketSource
     symbol_universe: Optional[Iterable[str]] = None
     indicators: Optional[Mapping[str, str]] = None
+    alternative_data: Optional[Iterable[AlternativeDataSpec | AlternativeDataConnector]] = None
     resample_rule: Optional[str] = None
     tz_convert: Optional[str] = None
     validate: bool = True
@@ -149,21 +151,43 @@ class SQLiteMarketDataset:
                 ind_df = ind_df.set_index(["timestamp", "symbol"]).sort_index()
                 indicator_frames.append(ind_df.add_prefix(f"{name}__"))
 
-        if indicator_frames:
-            merged = pd.concat([price_df] + indicator_frames, axis=1)
-        else:
-            merged = price_df
+            if indicator_frames:
+                merged = pd.concat([price_df] + indicator_frames, axis=1)
+            else:
+                merged = price_df
 
-        if self.resample_rule:
-            merged = (
-                merged.groupby(level="symbol")
-                .apply(lambda df: df.droplevel("symbol").resample(self.resample_rule).agg("last"))
-                .drop(columns=["symbol"], errors="ignore")
-            )
-            merged.index.names = ["symbol", "timestamp"]
-            merged = merged.swaplevel().sort_index()
+            if self.resample_rule:
+                merged = (
+                    merged.groupby(level="symbol")
+                    .apply(lambda df: df.droplevel("symbol").resample(self.resample_rule).agg("last"))
+                    .drop(columns=["symbol"], errors="ignore")
+                )
+                merged.index.names = ["symbol", "timestamp"]
+                merged = merged.swaplevel().sort_index()
 
-        merged = merged.dropna(how="all")
+            merged = merged.dropna(how="all")
+
+            if self.alternative_data:
+                base = merged.reset_index()
+                symbols: list[str] | None = None
+                if "symbol" in base.columns:
+                    symbols = list(dict.fromkeys(base["symbol"].tolist()))
+                connectors: list[AlternativeDataConnector] = []
+                for spec in self.alternative_data:
+                    if isinstance(spec, AlternativeDataConnector):
+                        connectors.append(spec)
+                    else:
+                        connectors.append(spec.build())
+                for connector in connectors:
+                    alt_df, value_columns = connector.fetch(conn, symbols=symbols)
+                    base = connector.enrich(base, alt_df, value_columns)
+                index_columns = [col for col in ("timestamp", "symbol") if col in base.columns]
+                if index_columns:
+                    merged = base.sort_values(index_columns)
+                    merged = merged.set_index(index_columns).sort_index()
+                else:
+                    merged = base
+
         return merged
 
     def as_panel(self) -> pd.DataFrame:

@@ -23,7 +23,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 
 ### Feature Registry Enhancements
 - [x] Auto-generate documentation from `FeatureRegistry.describe()` into Markdown.
-- [ ] Add alternative data connectors (on-chain metrics, macro calendars) into the registry.
+- [x] Add alternative data connectors (on-chain metrics, macro calendars) into the registry. (See `market_nn_plus_ultra.data.alternative_data` and regression coverage in `tests/test_alternative_data.py`.)
 - [ ] Document signal coverage expansion that pairs alternative data with technical indicators for long-horizon experiments.
 - [x] Surface dependency errors with structured logging for experiment reproducibility. (PR TBD)
 - [x] Seed registry with higher-moment statistics and spectral energy factors.
