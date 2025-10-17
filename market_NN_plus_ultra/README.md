@@ -88,13 +88,7 @@ The commands below take you from a fresh clone to running both training and infe
    python scripts/pretrain.py --config configs/pretrain.yaml --accelerator gpu --devices 1 --max-epochs 1
    ```
 
-   Adjust the overrides (e.g. `--accelerator gpu`, `--devices 1`) to match your hardware. The command saves checkpoints under `checkpoints/pretrain/` by default. If you are running on a single consumer GPU (RTX 30/40-series), start with the lighter-weight desktop preset:
-
-   ```powershell
-   python scripts/pretrain.py --config configs/pretrain_desktop.yaml --accelerator gpu --devices 1
-   ```
-
-   The desktop variant halves the model depth, reduces the batch size, and disables Lightning's validation sanity check so you see training batches almost immediately. You can still override values at the CLI (`--batch-size 12`, `--max-epochs 5`, etc.) without editing the YAML.
+   Adjust the overrides (e.g. `--accelerator gpu`, `--devices 1`) to match your hardware. The command saves checkpoints under `checkpoints/pretrain/` by default.
 
 4. **Train the supervised model**
 
@@ -134,20 +128,6 @@ You can run the project either directly in Windows or inside Windows Subsystem f
 * **WSL (Ubuntu/Debian)** — Offers a Linux userland with GPU passthrough from Windows. Follow the macOS/Linux instructions inside the WSL terminal and install the CUDA 12.6-compatible wheel (`pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126`). WSL supports bash heredocs like `python - <<'PY'`.
 
 Pick whichever workflow fits your tooling preferences; both are compatible with Lightning once the environment is initialised and the package is installed in editable mode.
-
-### Interpreting trainer output & GPU utilisation
-
-When pretraining starts, the console now prints a short summary similar to:
-
-```
-Prepared 68,000 training windows and 7,500 validation windows (batch size 24 → 2,834 steps/epoch)
-Engineered feature dimension: 132 columns
-Model parameters: 82.1M trainable / 82.3M total
-```
-
-These diagnostics explain where the workload originates before the first batch is executed. High GPU memory usage is primarily driven by **activation tensors** (batch × sequence length × hidden dimension × number of layers), which can easily consume tens of GB even when the model weights themselves are ~1 GB. Reduce `trainer.batch_size`, `model.model_dim`, or `model.depth` if you need to fit within your card's limits.
-
-If the Lightning progress bar stalls at `Sanity Checking`, you can lower the up-front validation cost by setting `trainer.num_sanity_val_steps: 0` in your YAML or by passing a smaller value on the command line (e.g. `python scripts/pretrain.py ... --max-epochs 1 --batch-size 16`). The trainer also honours `trainer.limit_val_batches`, which defaults to `0.5` in the desktop preset to keep validation quick on Windows machines.
 
 ## Vision
 
