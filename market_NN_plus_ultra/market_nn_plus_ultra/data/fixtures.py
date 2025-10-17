@@ -12,6 +12,7 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 
+from .labelling import generate_regime_labels
 from .validation import (
     validate_assets_frame,
     validate_indicator_frame,
@@ -44,12 +45,6 @@ def _rolling_feature(series: pd.Series, window: int) -> pd.Series:
 def _volatility_feature(series: pd.Series, window: int) -> pd.Series:
     returns = series.pct_change().fillna(0.0)
     return returns.rolling(window=window, min_periods=1).std().fillna(0.0)
-
-
-def _regime_labels(close: pd.Series, horizon: int = 48) -> pd.Series:
-    forward_returns = close.pct_change(periods=horizon).fillna(0.0)
-    bins = pd.qcut(forward_returns, q=3, labels=["bear", "neutral", "bull"], duplicates="drop")
-    return bins.astype(str)
 
 
 def _generate_price_panel(config: FixtureConfig) -> pd.DataFrame:
@@ -135,22 +130,8 @@ def _generate_assets(symbols: Iterable[str]) -> pd.DataFrame:
     return validate_assets_frame(assets)
 
 
-def _generate_regime_table(price_df: pd.DataFrame) -> pd.DataFrame:
-    frames: list[pd.DataFrame] = []
-    for symbol, sym_df in price_df.groupby("symbol"):
-        regimes = _regime_labels(sym_df["close"])
-        frames.append(
-            pd.DataFrame(
-                {
-                    "timestamp": sym_df["timestamp"],
-                    "symbol": symbol,
-                    "name": "regime_label",
-                    "value": regimes,
-                }
-            )
-        )
-    regime_df = pd.concat(frames, ignore_index=True)
-    return regime_df
+def _generate_regime_table(price_df: pd.DataFrame, assets: pd.DataFrame | None = None) -> pd.DataFrame:
+    return generate_regime_labels(price_df, assets=assets)
 
 
 def build_fixture(config: FixtureConfig) -> dict[str, pd.DataFrame]:
@@ -161,7 +142,7 @@ def build_fixture(config: FixtureConfig) -> dict[str, pd.DataFrame]:
     price_df = validate_price_frame(price_df, assets=assets_df)
     indicator_df = _generate_indicator_table(price_df, config)
     indicator_df = validate_indicator_frame(indicator_df, assets=assets_df)
-    regime_df = _generate_regime_table(price_df)
+    regime_df = _generate_regime_table(price_df, assets=assets_df)
     regime_df = validate_regime_frame(regime_df, assets=assets_df)
     frames = {
         "series": price_df,

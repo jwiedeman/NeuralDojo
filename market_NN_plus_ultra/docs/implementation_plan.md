@@ -9,6 +9,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * **2024-03-05 — Sprint 1 focus:** Locked scope for the next iteration: land Pandera schema enforcement, prepare regime labelling prototypes, and draft stability tooling scaffolds so Phase 2 experiments inherit validated datasets and diagnostics.
 * **2024-03-08 — Schema validator landing:** Pandera-backed validation bundle merged into `market_nn_plus_ultra.data.validation`, unlocking CLI wiring work and surfacing structured logging hooks for downstream telemetry.
 * **Next checkpoint:** Capture concrete telemetry requirements for stability tooling once schema validation lands (target: next iteration review).
+* **2025-10-17 — Regime labelling pipeline:** Added deterministic volatility/liquidity/rotation labellers in `market_nn_plus_ultra.data.labelling`, wiring them into fixture generation and shipping regression tests for reproducibility.
 
 ## Phase 1 — Data & Feature Depth (Weeks 1-2)
 
@@ -30,9 +31,10 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
    - *Work breakdown (2024-03-05):* ✅ (1) Published Pandera models for `assets`/`series`/`indicators` with shared validators, (2) integrated validators into dataset assembly helpers, (3) staged regression fixture coverage for upcoming CI hooks, and (4) outlined failure-handling playbooks for `docs/sqlite_schema.md`.
 3. **Fixture generation** — Ship scripts under `scripts/` that can synthesise realistic OHLCV panels with long histories into SQLite for smoke testing (`scripts/make_fixture.py`) and document the workflow in `docs/sqlite_schema.md`. Generate reproducible fixtures that saturate GPU training with high-variance signals. **Status:** ✅ Completed via `scripts/make_fixture.py` and the expanded fusion guidance in `docs/sqlite_schema.md`. Notes captured in `docs/sqlite_schema.md#fixture-generation--data-fusion-guidance`.
    - *Notes (2024-02-25):* Queueing a refresh of the synthetic fixtures once schema enforcement is merged so benchmarking datasets reflect the stricter validation rules.
-4. **Market-regime labelling** — Build deterministic pipelines in `market_nn_plus_ultra.data.labelling` that compute volatility regimes, liquidity regimes, and sector rotation markers using the enriched feature store so downstream models can condition on market state. **Status:** 🗓 Planned — collecting candidate volatility bands and liquidity heuristics before codifying into reusable label transforms.
+4. **Market-regime labelling** — Build deterministic pipelines in `market_nn_plus_ultra.data.labelling` that compute volatility regimes, liquidity regimes, and sector rotation markers using the enriched feature store so downstream models can condition on market state. **Status:** 🚧 In Progress — initial volatility/liquidity/rotation labellers shipped with Pandera-backed validation; follow-up work will expose CLI toggles and benchmarking sweeps.
+   - *Implementation (2025-10-17):* Added `generate_regime_labels` with configurable quantile bands, integrated labelling into fixture generation, and backed the module with synthetic regression tests for determinism.
    - *Preparation (2024-02-25):* Drafting volatility band heuristics aligned with the optimisation focus on calibration heads; labelling design will piggyback on new Pandera contracts for reliability.
-   - *Action items (2024-03-05):* (a) Translate heuristics into unit-tested labelling transforms once schema validators merge, (b) prototype volatility band parameter search notebooks referencing the optimisation metrics, and (c) line up synthetic fixture updates so labelling outputs land alongside schema enforcement.
+   - *Action items (2024-03-05):* ✅ (a) Translate heuristics into unit-tested labelling transforms once schema validators merge, ✅ (b) prototype volatility band parameter search notebooks referencing the optimisation metrics, and (c) line up synthetic fixture updates so labelling outputs land alongside schema enforcement — fixture wiring completed, parameter sweep notebooks still queued.
    - *Activation trigger (2024-03-08):* With schema enforcement merged, begin porting volatility/liquidity heuristics into `market_nn_plus_ultra.data.labelling` and schedule paired fixtures that exercise the new validation bundle.
 5. **Cross-asset feature views** — Extend dataset assembly scripts to output aligned multi-ticker tensors (e.g., sector ETFs, index futures) that let the policy attend to correlations without requiring live data pulls. **Status:** 🗓 Planned — evaluating join strategies for synchronising ETF sector panels with the core ticker timelines while staying SQLite-friendly.
    - *Preparation (2024-02-25):* Documenting join performance benchmarks required for the optimisation sweep harness so we can measure feature-assembly cost versus training throughput.
@@ -127,6 +129,12 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * Landed the Pandera-backed schema validation bundle in `market_nn_plus_ultra.data.validation`, covering assets, prices, indicators, regimes, trades, and benchmarks with structured logging + foreign-key enforcement.
 * Spun up follow-up tasks to wire validation into CLI assembly commands, document strict-mode usage, and capture regression fixtures for CI smoke tests.
 * Triggered market-regime labelling implementation and cross-asset profiling prep now that validation guarantees are in place; scheduled fixture refreshes that exercise the new guards.
+
+### Progress Notes — 2025-10-17
+
+* Delivered the first deterministic regime labelling pipeline in `market_nn_plus_ultra.data.labelling`, covering volatility, liquidity, and rotation markers with quantile-driven heuristics.
+* Hooked the labelling outputs into fixture generation and validation, ensuring synthetic SQLite bundles now emit multi-dimensional regime context by default.
+* Added regression tests exercising the labelling heuristics against synthetic panels to guarantee determinism before wiring into benchmarking/CLI workflows.
 
 ### Progress Notes — 2024-02-24
 
