@@ -12,7 +12,13 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 
-from .validation import validate_indicator_frame, validate_price_frame
+from .validation import (
+    validate_assets_frame,
+    validate_indicator_frame,
+    validate_price_frame,
+    validate_regime_frame,
+    validate_sqlite_frames,
+)
 
 
 @dataclass(slots=True)
@@ -125,7 +131,8 @@ def _generate_assets(symbols: Iterable[str]) -> pd.DataFrame:
         }
         for idx, symbol in enumerate(symbols)
     ]
-    return pd.DataFrame(data)
+    assets = pd.DataFrame(data)
+    return validate_assets_frame(assets)
 
 
 def _generate_regime_table(price_df: pd.DataFrame) -> pd.DataFrame:
@@ -150,15 +157,20 @@ def build_fixture(config: FixtureConfig) -> dict[str, pd.DataFrame]:
     """Return the generated fixture tables."""
 
     price_df = _generate_price_panel(config)
-    indicator_df = _generate_indicator_table(price_df, config)
-    regime_df = _generate_regime_table(price_df)
     assets_df = _generate_assets(config.symbols)
-    return {
+    price_df = validate_price_frame(price_df, assets=assets_df)
+    indicator_df = _generate_indicator_table(price_df, config)
+    indicator_df = validate_indicator_frame(indicator_df, assets=assets_df)
+    regime_df = _generate_regime_table(price_df)
+    regime_df = validate_regime_frame(regime_df, assets=assets_df)
+    frames = {
         "series": price_df,
         "indicators": indicator_df,
         "regimes": regime_df,
         "assets": assets_df,
     }
+    validate_sqlite_frames(frames)  # sanity check bundle relationships
+    return frames
 
 
 def write_fixture(frames: dict[str, pd.DataFrame], db_path: Path) -> Path:

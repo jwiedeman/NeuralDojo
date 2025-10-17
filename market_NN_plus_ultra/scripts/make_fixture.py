@@ -9,6 +9,7 @@ from pathlib import Path
 import pandas as pd
 
 from market_nn_plus_ultra.data.fixtures import FixtureConfig, build_fixture, write_fixture
+from market_nn_plus_ultra.data.validation import DataValidationError
 
 
 def parse_args() -> argparse.Namespace:
@@ -77,4 +78,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except DataValidationError as exc:
+        raise SystemExit(f"Validation failed: {exc}")

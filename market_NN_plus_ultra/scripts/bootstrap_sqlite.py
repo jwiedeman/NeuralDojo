@@ -29,6 +29,12 @@ from pathlib import Path
 from typing import Iterable
 
 import pandas as pd
+
+from market_nn_plus_ultra.data.validation import (
+    DataValidationError,
+    validate_assets_frame,
+    validate_price_frame,
+)
 import yfinance as yf
 
 
@@ -260,7 +266,16 @@ def main() -> None:
         conn.execute("PRAGMA foreign_keys = ON")
         ensure_schema(conn, config.overwrite)
         upsert_assets(conn, config.tickers)
+        assets_frame = pd.read_sql_query(
+            "SELECT * FROM assets WHERE symbol IN ({placeholders})".format(
+                placeholders=", ".join("?" for _ in config.tickers)
+            ),
+            conn,
+            params=tuple(config.tickers),
+        )
+        assets_frame = validate_assets_frame(assets_frame)
         frame = fetch_ohlcv(config.tickers, config.start, config.end)
+        frame = validate_price_frame(frame, assets=assets_frame)
         upsert_series(conn, frame)
         conn.commit()
 
@@ -275,5 +290,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except DataValidationError as exc:
+        raise SystemExit(f"Validation failed: {exc}")
 
