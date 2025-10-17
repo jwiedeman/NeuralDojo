@@ -18,10 +18,13 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Profile omni-scale backbone throughput and memory on GPU/CPU to tune default hyperparameters.
 - [ ] Add CI job that exercises `python -m compileall` + unit stubs to protect against syntax drift.
   - [x] Ship `scripts/ci_compile.py` as a reusable compileall smoke test for local + CI pipelines.
+- [ ] Publish guidance for fusing long price histories, technicals, and alternative data into the SQLite fixtures so GPU runs see richer regimes.
+- [ ] Generate reproducible, Pandera-validated fixtures sized to saturate a 24 GB GPU during long training sessions.
 
 ### Feature Registry Enhancements
 - [x] Auto-generate documentation from `FeatureRegistry.describe()` into Markdown.
 - [ ] Add alternative data connectors (on-chain metrics, macro calendars) into the registry.
+- [ ] Document signal coverage expansion that pairs alternative data with technical indicators for long-horizon experiments.
 - [x] Surface dependency errors with structured logging for experiment reproducibility. (PR TBD)
 - [x] Seed registry with higher-moment statistics and spectral energy factors.
 
@@ -30,11 +33,14 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Add multi-resolution attention block mixing dilated convolutions and transformer layers.
 - [x] Integrate state-space (S4/SSM) module for long-context retention.
 - [x] Ship mixture-of-experts expansion for scaling feed-forward capacity without quadratic attention cost.
-- [ ] Benchmark omni-scale backbone versus hybrid baseline across multiple asset universes.
+- [ ] Benchmark omni-scale backbone versus hybrid baseline across multiple asset universes with 4090 VRAM profiling.
 - [x] Pretrain on masked time-series reconstruction before supervised fine-tuning (`scripts/pretrain.py`).
 - [ ] Benchmark pretraining checkpoints vs. scratch initialisation across asset classes.
 - [x] Extend pretraining tasks with contrastive (TS2Vec-style) objectives for regime discrimination.
 - [x] Introduce curriculum over window sizes and horizons to stabilise very deep models. (See `CurriculumScheduler`)
+- [ ] Automate architecture sweeps over depth, horizon, and dilation for omni-scale, MoE, transformer, and state-space backbones.
+- [ ] Add gradient-noise diagnostics and calibration drift alerts to the training loop telemetry.
+- [ ] Integrate calibration-aware (Dirichlet/quantile) heads for safe scaling to deeper models.
 
 ## 2. Trading Objective & Reinforcement Learning
 - [x] Add differentiable PnL simulator with position sizing, transaction costs, and slippage.
@@ -42,6 +48,8 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Wrap policy gradient (PPO/IMPALA) fine-tuning on top of the supervised forecaster.
 - [x] Support batched scenario simulations to stress-test policies.
 - [ ] Explore calibration-aware heads (Dirichlet / quantile) for action confidence.
+- [ ] Warm-start RL fine-tuning runs from the masked/contrastive pretraining checkpoints via CLI switches.
+- [ ] Extend PPO-style upgrades to optimise ROI directly using the differentiable PnL simulator after supervised convergence.
 
 ## 3. Evaluation & Monitoring
 - [x] Build evaluation harness for daily/weekly backtests with walk-forward splits.
@@ -51,6 +59,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Wire up experiment tracking (Weights & Biases or MLflow) for metadata and artefacts.
 - [x] Add automated guardrail metrics (exposure, turnover, tail percentiles) for live trading readiness.
 - [ ] Publish automated run reports referencing the research agenda milestones.
+- [ ] Automate profitability summaries (ROI, Sharpe, drawdown) for every long training session.
 
 ## 4. Automation & Deployment
 - [ ] Containerise training + inference pipelines with GPU support.
@@ -58,6 +67,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [ ] Schedule continuous retraining jobs triggered by new data arrival.
 - [ ] Set up online monitoring for live performance and drift detection.
 - [ ] Build playbook for human-in-the-loop overrides and risk manager approvals.
+- [ ] Integrate live monitoring, automated reporting, and risk guardrails into a single operations playbook for extend/branch decisions.
 
 ---
 
