@@ -71,6 +71,14 @@ The commands below take you from a fresh clone to running both training and infe
    The resulting SQLite file drops straight into `data.sqlite_path` and is fully
    validated by Pandera before it is written to disk.
 
+   Regenerate regime labels or run integrity checks against an existing SQLite
+   bundle at any time with the dataset-build CLI:
+
+   ```bash
+   python -m market_nn_plus_ultra.cli.dataset_build data/market.db \
+       --regime-labels --strict-validation
+   ```
+
    To sanity check connectivity, drop into a Python shell and load the first few rows:
 
    ```bash
