@@ -16,7 +16,15 @@ from .train_loop import (
     MarketLightningModule,
     instantiate_modules,
     load_experiment_from_file,
+    TrainingRunResult,
     run_training,
+)
+from .benchmark import (
+    BenchmarkScenario,
+    TrainerOverrides,
+    flatten_benchmark_result,
+    iter_scenarios,
+    prepare_config_for_scenario,
 )
 from .curriculum import (
     CurriculumCallback,
@@ -53,7 +61,13 @@ __all__ = [
     "MarketDataModule",
     "instantiate_modules",
     "load_experiment_from_file",
+    "TrainingRunResult",
     "run_training",
+    "BenchmarkScenario",
+    "TrainerOverrides",
+    "prepare_config_for_scenario",
+    "iter_scenarios",
+    "flatten_benchmark_result",
     "MaskedTimeSeriesLightningModule",
     "ContrastiveTimeSeriesLightningModule",
     "instantiate_pretraining_module",

@@ -135,6 +135,20 @@ The commands below take you from a fresh clone to running both training and infe
 
    Swap in the path to the checkpoint you want to evaluate (`last.ckpt`, `best.ckpt`, etc.) and, if desired, request GPU execution with `--device cuda:0`. The script writes predictions to the requested parquet (or CSV) file and prints evaluation metrics when realised returns are available.
 
+6. **Benchmark architecture variants**
+
+   ```bash
+   python scripts/benchmarks/architecture_sweep.py \
+       --config configs/default.yaml \
+       --architectures hybrid_transformer,omni \
+       --model-dims 512,768 \
+       --depths 8,12 \
+       --limit-train-batches 0.1 \
+       --max-epochs 1
+   ```
+
+   The benchmarking CLI disables Weights & Biases logging by default, runs each scenario sequentially, and emits a parquet catalogue under `benchmarks/` capturing dataset stats, runtime, and validation metrics for downstream analysis. Use `--enable-wandb` when you want each run to report into your tracking workspace.
+
 ## Windows vs. WSL
 
 You can run the project either directly in Windows or inside Windows Subsystem for Linux (WSL):

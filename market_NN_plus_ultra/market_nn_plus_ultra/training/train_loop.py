@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 import logging
 import math
 from pathlib import Path
 import sys
-from typing import Any, Dict
+from typing import Any, Dict, Mapping
 
 import pytorch_lightning as pl
 import torch
@@ -45,6 +45,15 @@ from .curriculum import (
 
 logger = logging.getLogger(__name__)
 _IS_WINDOWS = sys.platform.startswith("win")
+
+
+@dataclass(slots=True)
+class TrainingRunResult:
+    """Structured summary returned after running supervised training."""
+
+    best_model_path: str
+    logged_metrics: dict[str, float]
+    dataset_summary: dict[str, int]
 
 
 def _parameter_counts(module: pl.LightningModule) -> tuple[int, int]:
@@ -527,7 +536,29 @@ def instantiate_modules(config: ExperimentConfig) -> tuple[MarketLightningModule
     return lightning_module, data_module
 
 
-def run_training(config: ExperimentConfig) -> dict[str, Any]:
+def _normalise_logged_metrics(metrics: Mapping[str, Any]) -> dict[str, float]:
+    """Convert arbitrary metric scalars (tensors, numpy types) to floats."""
+
+    normalised: dict[str, float] = {}
+    for key, value in metrics.items():
+        try:
+            if isinstance(value, torch.Tensor):
+                scalar = value.detach().cpu()
+                if scalar.numel() != 1:
+                    raise ValueError(
+                        f"Logged metric '{key}' is not a scalar tensor: shape={tuple(scalar.shape)}"
+                    )
+                normalised[key] = float(scalar.item())
+            elif hasattr(value, "item") and not isinstance(value, (int, float)):
+                normalised[key] = float(value.item())  # type: ignore[arg-type]
+            else:
+                normalised[key] = float(value)
+        except (TypeError, ValueError) as exc:  # pragma: no cover - defensive guard
+            raise ValueError(f"Unable to convert metric '{key}'={value!r} to float") from exc
+    return normalised
+
+
+def run_training(config: ExperimentConfig) -> TrainingRunResult:
     module, data_module = instantiate_modules(config)
     if data_module.train_dataset is None or data_module.val_dataset is None:
         data_module.setup(stage="fit")
@@ -605,8 +636,11 @@ def run_training(config: ExperimentConfig) -> dict[str, Any]:
         limit_val_batches=config.trainer.limit_val_batches,
     )
     trainer.fit(module, datamodule=data_module)
-    return {
-        "best_model_path": checkpoint_callback.best_model_path,
-        "logged_metrics": trainer.logged_metrics,
-    }
+    best_model_path = checkpoint_callback.best_model_path or ""
+    metrics = _normalise_logged_metrics(trainer.logged_metrics)
+    return TrainingRunResult(
+        best_model_path=str(best_model_path),
+        logged_metrics=metrics,
+        dataset_summary=dict(summary),
+    )
 
