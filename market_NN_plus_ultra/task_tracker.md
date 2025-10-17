@@ -16,10 +16,10 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Wire evaluation metrics into the agent CLI output for faster iteration loops.
 - [x] Expose rich CLI overrides for training and pretraining scripts so researchers can tweak depth, devices, and optimisation knobs without editing YAML files.
 - [x] Profile omni-scale backbone throughput and memory on GPU/CPU to tune default hyperparameters.
-- [ ] Add CI job that exercises `python -m compileall` + unit stubs to protect against syntax drift.
+- [x] Add CI job that exercises `python -m compileall` + unit stubs to protect against syntax drift. (See `.github/workflows/market-nn-plus-ultra-ci.yml`.)
   - [x] Ship `scripts/ci_compile.py` as a reusable compileall smoke test for local + CI pipelines.
-- [ ] Publish guidance for fusing long price histories, technicals, and alternative data into the SQLite fixtures so GPU runs see richer regimes.
-- [ ] Generate reproducible, Pandera-validated fixtures sized to saturate a 24 GB GPU during long training sessions.
+- [x] Publish guidance for fusing long price histories, technicals, and alternative data into the SQLite fixtures so GPU runs see richer regimes. (Documented in `docs/sqlite_schema.md`.)
+- [x] Generate reproducible, Pandera-validated fixtures sized to saturate a 24 GB GPU during long training sessions. (Use `scripts/make_fixture.py`.)
 
 ### Feature Registry Enhancements
 - [x] Auto-generate documentation from `FeatureRegistry.describe()` into Markdown.

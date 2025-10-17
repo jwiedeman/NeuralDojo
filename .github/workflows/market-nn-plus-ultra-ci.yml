@@ -1,0 +1,37 @@
+name: Market NN Plus Ultra CI
+
+on:
+  push:
+    paths:
+      - 'market_NN_plus_ultra/**'
+      - '.github/workflows/market-nn-plus-ultra-ci.yml'
+  pull_request:
+    paths:
+      - 'market_NN_plus_ultra/**'
+      - '.github/workflows/market-nn-plus-ultra-ci.yml'
+
+jobs:
+  compile-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy pandas pandera pytest
+          pip install --no-deps -e market_NN_plus_ultra
+
+      - name: Compile package
+        run: python market_NN_plus_ultra/scripts/ci_compile.py --quiet
+
+      - name: Run unit stubs
+        run: pytest market_NN_plus_ultra/tests/test_fixture_script.py

@@ -58,6 +58,19 @@ The commands below take you from a fresh clone to running both training and infe
 
    The script is idempotent; re-run it to refresh data or pass `--overwrite` to rebuild the tables. Alternatively copy a SQLite database that matches the schema documented in [`docs/sqlite_schema.md`](./docs/sqlite_schema.md) into `data/market.db`, or update the `data.sqlite_path` entry in your config YAML to point at your file. At minimum the database should contain `assets`, `series`, and any indicator tables you reference in the config.
 
+   Need a high-variance synthetic dataset for GPU benchmarking? Generate one with
+   the new fixture builder which fuses price history, technicals, alternative
+   signals, and regime labels in a single command:
+
+   ```bash
+   python scripts/make_fixture.py data/plus_ultra_fixture.db \
+       --symbols SPY QQQ IWM BTC-USD ETH-USD \
+       --rows 32768 --freq 15min --alt-features 4
+   ```
+
+   The resulting SQLite file drops straight into `data.sqlite_path` and is fully
+   validated by Pandera before it is written to disk.
+
    To sanity check connectivity, drop into a Python shell and load the first few rows:
 
    ```bash

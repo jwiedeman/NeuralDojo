@@ -52,6 +52,19 @@ alpha sources.
 
 *Suggested indices:* (`name`, `timestamp`), (`symbol`, `name`, `timestamp`).
 
+### `regimes`
+
+| Column      | Type     | Notes                                                                      |
+|-------------|----------|----------------------------------------------------------------------------|
+| `timestamp` | DATETIME | UTC timestamp aligned with `series.timestamp`.                             |
+| `symbol`    | TEXT     | Ticker symbol referencing `assets.symbol`.                                 |
+| `name`      | TEXT     | Regime feature name (`regime_label`, `vol_bucket`, etc.).                   |
+| `value`     | TEXT     | Discrete label or JSON blob describing the detected market regime.         |
+
+*Primary key:* (`timestamp`, `symbol`, `name`)
+
+*Suggested indices:* (`symbol`, `timestamp`), (`name`, `timestamp`).
+
 ### `trades`
 
 | Column        | Type     | Notes                                                                   |
@@ -129,4 +142,42 @@ LEFT JOIN benchmarks AS b
 Maintaining this contract ensures the Market NN Plus Ultra ingestion pipeline
 can spin up feature engineering, training, and inference jobs without manual
 data wrangling.
+
+## Fixture Generation & Data Fusion Guidance
+
+The `scripts/make_fixture.py` utility produces long-horizon fixtures that
+combine price history, engineered technical indicators, alternative data, and
+regime labels into a single SQLite database. The generator follows these steps:
+
+1. **Price synthesis** – create multi-symbol OHLCV series spanning tens of
+   thousands of rows per asset using log-normal random walks. Generated frames
+   are validated via `validate_price_frame` to guarantee schema compliance.
+2. **Technical overlays** – derive moving averages, realised volatility,
+   momentum, and drawdown indicators before melting them into the canonical
+   `indicators` table. Pandera validation (`validate_indicator_frame`) enforces
+   proper typing and duplicate guards.
+3. **Alternative data fusion** – add configurable synthetic signals (e.g.
+   rolling funding-rate proxies, sentiment momentum) per symbol. Use
+   `--alt-features` to control the breadth of signals fused alongside the price
+   series.
+4. **Regime annotation** – bucket forward returns into bear/neutral/bull
+   classes and persist them inside the dedicated `regimes` table. Downstream
+   experiments can join these labels to condition models on market state.
+5. **Asset metadata** – seed the `assets` table with synthetic entries so
+   foreign keys remain consistent across joins.
+
+Run the generator from the project root to create a GPU-saturating fixture with
+30k+ candles per symbol:
+
+```bash
+python scripts/make_fixture.py data/plus_ultra_fixture.db \
+    --symbols SPY QQQ IWM BTC-USD ETH-USD \
+    --rows 32768 --freq 15min --alt-features 4
+```
+
+The resulting database slots directly into the training configs via
+`data.sqlite_path`. Because every table is validated before persistence, the
+fixtures double as documentation for how to fuse long price histories,
+technicals, alternative data, and regime context into a reproducible SQLite
+asset store.
 

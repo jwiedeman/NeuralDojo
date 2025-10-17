@@ -4,6 +4,7 @@ from .sqlite_loader import SQLiteMarketSource, SQLiteMarketDataset
 from .feature_pipeline import FeatureDependencyError, FeatureRegistry, FeaturePipeline, FeatureSpec
 from .window_dataset import SlidingWindowDataset
 from .validation import validate_price_frame, validate_indicator_frame
+from .fixtures import FixtureConfig, build_fixture, write_fixture
 
 __all__ = [
     "SQLiteMarketSource",
@@ -15,4 +16,7 @@ __all__ = [
     "SlidingWindowDataset",
     "validate_price_frame",
     "validate_indicator_frame",
+    "FixtureConfig",
+    "build_fixture",
+    "write_fixture",
 ]
