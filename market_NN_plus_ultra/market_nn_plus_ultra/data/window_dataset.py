@@ -11,6 +11,14 @@ import torch
 from torch.utils.data import Dataset
 
 
+def _nan_to_num(array: np.ndarray) -> np.ndarray:
+    """Return a copy of *array* with NaN/Inf values replaced by safe defaults."""
+
+    if np.isfinite(array).all():
+        return array
+    return np.nan_to_num(array, nan=0.0, posinf=0.0, neginf=0.0)
+
+
 @dataclass(slots=True)
 class WindowSpec:
     """Specification for window extraction parameters."""
@@ -94,10 +102,20 @@ class SlidingWindowDataset(Dataset):
 
     def _normalise(self, window: np.ndarray) -> np.ndarray:
         if not self.normalise:
-            return window
-        mean = window.mean(axis=0, keepdims=True)
-        std = window.std(axis=0, keepdims=True) + 1e-6
-        return (window - mean) / std
+            return _nan_to_num(window)
+
+        clean = np.array(window, copy=True)
+        clean = clean.astype(np.float32, copy=False)
+        clean = np.where(np.isfinite(clean), clean, np.nan)
+
+        mean = np.nanmean(clean, axis=0, keepdims=True)
+        std = np.nanstd(clean, axis=0, keepdims=True)
+        mean = np.nan_to_num(mean, nan=0.0)
+        std = np.nan_to_num(std, nan=0.0) + 1e-6
+
+        filled = np.where(np.isnan(clean), mean, clean)
+        normalised = (filled - mean) / std
+        return _nan_to_num(normalised)
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         symbol, start = self._indices[idx]
@@ -110,8 +128,10 @@ class SlidingWindowDataset(Dataset):
         targets = data.targets[target_slice]
 
         window = self._normalise(window)
+        targets = _nan_to_num(targets)
 
         reference = data.targets[start + self.window_size - 1]
+        reference = _nan_to_num(reference)
         return {
             "symbol": symbol,
             "features": torch.from_numpy(window.copy()),
