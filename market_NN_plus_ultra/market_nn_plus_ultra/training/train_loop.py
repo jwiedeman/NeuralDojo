@@ -6,6 +6,7 @@ from dataclasses import asdict
 import logging
 import math
 from pathlib import Path
+import sys
 from typing import Any, Dict
 
 import pytorch_lightning as pl
@@ -42,6 +43,7 @@ from .curriculum import (
 
 
 logger = logging.getLogger(__name__)
+_IS_WINDOWS = sys.platform.startswith("win")
 
 
 def _parameter_counts(module: pl.LightningModule) -> tuple[int, int]:
@@ -217,6 +219,7 @@ class MarketDataModule(pl.LightningDataModule):
         self._enriched_panel = None
         self._feature_columns: list[str] = []
         self._target_columns: list[str] = []
+        self._persistent_workers: bool | None = None
 
     def setup(self, stage: str | None = None) -> None:
         source = SQLiteMarketSource(path=str(self.data_config.sqlite_path))
@@ -313,9 +316,7 @@ class MarketDataModule(pl.LightningDataModule):
             shuffle=True,
             num_workers=self.trainer_config.num_workers,
             pin_memory=self.trainer_config.accelerator != "cpu",
-            persistent_workers=bool(
-                self.trainer_config.persistent_workers and self.trainer_config.num_workers > 0
-            ),
+            persistent_workers=self._persistent_workers_enabled(),
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -326,10 +327,25 @@ class MarketDataModule(pl.LightningDataModule):
             shuffle=False,
             num_workers=self.trainer_config.num_workers,
             pin_memory=self.trainer_config.accelerator != "cpu",
-            persistent_workers=bool(
-                self.trainer_config.persistent_workers and self.trainer_config.num_workers > 0
-            ),
+            persistent_workers=self._persistent_workers_enabled(),
         )
+
+    def _persistent_workers_enabled(self) -> bool:
+        if self._persistent_workers is not None:
+            return self._persistent_workers
+
+        requested = bool(
+            self.trainer_config.persistent_workers and self.trainer_config.num_workers > 0
+        )
+        if requested and _IS_WINDOWS:
+            logger.warning(
+                "Persistent DataLoader workers are not supported on Windows; disabling to avoid hangs."
+            )
+            self._persistent_workers = False
+            return False
+
+        self._persistent_workers = requested
+        return requested
 
     def dataset_summary(self) -> dict[str, int]:
         """Return a lightweight summary of prepared datasets for logging."""
