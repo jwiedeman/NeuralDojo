@@ -74,6 +74,9 @@ class TrainerConfig:
     monitor_metric: str = "val/loss"
     monitor_mode: str = "min"
     save_top_k: int = 1
+    num_sanity_val_steps: int = 2
+    limit_train_batches: float | int = 1.0
+    limit_val_batches: float | int = 1.0
 
 
 @dataclass(slots=True)

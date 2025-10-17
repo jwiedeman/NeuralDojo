@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+import logging
 from typing import Any
 import warnings
 
@@ -17,7 +18,10 @@ from ..models.temporal_transformer import TemporalBackbone, TemporalBackboneConf
 from ..models.moe_transformer import MixtureOfExpertsBackbone, MixtureOfExpertsConfig
 from .config import ExperimentConfig, ModelConfig, OptimizerConfig, PretrainingConfig
 from ..utils.wandb import maybe_create_wandb_logger
-from .train_loop import MarketDataModule, ensure_feature_dim_alignment
+from .train_loop import MarketDataModule, ensure_feature_dim_alignment, _parameter_counts
+
+
+logger = logging.getLogger(__name__)
 
 
 def _build_backbone(model_config: ModelConfig) -> nn.Module:
@@ -395,6 +399,23 @@ def _ensure_supported_accelerator(config: ExperimentConfig) -> None:
 def run_pretraining(config: ExperimentConfig) -> dict[str, Any]:
     _ensure_supported_accelerator(config)
     module, data_module = instantiate_pretraining_module(config)
+    if data_module.train_dataset is None or data_module.val_dataset is None:
+        data_module.setup(stage="fit")
+    summary = data_module.dataset_summary()
+    logger.info(
+        "Prepared %s training windows and %s validation windows (batch size %s → %s steps/epoch)",
+        summary["train_windows"],
+        summary["val_windows"],
+        config.trainer.batch_size,
+        summary["train_batches"],
+    )
+    logger.info("Engineered feature dimension: %s columns", summary["feature_dim"])
+    trainable_params, total_params = _parameter_counts(module)
+    logger.info(
+        "Model parameters: %.2fM trainable / %.2fM total",
+        trainable_params / 1e6,
+        total_params / 1e6,
+    )
     checkpoint_dir = config.trainer.checkpoint_dir
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     monitor_metric = config.pretraining.monitor_metric
@@ -434,6 +455,9 @@ def run_pretraining(config: ExperimentConfig) -> dict[str, Any]:
         callbacks=[checkpoint_callback, lr_monitor],
         logger=trainer_logger,
         deterministic=True,
+        num_sanity_val_steps=config.trainer.num_sanity_val_steps,
+        limit_train_batches=config.trainer.limit_train_batches,
+        limit_val_batches=config.trainer.limit_val_batches,
     )
     trainer.fit(module, datamodule=data_module)
     return {

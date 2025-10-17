@@ -14,6 +14,9 @@ The commands below take you from a fresh clone to running both training and infe
 
 1. **Create a virtual environment and install the package**
 
+   <details>
+   <summary><strong>macOS / Linux (bash, zsh)</strong></summary>
+
    ```bash
    python -m venv .venv
    source .venv/bin/activate
@@ -21,7 +24,27 @@ The commands below take you from a fresh clone to running both training and infe
    pip install -e .
    ```
 
-   Installing in editable mode registers the `market_nn_plus_ultra` package and pulls in required dependencies such as PyTorch Lightning, pandas, and SQLAlchemy. This resolves the `ModuleNotFoundError` errors you would see when running the scripts without installing the project first.
+   </details>
+
+   <details>
+   <summary><strong>Windows (PowerShell)</strong></summary>
+
+   ```powershell
+   py -3.11 -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   python -m pip install --upgrade pip
+   pip install -e .
+   ```
+
+   ```powershell
+   # Optional: install the CUDA-enabled PyTorch wheel
+   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+   python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available())"
+   ```
+
+   </details>
+
+   Installing in editable mode registers the `market_nn_plus_ultra` package and pulls in required dependencies such as PyTorch Lightning, pandas, and SQLAlchemy. This resolves the `ModuleNotFoundError` errors you would see when running the scripts without installing the project first. Confirming `torch.cuda.is_available()` returns `True` ensures Lightning keeps the GPU accelerator without falling back to CPU.
 
 2. **Provide market data**
 
@@ -38,6 +61,7 @@ The commands below take you from a fresh clone to running both training and infe
    To sanity check connectivity, drop into a Python shell and load the first few rows:
 
    ```bash
+   # macOS / Linux
    python - <<'PY'
    from market_nn_plus_ultra.data.sqlite_loader import SQLiteMarketDataset, SQLiteMarketSource
 
@@ -47,18 +71,39 @@ The commands below take you from a fresh clone to running both training and infe
    PY
    ```
 
+   ```powershell
+   # Windows PowerShell
+   python -c "from market_nn_plus_ultra.data.sqlite_loader import SQLiteMarketDataset, SQLiteMarketSource; "^
+   "dataset = SQLiteMarketDataset(SQLiteMarketSource(path='data/market.db'), validate=False); "^
+   "frame = dataset.load(); print(frame.head())"
+   ```
+
 3. **(Optional) Warm start with self-supervised pretraining**
 
    ```bash
    python scripts/pretrain.py --config configs/pretrain.yaml --accelerator cpu --devices 1 --max-epochs 1
    ```
 
-   Adjust the overrides (e.g. `--accelerator gpu`, `--devices 1`) to match your hardware. The command saves checkpoints under `checkpoints/pretrain/` by default.
+   ```powershell
+   python scripts/pretrain.py --config configs/pretrain.yaml --accelerator gpu --devices 1 --max-epochs 1
+   ```
+
+   Adjust the overrides (e.g. `--accelerator gpu`, `--devices 1`) to match your hardware. The command saves checkpoints under `checkpoints/pretrain/` by default. If you are running on a single consumer GPU (RTX 30/40-series), start with the lighter-weight desktop preset:
+
+   ```powershell
+   python scripts/pretrain.py --config configs/pretrain_desktop.yaml --accelerator gpu --devices 1
+   ```
+
+   The desktop variant halves the model depth, reduces the batch size, and disables Lightning's validation sanity check so you see training batches almost immediately. You can still override values at the CLI (`--batch-size 12`, `--max-epochs 5`, etc.) without editing the YAML.
 
 4. **Train the supervised model**
 
    ```bash
    python scripts/train.py --config configs/default.yaml --accelerator cpu --devices 1 --max-epochs 1
+   ```
+
+   ```powershell
+   python scripts/train.py --config configs/default.yaml --accelerator gpu --devices 1 --max-epochs 1
    ```
 
    Remove or change the CLI overrides once you are ready to run a full GPU-backed training session. Checkpoints land in `checkpoints/default/`.
@@ -72,7 +117,37 @@ The commands below take you from a fresh clone to running both training and infe
      --output outputs/predictions.parquet
    ```
 
+   ```powershell
+   python scripts/run_agent.py --config configs/default.yaml `
+     --checkpoint checkpoints/default/last.ckpt `
+     --device cuda:0 `
+     --output outputs\predictions.parquet
+   ```
+
    Swap in the path to the checkpoint you want to evaluate (`last.ckpt`, `best.ckpt`, etc.) and, if desired, request GPU execution with `--device cuda:0`. The script writes predictions to the requested parquet (or CSV) file and prints evaluation metrics when realised returns are available.
+
+## Windows vs. WSL
+
+You can run the project either directly in Windows or inside Windows Subsystem for Linux (WSL):
+
+* **Native Windows (PowerShell)** — Recommended when you want to leverage NVIDIA's CUDA drivers with the official PyTorch wheels. Install Python 3.11, activate the virtual environment, and add the `cu126` wheel as shown above. PowerShell uses backticks (`` ` ``) for line continuations, so the README provides explicit Windows variants for multi-line commands.
+* **WSL (Ubuntu/Debian)** — Offers a Linux userland with GPU passthrough from Windows. Follow the macOS/Linux instructions inside the WSL terminal and install the CUDA 12.6-compatible wheel (`pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126`). WSL supports bash heredocs like `python - <<'PY'`.
+
+Pick whichever workflow fits your tooling preferences; both are compatible with Lightning once the environment is initialised and the package is installed in editable mode.
+
+### Interpreting trainer output & GPU utilisation
+
+When pretraining starts, the console now prints a short summary similar to:
+
+```
+Prepared 68,000 training windows and 7,500 validation windows (batch size 24 → 2,834 steps/epoch)
+Engineered feature dimension: 132 columns
+Model parameters: 82.1M trainable / 82.3M total
+```
+
+These diagnostics explain where the workload originates before the first batch is executed. High GPU memory usage is primarily driven by **activation tensors** (batch × sequence length × hidden dimension × number of layers), which can easily consume tens of GB even when the model weights themselves are ~1 GB. Reduce `trainer.batch_size`, `model.model_dim`, or `model.depth` if you need to fit within your card's limits.
+
+If the Lightning progress bar stalls at `Sanity Checking`, you can lower the up-front validation cost by setting `trainer.num_sanity_val_steps: 0` in your YAML or by passing a smaller value on the command line (e.g. `python scripts/pretrain.py ... --max-epochs 1 --batch-size 16`). The trainer also honours `trainer.limit_val_batches`, which defaults to `0.5` in the desktop preset to keep validation quick on Windows machines.
 
 ## Vision
 
@@ -89,7 +164,9 @@ market_NN_plus_ultra/
 ├── task_tracker.md            # Living backlog for future work
 ├── pyproject.toml             # Python package definition + dependencies
 ├── configs/
-│   └── default.yaml           # Example configuration for experiments
+│   ├── default.yaml           # Supervised training example configuration
+│   ├── pretrain.yaml          # High-capacity self-supervised pretraining recipe
+│   └── pretrain_desktop.yaml  # Consumer-GPU friendly pretraining preset
 ├── scripts/
 │   └── train.py               # Entry point for running training pipelines
 └── market_nn_plus_ultra/
@@ -159,13 +236,44 @@ task tracker backlog into chronological milestones.
 
 ## Getting Started
 
-1. **Create a virtual environment** and install the package in editable mode:
+1. **Create a virtual environment and install the package**
+
+   Choose the commands that match your shell. The Windows instructions assume PowerShell and Python 3.11 (the newest release with official CUDA wheels as of 2025).
+
+   <details>
+   <summary><strong>macOS / Linux (bash, zsh)</strong></summary>
 
    ```bash
    python -m venv .venv
    source .venv/bin/activate
+   python -m pip install --upgrade pip
    pip install -e .
    ```
+
+   </details>
+
+   <details>
+   <summary><strong>Windows (PowerShell)</strong></summary>
+
+   ```powershell
+   py -3.11 -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   python -m pip install --upgrade pip
+   pip install -e .
+   ```
+
+   </details>
+
+   Installing in editable mode registers the `market_nn_plus_ultra` package and pulls in required dependencies such as PyTorch Lightning, pandas, and SQLAlchemy. This resolves the `ModuleNotFoundError` errors you would see when running the scripts without installing the project first.
+
+   *Windows GPU wheel:* if you want CUDA acceleration on bare-metal Windows, install the CUDA-enabled torch wheel **after** activating the virtual environment:
+
+   ```powershell
+   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+   python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available())"
+   ```
+
+   The `cu126` index currently publishes wheels for Python 3.11. If `torch.cuda.is_available()` prints `False`, double-check that the virtual environment is active and that you are not on an unsupported Python version (e.g. 3.13). When the command returns `True`, Lightning will keep the `gpu` accelerator without falling back to CPU.
 
 2. **Prepare market data**:
    * Provide a SQLite database that includes `assets`, `series`, and `indicators` tables (see `sqlite_loader.py` for the expected schema).
