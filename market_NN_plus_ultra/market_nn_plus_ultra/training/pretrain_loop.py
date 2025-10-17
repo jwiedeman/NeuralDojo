@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from typing import Any
+import warnings
 
 import pytorch_lightning as pl
 import torch
@@ -338,7 +339,39 @@ def instantiate_pretraining_module(
     return module, data_module
 
 
+def _ensure_supported_accelerator(config: ExperimentConfig) -> None:
+    """Downgrade to CPU if the requested accelerator isn't available."""
+
+    accelerator = config.trainer.accelerator
+    if accelerator is None:
+        return
+
+    normalized = accelerator.lower()
+    if normalized in {"gpu", "cuda"}:
+        if torch.cuda.is_available():
+            return
+        message = (
+            "Trainer accelerator set to '%s' but CUDA is not available. "
+            "Falling back to CPU. Install a CUDA-enabled PyTorch build to train on the GPU."
+        )
+        warnings.warn(message % accelerator, RuntimeWarning, stacklevel=3)
+        config.trainer.accelerator = "cpu"
+        return
+
+    if normalized == "mps":
+        mps_backend = getattr(torch.backends, "mps", None)
+        if mps_backend is not None and mps_backend.is_available():
+            return
+        warnings.warn(
+            "Trainer accelerator set to 'mps' but the MPS backend is unavailable. Falling back to CPU.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+        config.trainer.accelerator = "cpu"
+
+
 def run_pretraining(config: ExperimentConfig) -> dict[str, Any]:
+    _ensure_supported_accelerator(config)
     module, data_module = instantiate_pretraining_module(config)
     checkpoint_dir = config.trainer.checkpoint_dir
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
