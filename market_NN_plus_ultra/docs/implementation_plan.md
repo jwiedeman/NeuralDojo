@@ -9,6 +9,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * **2024-03-05 — Sprint 1 focus:** Locked scope for the next iteration: land Pandera schema enforcement, prepare regime labelling prototypes, and draft stability tooling scaffolds so Phase 2 experiments inherit validated datasets and diagnostics.
 * **2024-03-08 — Schema validator landing:** Pandera-backed validation bundle merged into `market_nn_plus_ultra.data.validation`, unlocking CLI wiring work and surfacing structured logging hooks for downstream telemetry.
 * **Next checkpoint:** Capture concrete telemetry requirements for stability tooling once schema validation lands (target: next iteration review).
+* **2025-10-19 — Sprint 2 alignment:** Locked the follow-up slice of work to (a) wire regime-label toggles through the CLI and document troubleshooting, (b) prototype cross-asset join profiling with reproducible benchmarks, (c) catalogue combined alternative-data + technical signals for documentation, and (d) specify the telemetry schema (gradient noise, calibration drift, throughput) required for Phase 2 diagnostics. Progress will be recorded directly against the four active milestones below so downstream implementers can pick up remaining sub-tasks without re-triage.
 * **2025-10-18 — Optimisation cadence reset:** Locked the follow-up sprint around wiring regime labelling into the CLI, staging stability diagnostics scaffolding, and cataloguing cross-asset join benchmarks so benchmarking runs inherit complete telemetry. Added explicit acceptance criteria for each outstanding milestone to keep dependency ordering visible while implementation proceeds.
 * **2025-10-17 — Regime labelling pipeline:** Added deterministic volatility/liquidity/rotation labellers in `market_nn_plus_ultra.data.labelling`, wiring them into fixture generation and shipping regression tests for reproducibility.
 
@@ -38,11 +39,13 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
    - *Action items (2024-03-05):* ✅ (a) Translate heuristics into unit-tested labelling transforms once schema validators merge, ✅ (b) prototype volatility band parameter search notebooks referencing the optimisation metrics, and (c) line up synthetic fixture updates so labelling outputs land alongside schema enforcement — fixture wiring completed, parameter sweep notebooks still queued.
    - *Activation trigger (2024-03-08):* With schema enforcement merged, begin porting volatility/liquidity heuristics into `market_nn_plus_ultra.data.labelling` and schedule paired fixtures that exercise the new validation bundle.
    - *Next sprint goals (2025-10-18):* (1) Expose labelling toggles via `market_nn_plus_ultra.cli.dataset_build --regime-labels`, (2) extend regression fixtures to cover mixed-asset panels with label integrity checks, and (3) publish troubleshooting guidance in `docs/sqlite_schema.md` for mismatched label cardinality or stale quantile caches.
+   - *In-flight planning (2025-10-19):* Finalising CLI surface design (`--regime-labels`, `--regime-bands`) and regression coverage that exercises single-asset, multi-asset, and stale-cache scenarios so documentation updates can include concrete error-handling playbooks once the toggles land.
 5. **Cross-asset feature views** — Extend dataset assembly scripts to output aligned multi-ticker tensors (e.g., sector ETFs, index futures) that let the policy attend to correlations without requiring live data pulls. **Status:** 🗓 Planned — evaluating join strategies for synchronising ETF sector panels with the core ticker timelines while staying SQLite-friendly.
    - *Preparation (2024-02-25):* Documenting join performance benchmarks required for the optimisation sweep harness so we can measure feature-assembly cost versus training throughput.
    - *Preparation extension (2024-03-05):* Begin profiling candidate join strategies against regenerated fixtures, capture latency + memory metrics for the implementation log, and earmark config toggles so benchmarking sweeps can enable/disable cross-asset tensors cheaply.
-   - *Profiling hook (2024-03-08):* Use the stricter validation outputs to seed multi-ticker fixture builds, recording join timings and memory in the optimisation log for next sprint planning.
-   - *Benchmark checklist (2025-10-18):* (a) Collect baseline join timings for equities + ETF baskets on the refreshed fixtures, (b) document acceptable latency/regression thresholds for inclusion in benchmarking sweeps, and (c) stage a `--cross-asset-view` toggle in the CLI with a guardrail that enforces aligned calendars before merging.
+    - *Profiling hook (2024-03-08):* Use the stricter validation outputs to seed multi-ticker fixture builds, recording join timings and memory in the optimisation log for next sprint planning.
+    - *Benchmark checklist (2025-10-18):* (a) Collect baseline join timings for equities + ETF baskets on the refreshed fixtures, (b) document acceptable latency/regression thresholds for inclusion in benchmarking sweeps, and (c) stage a `--cross-asset-view` toggle in the CLI with a guardrail that enforces aligned calendars before merging.
+   - *Instrumentation plan (2025-10-19):* Defining profiling hooks (memory snapshots, wall-clock timings, alignment-violation counts) and drafting fixture variations (sector ETF + equity basket, crypto + funding rates) so the benchmarking sweep captures stress cases before the CLI toggle ships.
 
 **Exit Criteria**
 
@@ -149,6 +152,13 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * Delivered the first deterministic regime labelling pipeline in `market_nn_plus_ultra.data.labelling`, covering volatility, liquidity, and rotation markers with quantile-driven heuristics.
 * Hooked the labelling outputs into fixture generation and validation, ensuring synthetic SQLite bundles now emit multi-dimensional regime context by default.
 * Added regression tests exercising the labelling heuristics against synthetic panels to guarantee determinism before wiring into benchmarking/CLI workflows.
+
+### Progress Notes — 2025-10-19
+
+* Scoped CLI toggles for regime labelling (`--regime-labels`, `--regime-bands`) alongside regression coverage for mixed-asset fixtures to unblock documentation of troubleshooting flows.
+* Outlined cross-asset profiling harness requirements (memory, wall-clock, alignment diagnostics) and enumerated representative fixtures so benchmark data can be captured consistently in the optimisation log.
+* Drafted documentation structure for combined alternative-data + technical signals, ensuring the upcoming write-up references the new CLI toggles and validation hooks.
+* Itemised telemetry schema needs (gradient noise, calibration drift, throughput) so stability tooling and reporting milestones inherit a consistent metric contract.
 
 ### Progress Notes — 2024-02-24
 
