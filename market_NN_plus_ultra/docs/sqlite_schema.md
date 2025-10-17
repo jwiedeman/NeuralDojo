@@ -193,3 +193,32 @@ fixtures double as documentation for how to fuse long price histories,
 technicals, alternative data, and regime context into a reproducible SQLite
 asset store.
 
+## Regime Labelling CLI & Troubleshooting
+
+Use the dataset-build CLI to refresh regime annotations and exercise the full
+Pandera validation bundle from the terminal:
+
+```bash
+python -m market_nn_plus_ultra.cli.dataset_build data/market.db \
+    --regime-labels --strict-validation \
+    --regime-bands volatility:0.25,0.75 \
+    --regime-bands liquidity:0.2,0.8
+```
+
+Key troubleshooting tips:
+
+* **Mismatched label counts** – When the CLI detects duplicate or missing
+  (`timestamp`, `symbol`, `name`) combinations it logs `label_integrity_error`
+  events before aborting. Regenerate labels with `--regime-labels` to rebuild
+  the table deterministically, and ensure the requested `--symbol-universe`
+  covers every asset referenced in `regimes`.
+* **Stale quantile caches** – Adjust the quantile overrides with repeated
+  `--regime-bands` flags (e.g. `rotation:0.2,0.8`) to force fresh bands when the
+  underlying series distribution shifts. The CLI writes the regenerated table
+  atomically so downstream jobs never observe partially updated labels.
+* **Strict mode halts** – With `--strict-validation` enabled, Pandera schema and
+  foreign-key checks execute after the regime table is replaced. Validation
+  failures include structured samples in the log output so you can reconcile the
+  offending rows directly in SQLite or regenerate fixtures via
+  `scripts/make_fixture.py` before rerunning the CLI.
+
