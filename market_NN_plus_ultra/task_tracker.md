@@ -80,6 +80,12 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 * Market-regime labelling (Phase 1 Milestone 4) discovery underway — collecting volatility/liquidity heuristics and alternative data touchpoints.
 * Cross-asset feature view planning (Phase 1 Milestone 5) started — assessing ETF sector panel alignment strategies for SQLite-friendly joins.
 
+### Active Work Log — 2025-10-17
+
+* Market-regime labelling pipeline implemented with volatility/liquidity/rotation buckets and wired into synthetic fixture generation.
+* Added regression coverage in `tests/test_labelling.py` to guarantee deterministic outputs and fallback behaviour when turnover is absent.
+* Documented progress in the implementation log to unblock CLI wiring and benchmarking follow-ups for regime-aware experiments.
+
 ---
 
 ### Contributing Guidelines

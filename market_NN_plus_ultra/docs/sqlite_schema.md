@@ -160,9 +160,12 @@ regime labels into a single SQLite database. The generator follows these steps:
    rolling funding-rate proxies, sentiment momentum) per symbol. Use
    `--alt-features` to control the breadth of signals fused alongside the price
    series.
-4. **Regime annotation** – bucket forward returns into bear/neutral/bull
-   classes and persist them inside the dedicated `regimes` table. Downstream
-   experiments can join these labels to condition models on market state.
+4. **Regime annotation** – run the quantile-driven labelling pipeline in
+   `market_nn_plus_ultra.data.labelling.generate_regime_labels` to compute
+   volatility buckets, liquidity states, and cross-sectional rotation roles.
+   The resulting multi-dimensional labels are written into the `regimes`
+   table and validated alongside the other fixtures so experiments inherit
+   deterministic market-state context.
 5. **Asset metadata** – seed the `assets` table with synthetic entries so
    foreign keys remain consistent across joins.
 
