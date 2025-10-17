@@ -41,12 +41,14 @@ optimizer:
 trainer:
   batch_size: 128
   num_workers: 8
+  persistent_workers: true
   max_epochs: 50
   gradient_clip_val: 1.0
   accumulate_grad_batches: 2
   accelerator: gpu
   devices: null
   precision: bf16-mixed
+  matmul_precision: high
   log_every_n_steps: 50
   checkpoint_dir: checkpoints/pretrain
   monitor_metric: val/pretrain_loss

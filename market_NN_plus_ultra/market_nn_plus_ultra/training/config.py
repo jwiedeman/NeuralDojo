@@ -63,12 +63,14 @@ class OptimizerConfig:
 class TrainerConfig:
     batch_size: int = 32
     num_workers: int = 8
+    persistent_workers: bool = True
     max_epochs: int = 100
     gradient_clip_val: float = 1.0
     accumulate_grad_batches: int = 1
     accelerator: str = "gpu"
     devices: Optional[int] = None
     precision: str = "bf16-mixed"
+    matmul_precision: Optional[str] = "high"
     log_every_n_steps: int = 50
     checkpoint_dir: Path = Path("checkpoints")
     monitor_metric: str = "val/loss"
