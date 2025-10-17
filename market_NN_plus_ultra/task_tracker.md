@@ -95,6 +95,12 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 * Drafting documentation structure for combined signal coverage, tying sections to upcoming CLI toggles and validation references.
 * Outlining telemetry schema (gradient noise, calibration drift, throughput) that Phase 2 diagnostics and reporting milestones will consume.
 
+### Active Work Log — 2025-10-22
+
+* Completed cross-asset alignment implementation, wiring the dataset-build CLI toggle, validation schema, and documentation updates into the release plan.
+* Added regression coverage for the cross-asset view builder and CLI entry point to guarantee deterministic fills and feature naming.
+* Published the cross-asset profiling script and recorded new telemetry fields (fill rate, dropped rows/features) for upcoming benchmarking runs.
+
 ---
 
 ### Contributing Guidelines

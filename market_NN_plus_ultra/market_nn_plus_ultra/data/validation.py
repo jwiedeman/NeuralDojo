@@ -172,6 +172,23 @@ def _fallback_benchmark_validation(df: pd.DataFrame, context: str, *, logger: St
     return validated
 
 
+def _fallback_cross_asset_validation(
+    df: pd.DataFrame,
+    context: str,
+    *,
+    logger: StructuredLogger | None = None,
+) -> pd.DataFrame:
+    validated = df.copy()
+    validated["timestamp"] = _coerce_datetime(validated["timestamp"], context, logger=logger)
+    validated["feature"] = validated["feature"].astype(str)
+    validated["value"] = _fallback_numeric(validated["value"])
+    if "universe" in validated.columns:
+        validated["universe"] = validated["universe"].astype(str)
+    if "metadata" in validated.columns:
+        validated["metadata"] = validated["metadata"].astype(str)
+    return validated
+
+
 if pa is not None:  # pragma: no branch - only executed when dependency available
     ASSET_SCHEMA = pa.DataFrameSchema(
         {
@@ -246,6 +263,17 @@ if pa is not None:  # pragma: no branch - only executed when dependency availabl
         },
         coerce=True,
     )
+
+    CROSS_ASSET_VIEW_SCHEMA = pa.DataFrameSchema(
+        {
+            "timestamp": pa.Column(pa.DateTime, nullable=False, coerce=True),
+            "feature": pa.Column(pa.String, nullable=False, coerce=True),
+            "value": pa.Column(pa.Float, nullable=False, coerce=True),
+            "universe": pa.Column(pa.String, nullable=True, required=False, coerce=True),
+            "metadata": pa.Column(pa.String, nullable=True, required=False, coerce=True),
+        },
+        coerce=True,
+    )
 else:  # pragma: no cover - fallback definitions
     ASSET_SCHEMA = None
     PRICE_SCHEMA = None
@@ -253,6 +281,7 @@ else:  # pragma: no cover - fallback definitions
     REGIME_SCHEMA = None
     TRADE_SCHEMA = None
     BENCHMARK_SCHEMA = None
+    CROSS_ASSET_VIEW_SCHEMA = None
 
 
 def _enforce_foreign_key(df: pd.DataFrame, column: str, valid_values: set[str], context: str, *, logger: StructuredLogger | None = None) -> None:
@@ -389,6 +418,26 @@ def validate_benchmark_frame(df: pd.DataFrame, *, logger: StructuredLogger | Non
     return validated.sort_values(["symbol", "timestamp"])
 
 
+def validate_cross_asset_view_frame(
+    df: pd.DataFrame,
+    *,
+    logger: StructuredLogger | None = None,
+) -> pd.DataFrame:
+    """Validate aligned cross-asset feature views."""
+
+    if df.empty:
+        return df
+
+    context = "cross_asset_views"
+    if CROSS_ASSET_VIEW_SCHEMA is not None:
+        validated = _run_pandera_validation(CROSS_ASSET_VIEW_SCHEMA, df, context, logger=logger)
+    else:
+        validated = _fallback_cross_asset_validation(df, context, logger=logger)
+
+    _ensure_unique(validated, ("timestamp", "feature"), context, logger=logger)
+    return validated.sort_values(["timestamp", "feature"]).reset_index(drop=True)
+
+
 @dataclass(slots=True)
 class ValidationBundle:
     """Container for validated frames returned by :func:`validate_sqlite_frames`."""
@@ -399,6 +448,7 @@ class ValidationBundle:
     regimes: pd.DataFrame | None = None
     trades: pd.DataFrame | None = None
     benchmarks: pd.DataFrame | None = None
+    cross_asset_views: pd.DataFrame | None = None
 
 
 def validate_sqlite_frames(frames: Mapping[str, pd.DataFrame], *, logger: StructuredLogger | None = None) -> ValidationBundle:
@@ -434,6 +484,13 @@ def validate_sqlite_frames(frames: Mapping[str, pd.DataFrame], *, logger: Struct
         validate_benchmark_frame(benchmarks, logger=logger) if benchmarks is not None else None
     )
 
+    cross_asset = frames.get("cross_asset_views")
+    validated_cross_asset = (
+        validate_cross_asset_view_frame(cross_asset, logger=logger)
+        if cross_asset is not None
+        else None
+    )
+
     return ValidationBundle(
         assets=validated_assets,
         series=validated_series,
@@ -441,6 +498,7 @@ def validate_sqlite_frames(frames: Mapping[str, pd.DataFrame], *, logger: Struct
         regimes=validated_regimes,
         trades=validated_trades,
         benchmarks=validated_benchmarks,
+        cross_asset_views=validated_cross_asset,
     )
 
 
@@ -455,6 +513,7 @@ def safe_float_array(series: pd.Series) -> np.ndarray:
 __all__ = [
     "ASSET_SCHEMA",
     "BENCHMARK_SCHEMA",
+    "CROSS_ASSET_VIEW_SCHEMA",
     "DataValidationError",
     "INDICATOR_SCHEMA",
     "PRICE_SCHEMA",
@@ -463,6 +522,7 @@ __all__ = [
     "ValidationBundle",
     "validate_assets_frame",
     "validate_benchmark_frame",
+    "validate_cross_asset_view_frame",
     "validate_indicator_frame",
     "validate_price_frame",
     "validate_regime_frame",
