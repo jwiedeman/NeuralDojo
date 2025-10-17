@@ -350,11 +350,33 @@ def _ensure_supported_accelerator(config: ExperimentConfig) -> None:
     if normalized in {"gpu", "cuda"}:
         if torch.cuda.is_available():
             return
+
+        extra_help: list[str] = []
+        cuda_version = getattr(torch.version, "cuda", None)
+        if not cuda_version:
+            # Installed PyTorch build does not include CUDA support.
+            base_version = torch.__version__.split("+")[0]
+            extra_help.append(
+                "The current PyTorch installation was built without CUDA support. "
+                "Install a CUDA-enabled wheel to train on the GPU."
+            )
+            extra_help.append(
+                "For example: 'pip install --index-url https://download.pytorch.org/whl/cu121 "
+                f"torch=={base_version}'"
+            )
+        else:
+            extra_help.append(
+                "PyTorch reports CUDA %s support but no GPU devices are available. "
+                "Verify that the NVIDIA drivers are installed and CUDA_VISIBLE_DEVICES allows access."%
+                cuda_version
+            )
+
+        help_message = " ".join(extra_help)
         message = (
-            "Trainer accelerator set to '%s' but CUDA is not available. "
-            "Falling back to CPU. Install a CUDA-enabled PyTorch build to train on the GPU."
+            "Trainer accelerator set to '%s' but CUDA is not available. Falling back to CPU. %s"
+            % (accelerator, help_message)
         )
-        warnings.warn(message % accelerator, RuntimeWarning, stacklevel=3)
+        warnings.warn(message.strip(), RuntimeWarning, stacklevel=3)
         config.trainer.accelerator = "cpu"
         return
 
