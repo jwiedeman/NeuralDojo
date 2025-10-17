@@ -50,6 +50,7 @@ class ModelConfig:
     rope_theta: float = 10000.0
     encoder_layers: Optional[int] = None
     decoder_layers: Optional[int] = None
+    gradient_checkpointing: bool = False
 
 
 @dataclass(slots=True)

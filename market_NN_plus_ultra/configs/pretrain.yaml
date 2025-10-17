@@ -9,7 +9,7 @@ data:
   tz_convert: null
   feature_set: null
   target_columns: [close]
-  window_size: 512
+  window_size: 256
   horizon: 5
   stride: 4
   normalise: true
@@ -18,7 +18,7 @@ data:
 model:
   feature_dim: 128
   model_dim: 768
-  depth: 24
+  depth: 16
   heads: 12
   dropout: 0.1
   conv_kernel_size: 7
@@ -32,6 +32,7 @@ model:
   coarse_factor: 4
   cross_every: 2
   max_seq_len: 4096
+  gradient_checkpointing: true
 
 optimizer:
   lr: 0.0003
@@ -39,12 +40,12 @@ optimizer:
   betas: [0.9, 0.95]
 
 trainer:
-  batch_size: 128
+  batch_size: 32
   num_workers: 8
-  persistent_workers: true
+  persistent_workers: false
   max_epochs: 50
   gradient_clip_val: 1.0
-  accumulate_grad_batches: 2
+  accumulate_grad_batches: 8
   accelerator: gpu
   devices: null
   precision: bf16-mixed
