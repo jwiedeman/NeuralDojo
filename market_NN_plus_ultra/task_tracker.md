@@ -26,6 +26,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Add alternative data connectors (on-chain metrics, macro calendars) into the registry. (See `market_nn_plus_ultra.data.alternative_data` and regression coverage in `tests/test_alternative_data.py`.)
 - [ ] Document signal coverage expansion that pairs alternative data with technical indicators for long-horizon experiments. — Status: Drafting outline that captures cross-asset feature view requirements from the implementation plan.
   - Notes (2024-02-25): Outline will now cross-reference schema enforcement progress so the documentation includes validation guarantees and benchmark expectations highlighted in the optimisation log.
+  - Notes (2025-10-19): Drafted section headers covering regime usage, macro/technical recipes, and CLI toggles so the documentation update can land as soon as the new switches are implemented.
 - [x] Surface dependency errors with structured logging for experiment reproducibility. (PR TBD)
 - [x] Seed registry with higher-moment statistics and spectral energy factors.
 
@@ -41,6 +42,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Introduce curriculum over window sizes and horizons to stabilise very deep models. (See `CurriculumScheduler`)
 - [ ] Automate architecture sweeps over depth, horizon, and dilation for omni-scale, MoE, transformer, and state-space backbones. — Notes: Planned to extend the benchmark harness CLI once baseline sweeps are in place.
 - [ ] Add gradient-noise diagnostics and calibration drift alerts to the training loop telemetry. — Notes: Aligning with Phase 2 stability tooling design before implementation.
+  - Notes (2025-10-19): Telemetry schema draft enumerates gradient noise, calibration drift, throughput, and data freshness metrics to ensure future instrumentation plugs into reporting without rework.
 - [ ] Integrate calibration-aware (Dirichlet/quantile) heads for safe scaling to deeper models. — Notes: Pending concentration prior research captured in the implementation plan.
   - Notes (2024-02-25): Calibration head design will inherit empirical priors collected during the optimisation plan resync; keeping dependency on stability tooling explicit.
 
@@ -85,6 +87,13 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 * Market-regime labelling pipeline implemented with volatility/liquidity/rotation buckets and wired into synthetic fixture generation.
 * Added regression coverage in `tests/test_labelling.py` to guarantee deterministic outputs and fallback behaviour when turnover is absent.
 * Documented progress in the implementation log to unblock CLI wiring and benchmarking follow-ups for regime-aware experiments.
+
+### Active Work Log — 2025-10-19
+
+* Finalising CLI surface and validation matrix for regime labelling toggles so implementation can proceed without re-triage.
+* Specifying cross-asset profiling instrumentation (latency, memory, alignment diagnostics) and identifying representative fixtures for benchmarking.
+* Drafting documentation structure for combined signal coverage, tying sections to upcoming CLI toggles and validation references.
+* Outlining telemetry schema (gradient noise, calibration drift, throughput) that Phase 2 diagnostics and reporting milestones will consume.
 
 ---
 
