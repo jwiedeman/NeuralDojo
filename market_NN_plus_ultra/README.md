@@ -144,7 +144,9 @@ market_NN_plus_ultra/
 ├── task_tracker.md            # Living backlog for future work
 ├── pyproject.toml             # Python package definition + dependencies
 ├── configs/
-│   └── default.yaml           # Example configuration for experiments
+│   ├── default.yaml           # Supervised training example configuration
+│   ├── pretrain.yaml          # High-capacity self-supervised pretraining recipe
+│   └── pretrain_desktop.yaml  # Consumer-GPU friendly pretraining preset
 ├── scripts/
 │   └── train.py               # Entry point for running training pipelines
 └── market_nn_plus_ultra/

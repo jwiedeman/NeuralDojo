@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 import logging
+import math
 from pathlib import Path
 from typing import Any, Dict
 
@@ -41,6 +42,14 @@ from .curriculum import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _parameter_counts(module: pl.LightningModule) -> tuple[int, int]:
+    """Return trainable and total parameter counts for logging."""
+
+    trainable = sum(p.numel() for p in module.parameters() if p.requires_grad)
+    total = sum(p.numel() for p in module.parameters())
+    return trainable, total
 
 
 class MarketLightningModule(pl.LightningModule):
@@ -316,6 +325,23 @@ class MarketDataModule(pl.LightningDataModule):
             pin_memory=self.trainer_config.accelerator != "cpu",
         )
 
+    def dataset_summary(self) -> dict[str, int]:
+        """Return a lightweight summary of prepared datasets for logging."""
+
+        if self.train_dataset is None or self.val_dataset is None:
+            raise RuntimeError("DataModule.setup must run before requesting a dataset summary")
+
+        batch_size = max(1, self.trainer_config.batch_size)
+        train_len = len(self.train_dataset)
+        val_len = len(self.val_dataset)
+        return {
+            "train_windows": train_len,
+            "val_windows": val_len,
+            "train_batches": math.ceil(train_len / batch_size),
+            "val_batches": math.ceil(val_len / batch_size),
+            "feature_dim": self.feature_dim,
+        }
+
     @property
     def feature_columns(self) -> list[str]:
         return list(self._feature_columns)
@@ -449,6 +475,23 @@ def instantiate_modules(config: ExperimentConfig) -> tuple[MarketLightningModule
 
 def run_training(config: ExperimentConfig) -> dict[str, Any]:
     module, data_module = instantiate_modules(config)
+    if data_module.train_dataset is None or data_module.val_dataset is None:
+        data_module.setup(stage="fit")
+    summary = data_module.dataset_summary()
+    logger.info(
+        "Prepared %s training windows and %s validation windows (batch size %s → %s steps/epoch)",
+        summary["train_windows"],
+        summary["val_windows"],
+        config.trainer.batch_size,
+        summary["train_batches"],
+    )
+    logger.info("Engineered feature dimension: %s columns", summary["feature_dim"])
+    trainable_params, total_params = _parameter_counts(module)
+    logger.info(
+        "Model parameters: %.2fM trainable / %.2fM total",
+        trainable_params / 1e6,
+        total_params / 1e6,
+    )
     checkpoint_dir = config.trainer.checkpoint_dir
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     monitor_metric = config.trainer.monitor_metric
@@ -503,6 +546,9 @@ def run_training(config: ExperimentConfig) -> dict[str, Any]:
         callbacks=callbacks,
         logger=trainer_logger,
         deterministic=True,
+        num_sanity_val_steps=config.trainer.num_sanity_val_steps,
+        limit_train_batches=config.trainer.limit_train_batches,
+        limit_val_batches=config.trainer.limit_val_batches,
     )
     trainer.fit(module, datamodule=data_module)
     return {
