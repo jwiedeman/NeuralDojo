@@ -88,7 +88,7 @@ The commands below take you from a fresh clone to running both training and infe
    python scripts/pretrain.py --config configs/pretrain.yaml --accelerator gpu --devices 1 --max-epochs 1
    ```
 
-   Adjust the overrides (e.g. `--accelerator gpu`, `--devices 1`) to match your hardware. The command saves checkpoints under `checkpoints/pretrain/` by default.
+   Adjust the overrides (e.g. `--accelerator gpu`, `--devices 1`) to match your hardware. The command saves checkpoints under `checkpoints/pretrain/` by default and now auto-launches a Weights & Biases run with sensible defaults so you can watch loss curves evolve in real time. Add `--wandb-offline` for air-gapped environments or `--no-wandb` if you need to suppress tracking entirely.
 
 4. **Train the supervised model**
 
@@ -100,7 +100,7 @@ The commands below take you from a fresh clone to running both training and infe
    python scripts/train.py --config configs/default.yaml --accelerator gpu --devices 1 --max-epochs 1
    ```
 
-   Remove or change the CLI overrides once you are ready to run a full GPU-backed training session. Checkpoints land in `checkpoints/default/`.
+   Remove or change the CLI overrides once you are ready to run a full GPU-backed training session. Checkpoints land in `checkpoints/default/`. As with pretraining, Weights & Biases logging starts automatically (project name defaults to `plus-ultra` and run names include the config + timestamp). Opt out with `--no-wandb` if you prefer local-only console logging.
 
    > 💡 Running into GPU memory pressure on a consumer card? Swap in `configs/default_desktop.yaml` for a lighter-weight architecture (`--config configs/default_desktop.yaml`). The desktop preset trims the model depth, attention width, and batch size, and disables persistent dataloader workers so training stays responsive on Windows.
 
