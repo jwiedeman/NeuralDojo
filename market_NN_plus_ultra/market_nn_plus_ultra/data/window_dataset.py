@@ -15,8 +15,12 @@ def _nan_to_num(array: np.ndarray) -> np.ndarray:
     """Return a copy of *array* with NaN/Inf values replaced by safe defaults."""
 
     if np.isfinite(array).all():
-        return array
-    return np.nan_to_num(array, nan=0.0, posinf=0.0, neginf=0.0)
+        return array.astype(np.float32, copy=False)
+
+    dtype = array.dtype if np.issubdtype(array.dtype, np.floating) else np.float32
+    zero = dtype.type(0.0)
+    filled = np.nan_to_num(array, nan=zero, posinf=zero, neginf=zero)
+    return np.asarray(filled, dtype=dtype)
 
 
 @dataclass(slots=True)
@@ -138,11 +142,11 @@ class SlidingWindowDataset(Dataset):
         window = data.features[window_slice]
         targets = data.targets[target_slice]
 
-        window = self._normalise(window)
-        targets = _nan_to_num(targets)
+        window = self._normalise(window).astype(np.float32, copy=False)
+        targets = _nan_to_num(targets).astype(np.float32, copy=False)
 
         reference = data.targets[start + self.window_size - 1]
-        reference = _nan_to_num(reference)
+        reference = _nan_to_num(reference).astype(np.float32, copy=False)
         return {
             "symbol": symbol,
             "features": torch.from_numpy(window.copy()),
