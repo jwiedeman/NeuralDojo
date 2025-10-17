@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 from pathlib import Path
 
 from market_nn_plus_ultra.training import load_experiment_from_file, run_pretraining
@@ -86,6 +87,30 @@ def _apply_overrides(config, args) -> None:
         config.wandb_tags = tuple(tags)
     if args.wandb_offline:
         config.wandb_offline = True
+    if args.no_wandb:
+        config.wandb_project = None
+        config.wandb_run_name = None
+        config.wandb_tags = ()
+
+
+def _ensure_wandb_defaults(config, *, config_path: Path, disabled: bool) -> None:
+    """Populate sensible Weights & Biases defaults unless explicitly disabled."""
+
+    if disabled:
+        return
+
+    if not config.wandb_project:
+        config.wandb_project = "plus-ultra"
+
+    config_name = config_path.stem or "experiment"
+    if not config.wandb_run_name:
+        timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+        config.wandb_run_name = f"pretrain-{config_name}-{timestamp}"
+
+    tags = list(config.wandb_tags)
+    if config_name not in tags:
+        tags.append(config_name)
+    config.wandb_tags = tuple(dict.fromkeys(tags))
 
 
 def parse_args() -> argparse.Namespace:
@@ -139,6 +164,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Force Weights & Biases into offline mode for air-gapped experiments",
     )
+    parser.add_argument(
+        "--no-wandb",
+        action="store_true",
+        help="Disable the automatic Weights & Biases run launched by the pretrainer",
+    )
     return parser.parse_args()
 
 
@@ -148,6 +178,7 @@ def main() -> None:
     if config.pretraining is None:
         raise SystemExit("Config must include a 'pretraining' section for self-supervised runs")
     _apply_overrides(config, args)
+    _ensure_wandb_defaults(config, config_path=args.config, disabled=args.no_wandb)
     result = run_pretraining(config)
     print(f"Best checkpoint stored at: {result['best_model_path']}")
 
