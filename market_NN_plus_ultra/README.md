@@ -338,6 +338,14 @@ Training runs accept the same style of overrides. For example, to train an omni 
 
 The script orchestrates data loading, feature enrichment, sliding-window inference, and optional ROI evaluation if realised returns are present. Use `--no-eval` to skip metrics and `--return-column` to target a specific realised return column in the generated prediction frame.
 
+**Diagnostics tooling:** the training CLI exposes first-class controls for the stability telemetry shipped in `configs/default*.yaml`.
+
+* `--enable-diagnostics` / `--disable-diagnostics` toggle the callback regardless of YAML defaults.
+* `--diagnostics-interval` changes how often gradient-noise statistics are sampled.
+* `--diagnostics-profile` turns on extended validation summaries (calibration spread, bias variance).
+* `--diagnostics-noise-threshold`, `--diagnostics-bias-threshold`, and `--diagnostics-error-threshold` adjust warning guardrails without editing config files.
+* The `diagnostics` section inside the YAML mirrors these switches so long runs can opt into richer telemetry by default.
+
 ### Reinforcement Fine-Tuning
 
 When it's time to align the agent with ROI directly, kick off policy-gradient optimisation with PPO:

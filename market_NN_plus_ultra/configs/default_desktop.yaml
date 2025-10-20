@@ -76,6 +76,14 @@ trainer:
   limit_train_batches: 1.0
   limit_val_batches: 0.5
 
+diagnostics:
+  enabled: true
+  log_interval: 20
+  profile: true
+  gradient_noise_threshold: 4.5
+  calibration_bias_threshold: 0.06
+  calibration_error_threshold: 0.18
+
 wandb_project: null
 wandb_entity: null
 wandb_run_name: null

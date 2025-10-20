@@ -77,6 +77,24 @@ def _apply_overrides(config, args) -> None:
         config.wandb_run_name = None
         config.wandb_tags = ()
 
+    diagnostics = config.diagnostics
+    if args.enable_diagnostics:
+        diagnostics.enabled = True
+    if args.disable_diagnostics:
+        diagnostics.enabled = False
+    if args.diagnostics_interval is not None:
+        diagnostics.enabled = True
+        diagnostics.log_interval = max(1, args.diagnostics_interval)
+    if args.diagnostics_profile:
+        diagnostics.enabled = True
+        diagnostics.profile = True
+    if args.diagnostics_noise_threshold is not None:
+        diagnostics.gradient_noise_threshold = args.diagnostics_noise_threshold
+    if args.diagnostics_bias_threshold is not None:
+        diagnostics.calibration_bias_threshold = args.diagnostics_bias_threshold
+    if args.diagnostics_error_threshold is not None:
+        diagnostics.calibration_error_threshold = args.diagnostics_error_threshold
+
 
 def _ensure_wandb_defaults(config, *, config_path: Path, disabled: bool) -> None:
     """Populate sensible Weights & Biases defaults unless explicitly disabled."""
@@ -133,6 +151,41 @@ def parse_args() -> argparse.Namespace:
         "--no-wandb",
         action="store_true",
         help="Disable the automatic Weights & Biases run launched by the trainer",
+    )
+    parser.add_argument(
+        "--enable-diagnostics",
+        action="store_true",
+        help="Force-enable training diagnostics regardless of the config default",
+    )
+    parser.add_argument(
+        "--disable-diagnostics",
+        action="store_true",
+        help="Disable training diagnostics even if they are enabled in the config",
+    )
+    parser.add_argument(
+        "--diagnostics-interval",
+        type=int,
+        help="Log gradient diagnostics every N optimisation steps",
+    )
+    parser.add_argument(
+        "--diagnostics-profile",
+        action="store_true",
+        help="Emit expanded diagnostics (spread/bias statistics) during validation",
+    )
+    parser.add_argument(
+        "--diagnostics-noise-threshold",
+        type=float,
+        help="Trigger a warning when the gradient noise ratio exceeds this value",
+    )
+    parser.add_argument(
+        "--diagnostics-bias-threshold",
+        type=float,
+        help="Trigger a warning when validation bias magnitude exceeds this value",
+    )
+    parser.add_argument(
+        "--diagnostics-error-threshold",
+        type=float,
+        help="Trigger a warning when validation absolute error exceeds this value",
     )
     return parser.parse_args()
 
