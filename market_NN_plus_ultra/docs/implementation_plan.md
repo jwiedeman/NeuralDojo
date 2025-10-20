@@ -35,6 +35,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * **2025-11-09 — Execution simulator MVP:** Landed the vectorised execution engine in `market_nn_plus_ultra.simulation`, covering partial fills, latency penalties, funding costs, slippage, and position limits with dedicated regression tests so PPO and reporting workstreams can consume realistic execution telemetry.
 * **2025-11-10 — Risk-aware reward shaping release:** Enabled configurable Sharpe/Sortino bonuses with drawdown and CVaR penalties via `RiskObjectiveConfig`, shipping reusable risk metric utilities and regression coverage so PPO runs inherit the new reward tuning knobs out of the box.
 * **2025-11-10 — Research agenda reporting alignment:** Added milestone-aware report generation (`MilestoneReference`), CLI ingestion for agenda annotations, and regression coverage so automated reports now surface roadmap context by default.
+* **2025-11-10 — Dilation sweep automation:** Extended the architecture benchmark CLI to accept multi-schedule dilation grids, persisted schedule identifiers in parquet outputs, and refreshed regression coverage so optimisation sweeps now traverse depth/horizon/dilation combinations without manual YAML edits.
 
 ## Phase 1 — Data & Feature Depth (Weeks 1-2)
 
@@ -350,6 +351,12 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * Executed simulator kernel smoke tests on synthetic fixtures, capturing latency bucket histograms and validating telemetry export formats ahead of PPO rollout integration.
 * Locked profitability reporting payload contracts (diagnostics aggregates, simulator cost deltas, calibration confidence bands) and propagated schema IDs to the service and orchestration design notes to avoid churn when automation lands.
 * Stubbed orchestration DAG tasks for simulator smoke tests and profitability report generation, adding retry/idempotency notes and planning fixture-backed regression coverage for the dataset refresh → diagnostics export path.
+
+### Progress Notes — 2025-11-10
+
+* Landed dilation schedule enumeration in `scripts/benchmarks/architecture_sweep.py`, enabling architecture sweeps to scan horizon/depth combinations alongside MoE and state-space dilation grids from a single CLI invocation.
+* Updated benchmarking fixtures and documentation hooks so parquet catalogues embed the dilation signature, unlocking downstream visualisation notebooks that compare receptive-field schedules across asset universes.
+* Recorded optimisation log entry to tie the new CLI functionality back to the Phase 1 benchmarking milestone and to surface the new `--dilation-schedules` syntax for researchers scheduling 4090 profiling runs.
 
 **Exit Criteria**
 
