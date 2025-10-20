@@ -159,6 +159,13 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 * Mapped CLI integration work for opt-in diagnostics, ensuring researchers can trigger telemetry without editing experiment YAML.
 * Scheduled telemetry schema reviews so the new diagnostics artefacts feed Phase 2 reporting and Phase 4 monitoring milestones without rework.
 
+### Active Work Log — 2025-11-03
+
+* Ran Sprint 4 integration sync to coordinate calibration-head export wiring, PPO warm-start smoke tests, simulator profiling harness tasks, and reporting/monitoring dependencies.
+* Logged regression/CI coverage gaps for PPO warm starts, simulator trace exports, and profitability report templates so upcoming PRs remain incremental.
+* Sequenced documentation updates (`docs/sqlite_schema.md`, telemetry guide, operations playbook) with planned implementations to keep stakeholder onboarding smooth.
+* Captured telemetry contract owners across diagnostics parquet exports, simulator trace payloads, and service response schemas to reduce cross-stream coordination overhead during implementation.
+
 ### Active Work Log — 2025-10-24
 
 * Shipped the production diagnostics callback with gradient-noise ratio tracking, calibration drift summaries, and thresholded warnings tied to config toggles.
