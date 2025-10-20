@@ -1,0 +1,41 @@
+[
+  {
+    "label": "baseline-cpu",
+    "architecture": "state_space",
+    "model_dim": 256,
+    "depth": 6,
+    "horizon": 5,
+    "duration_seconds": 0.22000000000000064,
+    "best_model_path": "artifacts/baseline-cpu.ckpt",
+    "metric_val_loss": 0.3,
+    "metric_train_loss": 0.25,
+    "dataset_samples": 64,
+    "dataset_batches": 4
+  },
+  {
+    "label": "hybrid-gpu",
+    "architecture": "hybrid_transformer",
+    "model_dim": 512,
+    "depth": 8,
+    "horizon": 5,
+    "duration_seconds": 0.25,
+    "best_model_path": "artifacts/hybrid-gpu.ckpt",
+    "metric_val_loss": 0.2,
+    "metric_train_loss": 0.15,
+    "dataset_samples": 64,
+    "dataset_batches": 4
+  },
+  {
+    "label": "omni-gpu",
+    "architecture": "omni_mixture",
+    "model_dim": 768,
+    "depth": 12,
+    "horizon": 5,
+    "duration_seconds": 0.09999999999999432,
+    "best_model_path": "artifacts/omni-gpu.ckpt",
+    "metric_val_loss": 0.1,
+    "metric_train_loss": 0.08,
+    "dataset_samples": 64,
+    "dataset_batches": 4
+  }
+]
