@@ -6,30 +6,28 @@ import torch
 from torch import nn
 
 from ..trading.pnl import TradingCosts, differentiable_pnl, price_to_returns
+from ..trading.risk import max_drawdown, sharpe_ratio, sortino_ratio
 
 
-def sharpe_ratio_loss(returns: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
-    """Differentiable Sharpe ratio loss (negative Sharpe)."""
+def sharpe_ratio_loss(returns: torch.Tensor) -> torch.Tensor:
+    """Differentiable Sharpe ratio loss (negative Sharpe averaged over batch)."""
 
-    mean = returns.mean()
-    std = returns.std(unbiased=False) + eps
-    sharpe = mean / std
-    return -sharpe
+    sharpe = sharpe_ratio(returns, dim=-1)
+    return -sharpe.mean()
 
 
-def sortino_ratio_loss(returns: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
-    downside = returns[returns < 0]
-    downside_std = downside.pow(2).mean().sqrt() + eps
-    target_return = returns.mean()
-    sortino = target_return / downside_std
-    return -sortino
+def sortino_ratio_loss(returns: torch.Tensor) -> torch.Tensor:
+    """Differentiable Sortino ratio loss averaged over the batch."""
+
+    sortino = sortino_ratio(returns, dim=-1)
+    return -sortino.mean()
 
 
-def max_drawdown_penalty(returns: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
-    cumulative = returns.cumsum(dim=-1)
-    rolling_max = torch.cummax(cumulative, dim=-1)[0]
-    drawdown = (cumulative - rolling_max) / (rolling_max.abs() + eps)
-    return drawdown.abs().max()
+def max_drawdown_penalty(returns: torch.Tensor) -> torch.Tensor:
+    """Maximum drawdown penalty averaged over the batch."""
+
+    drawdown = max_drawdown(returns, dim=-1)
+    return drawdown.mean()
 
 
 class CompositeTradingLoss(nn.Module):

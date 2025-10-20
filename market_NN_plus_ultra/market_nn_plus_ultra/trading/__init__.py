@@ -1,6 +1,14 @@
 """Trading and inference utilities for Market NN Plus Ultra."""
 
 from .pnl import TradingCosts, differentiable_pnl, price_to_returns
+from .risk import (
+    RiskMetrics,
+    compute_risk_metrics,
+    conditional_value_at_risk,
+    max_drawdown,
+    sharpe_ratio,
+    sortino_ratio,
+)
 
 __all__ = [
     "MarketNNPlusUltraAgent",
@@ -8,6 +16,12 @@ __all__ = [
     "TradingCosts",
     "price_to_returns",
     "differentiable_pnl",
+    "RiskMetrics",
+    "compute_risk_metrics",
+    "conditional_value_at_risk",
+    "max_drawdown",
+    "sharpe_ratio",
+    "sortino_ratio",
 ]
 
 
