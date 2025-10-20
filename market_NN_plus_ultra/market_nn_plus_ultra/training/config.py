@@ -184,6 +184,16 @@ class PretrainingConfig:
 
 
 @dataclass(slots=True)
+class ReplayBufferConfig:
+    """Configuration for PPO replay buffer sampling."""
+
+    enabled: bool = False
+    capacity: int = 16384
+    sample_ratio: float = 0.5
+    min_samples: int = 2048
+
+
+@dataclass(slots=True)
 class ReinforcementConfig:
     """Hyper-parameters controlling policy-gradient fine-tuning."""
 
@@ -202,6 +212,7 @@ class ReinforcementConfig:
     activation: str = "tanh"
     costs: Optional[TradingCosts] = None
     risk_objective: RiskObjectiveConfig = field(default_factory=RiskObjectiveConfig)
+    replay_buffer: ReplayBufferConfig = field(default_factory=ReplayBufferConfig)
 
 
 @dataclass(slots=True)

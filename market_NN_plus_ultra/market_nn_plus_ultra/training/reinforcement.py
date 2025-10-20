@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Sequence
 
 import torch
 import torch.nn.functional as F
@@ -17,6 +17,7 @@ from .config import (
     ExperimentConfig,
     ModelConfig,
     OptimizerConfig,
+    ReplayBufferConfig,
     ReinforcementConfig,
     RiskObjectiveConfig,
 )
@@ -143,6 +144,100 @@ class RolloutBatch:
     returns: torch.Tensor
     rewards: torch.Tensor
 
+    def to(self, device: torch.device | str) -> "RolloutBatch":
+        device = torch.device(device)
+        return RolloutBatch(
+            features=self.features.to(device),
+            actions=self.actions.to(device),
+            log_probs=self.log_probs.to(device),
+            values=self.values.to(device),
+            advantages=self.advantages.to(device),
+            returns=self.returns.to(device),
+            rewards=self.rewards.to(device),
+        )
+
+    def detach(self) -> "RolloutBatch":
+        return RolloutBatch(
+            features=self.features.detach(),
+            actions=self.actions.detach(),
+            log_probs=self.log_probs.detach(),
+            values=self.values.detach(),
+            advantages=self.advantages.detach(),
+            returns=self.returns.detach(),
+            rewards=self.rewards.detach(),
+        )
+
+    def __len__(self) -> int:
+        return int(self.features.size(0))
+
+    def select(self, indices: torch.Tensor) -> "RolloutBatch":
+        return RolloutBatch(
+            features=self.features.index_select(0, indices),
+            actions=self.actions.index_select(0, indices),
+            log_probs=self.log_probs.index_select(0, indices),
+            values=self.values.index_select(0, indices),
+            advantages=self.advantages.index_select(0, indices),
+            returns=self.returns.index_select(0, indices),
+            rewards=self.rewards.index_select(0, indices),
+        )
+
+    def slice(self, start: int, end: int | None = None) -> "RolloutBatch":
+        return RolloutBatch(
+            features=self.features[start:end],
+            actions=self.actions[start:end],
+            log_probs=self.log_probs[start:end],
+            values=self.values[start:end],
+            advantages=self.advantages[start:end],
+            returns=self.returns[start:end],
+            rewards=self.rewards[start:end],
+        )
+
+
+def _concat_rollout_batches(batches: Sequence[RolloutBatch]) -> RolloutBatch:
+    valid = [batch for batch in batches if batch is not None]
+    if not valid:
+        raise ValueError("At least one rollout batch must be provided")
+    return RolloutBatch(
+        features=torch.cat([batch.features for batch in valid], dim=0),
+        actions=torch.cat([batch.actions for batch in valid], dim=0),
+        log_probs=torch.cat([batch.log_probs for batch in valid], dim=0),
+        values=torch.cat([batch.values for batch in valid], dim=0),
+        advantages=torch.cat([batch.advantages for batch in valid], dim=0),
+        returns=torch.cat([batch.returns for batch in valid], dim=0),
+        rewards=torch.cat([batch.rewards for batch in valid], dim=0),
+    )
+
+
+class RolloutReplayBuffer:
+    """Fixed-capacity buffer that stores PPO rollouts on CPU."""
+
+    def __init__(self, config: ReplayBufferConfig) -> None:
+        self.config = config
+        self._buffer: RolloutBatch | None = None
+
+    def add(self, batch: RolloutBatch) -> None:
+        cpu_batch = batch.detach().to(torch.device("cpu"))
+        if self._buffer is None:
+            self._buffer = cpu_batch
+        else:
+            self._buffer = _concat_rollout_batches([self._buffer, cpu_batch])
+        excess = len(self._buffer) - self.config.capacity
+        if excess > 0:
+            self._buffer = self._buffer.slice(excess)
+
+    def can_sample(self) -> bool:
+        return self._buffer is not None and len(self._buffer) >= self.config.min_samples
+
+    def sample(self, count: int) -> RolloutBatch | None:
+        if self._buffer is None or not self.can_sample():
+            return None
+        total = len(self._buffer)
+        count = max(0, min(count, total))
+        if count == 0:
+            return None
+        indices = torch.randperm(total)[:count]
+        return self._buffer.select(indices)
+
 
 @dataclass(slots=True)
 class ReinforcementUpdate:
@@ -153,6 +248,7 @@ class ReinforcementUpdate:
     policy_loss: float
     value_loss: float
     entropy: float
+    samples: int
 
 
 @dataclass(slots=True)
@@ -288,7 +384,7 @@ def _ppo_update(
 ) -> ReinforcementUpdate:
     policy.train()
 
-    num_samples = rollout.features.size(0)
+    num_samples = len(rollout)
     minibatch = max(1, min(reinforcement.minibatch_size, num_samples))
     indices = torch.arange(num_samples, device=rollout.features.device)
 
@@ -335,6 +431,7 @@ def _ppo_update(
         policy_loss=policy_loss_total / denom,
         value_loss=value_loss_total / denom,
         entropy=entropy_total / denom,
+        samples=num_samples,
     )
 
 
@@ -387,9 +484,32 @@ def run_reinforcement_finetuning(
     iterator = infinite_iterator(train_loader)
     updates: List[ReinforcementUpdate] = []
 
+    buffer: RolloutReplayBuffer | None = None
+    if reinforcement.replay_buffer.enabled:
+        if reinforcement.replay_buffer.capacity <= 0:
+            raise ValueError("replay_buffer.capacity must be positive when enabled")
+        if reinforcement.replay_buffer.min_samples <= 0:
+            raise ValueError("replay_buffer.min_samples must be positive when enabled")
+        buffer = RolloutReplayBuffer(reinforcement.replay_buffer)
+
+    sample_ratio = reinforcement.replay_buffer.sample_ratio if reinforcement.replay_buffer.enabled else 0.0
+    if sample_ratio < 0.0:
+        raise ValueError("replay_buffer.sample_ratio must be non-negative")
+
     for step in range(reinforcement.total_updates):
         rollout = _collect_rollout(policy, iterator, reinforcement, device)
-        update_stats = _ppo_update(policy, optimizer, rollout, reinforcement)
+        combined = rollout
+        if buffer is not None:
+            ratio = min(sample_ratio, 1.0)
+            replay_batch: RolloutBatch | None = None
+            if ratio > 0.0 and buffer.can_sample():
+                requested = max(1, int(round(len(rollout) * ratio)))
+                replay_batch = buffer.sample(requested)
+            buffer.add(rollout)
+            if replay_batch is not None:
+                combined = _concat_rollout_batches([rollout, replay_batch.to(device)])
+
+        update_stats = _ppo_update(policy, optimizer, combined, reinforcement)
         updates.append(
             ReinforcementUpdate(
                 update=step,
@@ -397,6 +517,7 @@ def run_reinforcement_finetuning(
                 policy_loss=update_stats.policy_loss,
                 value_loss=update_stats.value_loss,
                 entropy=update_stats.entropy,
+                samples=update_stats.samples,
             )
         )
 
