@@ -24,11 +24,12 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 ### Feature Registry Enhancements
 - [x] Auto-generate documentation from `FeatureRegistry.describe()` into Markdown.
 - [x] Add alternative data connectors (on-chain metrics, macro calendars) into the registry. (See `market_nn_plus_ultra.data.alternative_data` and regression coverage in `tests/test_alternative_data.py`.)
-- [ ] Document signal coverage expansion that pairs alternative data with technical indicators for long-horizon experiments. — Status: Drafting outline that captures cross-asset feature view requirements from the implementation plan.
+- [x] Document signal coverage expansion that pairs alternative data with technical indicators for long-horizon experiments. — Status: Published pairing matrix and workflow guidance in `docs/signal_coverage.md`.
   - Notes (2024-02-25): Outline will now cross-reference schema enforcement progress so the documentation includes validation guarantees and benchmark expectations highlighted in the optimisation log.
   - Notes (2025-10-19): Drafted section headers covering regime usage, macro/technical recipes, and CLI toggles so the documentation update can land as soon as the new switches are implemented.
   - Notes (2025-10-25): Consolidated telemetry inputs (diagnostics parquet exports, cross-asset profiling metrics) to ensure the documentation highlights how alternative-data features interplay with calibration-aware heads and PPO warm starts.
   - Notes (2025-10-26): Logged calibration-head and simulator dependencies so the documentation can reference confidence telemetry and PPO warm-start workflows once implemented.
+  - Notes (2025-10-27): Added pairing matrix, regime-aware workflow checklist, and CLI toggle coverage so research teams can enable fused bundles without bespoke notebooks.
 - [x] Surface dependency errors with structured logging for experiment reproducibility. (PR TBD)
 - [x] Seed registry with higher-moment statistics and spectral energy factors.
 
