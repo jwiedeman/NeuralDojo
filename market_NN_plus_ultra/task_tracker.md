@@ -45,15 +45,17 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-11-05): Captured benchmark configs under `configs/benchmarks/`, logged profiler placeholders in `docs/benchmarks/architecture_sweep.md`, and added regression coverage in `tests/benchmarks/test_architecture_sweep.py`; telemetry remains pending dedicated GPU allocation.
 - [x] Pretrain on masked time-series reconstruction before supervised fine-tuning (`scripts/pretrain.py`).
 - [ ] Benchmark pretraining checkpoints vs. scratch initialisation across asset classes. — Notes: Will run after schema enforcement lands to guarantee clean fixtures.
-  - Notes (2025-10-26): Defined evaluation splits aligned with diagnostics outputs so calibration drift and gradient-noise comparisons remain reproducible.
-  - Notes (2025-10-28): Synced checkpoint catalogue with latest fixtures, earmarked masked/contrastive pairs for comparative runs, and listed telemetry exports required for profitability dashboards.
-  - Notes (2025-10-29): Reserved benchmarking slots following warm-start smoke tests, documented metric rollups shared with profitability reporting, and queued automation scripts to publish comparison summaries alongside diagnostics logs.
+   - Notes (2025-10-26): Defined evaluation splits aligned with diagnostics outputs so calibration drift and gradient-noise comparisons remain reproducible.
+   - Notes (2025-10-28): Synced checkpoint catalogue with latest fixtures, earmarked masked/contrastive pairs for comparative runs, and listed telemetry exports required for profitability dashboards.
+   - Notes (2025-10-29): Reserved benchmarking slots following warm-start smoke tests, documented metric rollups shared with profitability reporting, and queued automation scripts to publish comparison summaries alongside diagnostics logs.
+   - Notes (2025-11-07): Sequenced GPU allocation requests alongside upcoming PPO rollout profiling, recorded dependency on profitability reporting schema updates, and outlined fallback CPU smoke tests to keep configs exercised while waiting for hardware.
 - [x] Extend pretraining tasks with contrastive (TS2Vec-style) objectives for regime discrimination.
 - [x] Introduce curriculum over window sizes and horizons to stabilise very deep models. (See `CurriculumScheduler`)
 - [ ] Automate architecture sweeps over depth, horizon, and dilation for omni-scale, MoE, transformer, and state-space backbones. — Notes: Planned to extend the benchmark harness CLI once baseline sweeps are in place.
-  - Notes (2025-10-26): Drafted CLI flag matrix tying sweep dimensions to diagnostics sampling intervals and documented GPU memory heuristics from recent telemetry runs.
-  - Notes (2025-10-28): Outlined experiment-tracker batching to surface partial results, captured requirement to persist profiler traces, and aligned outputs with upcoming reporting automation.
-  - Notes (2025-10-29): Stubbed CLI flag validation tests, scheduled integration with telemetry catalogue exports, and earmarked automation hooks for pushing sweep results into the reporting pipeline.
+   - Notes (2025-10-26): Drafted CLI flag matrix tying sweep dimensions to diagnostics sampling intervals and documented GPU memory heuristics from recent telemetry runs.
+   - Notes (2025-10-28): Outlined experiment-tracker batching to surface partial results, captured requirement to persist profiler traces, and aligned outputs with upcoming reporting automation.
+   - Notes (2025-10-29): Stubbed CLI flag validation tests, scheduled integration with telemetry catalogue exports, and earmarked automation hooks for pushing sweep results into the reporting pipeline.
+   - Notes (2025-11-07): Prioritised sweep automation backlog for Sprint 5, pairing distributed rollout telemetry with architecture profiling harnesses and drafting regression fixtures to validate CLI flag combinations before enabling GPU jobs.
 - [x] Add gradient-noise diagnostics and calibration drift alerts to the training loop telemetry. — Notes: `TrainingDiagnosticsCallback` now logs gradient-noise ratios and calibration drift with configurable thresholds plus regression coverage.
   - Notes (2025-10-19): Telemetry schema draft enumerates gradient noise, calibration drift, throughput, and data freshness metrics to ensure future instrumentation plugs into reporting without rework.
   - Notes (2025-10-23): Prototyping `TrainingDiagnosticsCallback` scaffolding with CLI toggles for opt-in telemetry (`--diagnostics-profile`, `--diagnostics-interval`) while drafting regression hooks that compare diagnostics across fixture runs.
@@ -84,10 +86,11 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-11-04): Implemented warm-start CLI gating with resume semantics, executed the first diagnostics-enabled smoke run, and staged distributed rollout harness benchmarks for the next Sprint 4 review.
   - Notes (2025-11-05): Finalised backbone weight loading from masked/contrastive checkpoints via the PPO runner, added `--pretrain-checkpoint` validation to the CLI, and extended regression coverage to assert weights transfer before PPO updates.
 - [ ] Extend PPO-style upgrades to optimise ROI directly using the differentiable PnL simulator after supervised convergence.
-  - Notes (2024-02-25): PPO upgrades will reuse optimisation telemetry (latency, gradient noise) once Phase 2 diagnostics are instrumented, keeping action-confidence work grounded in measurable improvements.
-  - Notes (2025-10-26): Sequenced simulator integration milestones (slippage hooks, latency buckets) with PPO reward-shaping toggles to align ROI optimisation with execution realism.
-  - Notes (2025-10-28): Defined convergence gates (calibration drift threshold, drawdown guardrails) for enabling ROI-centric updates and queued benchmarking harness updates for ROI vs. risk comparisons.
-  - Notes (2025-10-29): Planned incremental rollout of ROI-tuned objectives following warm-start smoke tests, allocated profiling windows for simulator latency validation, and aligned KPI reporting with profitability automation tasks.
+   - Notes (2024-02-25): PPO upgrades will reuse optimisation telemetry (latency, gradient noise) once Phase 2 diagnostics are instrumented, keeping action-confidence work grounded in measurable improvements.
+   - Notes (2025-10-26): Sequenced simulator integration milestones (slippage hooks, latency buckets) with PPO reward-shaping toggles to align ROI optimisation with execution realism.
+   - Notes (2025-10-28): Defined convergence gates (calibration drift threshold, drawdown guardrails) for enabling ROI-centric updates and queued benchmarking harness updates for ROI vs. risk comparisons.
+   - Notes (2025-10-29): Planned incremental rollout of ROI-tuned objectives following warm-start smoke tests, allocated profiling windows for simulator latency validation, and aligned KPI reporting with profitability automation tasks.
+   - Notes (2025-11-07): Locked Sprint 5 spike to map PPO reward-shaping hooks onto the upcoming simulator telemetry schema, drafted replay-buffer instrumentation requirements, and catalogued regression scenarios exercising risk-aware losses alongside ROI objectives.
 
 ## 3. Evaluation & Monitoring
 - [x] Build evaluation harness for daily/weekly backtests with walk-forward splits.
@@ -100,9 +103,10 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-10-26): Logged telemetry exports (diagnostics aggregates, calibration sweeps, simulator cost breakdowns) that the reporting automation must ingest.
   - Notes (2025-10-28): Drafted milestone-referenced narrative stubs so automation can link experiment artefacts back to roadmap status without manual editing.
 - [ ] Automate profitability summaries (ROI, Sharpe, drawdown) for every long training session. — Notes: Targeting the same reporting stack as Phase 4 Milestone 1.
-  - Notes (2024-02-25): Report automation will ingest optimisation KPIs defined in the implementation log so profitability summaries capture calibration and stability diagnostics alongside ROI.
-  - Notes (2025-10-26): Captured integration tasks for incorporating simulator-derived execution costs into summary tables and queued fixtures for validating drawdown aggregation under new telemetry fields.
-  - Notes (2025-10-28): Added experiment-tracker upload cadence for interim profitability snapshots and documented schema extensions for calibration-derived confidence intervals.
+   - Notes (2024-02-25): Report automation will ingest optimisation KPIs defined in the implementation log so profitability summaries capture calibration and stability diagnostics alongside ROI.
+   - Notes (2025-10-26): Captured integration tasks for incorporating simulator-derived execution costs into summary tables and queued fixtures for validating drawdown aggregation under new telemetry fields.
+   - Notes (2025-10-28): Added experiment-tracker upload cadence for interim profitability snapshots and documented schema extensions for calibration-derived confidence intervals.
+   - Notes (2025-11-07): Coordinated telemetry schema updates with simulator and PPO teams, outlined Markdown/HTML template deltas for risk-aware metrics, and scheduled Sprint 5 doc automation spikes to keep reporting aligned with new objectives.
 
 ## 4. Automation & Deployment
 - [ ] Containerise training + inference pipelines with GPU support. — Notes: Blocked until simulator + service interface prototypes settle.
