@@ -239,6 +239,7 @@ def generate_markdown_report(
     include_equity_chart: bool = True,
     include_distribution_chart: bool = True,
     periods_per_year: int = 252,
+    charts_dir_name: str | None = None,
 ) -> Path:
     """Write a Markdown performance report and return the file path."""
 
@@ -254,7 +255,9 @@ def generate_markdown_report(
         periods_per_year=periods_per_year,
     )
 
-    charts_dir = output.parent / f"{output.stem}_assets"
+    charts_dir = output.parent / (
+        charts_dir_name if charts_dir_name else f"{output.stem}_assets"
+    )
     charts = _generate_charts(
         returns,
         charts_dir,
@@ -286,6 +289,7 @@ def generate_html_report(
     include_equity_chart: bool = True,
     include_distribution_chart: bool = True,
     periods_per_year: int = 252,
+    charts_dir_name: str | None = None,
 ) -> Path:
     """Write an HTML performance report and return the file path."""
 
@@ -301,7 +305,9 @@ def generate_html_report(
         periods_per_year=periods_per_year,
     )
 
-    charts_dir = output.parent / f"{output.stem}_assets"
+    charts_dir = output.parent / (
+        charts_dir_name if charts_dir_name else f"{output.stem}_assets"
+    )
     charts = _generate_charts(
         returns,
         charts_dir,
@@ -333,6 +339,7 @@ def generate_report(
     include_equity_chart: bool = True,
     include_distribution_chart: bool = True,
     periods_per_year: int = 252,
+    charts_dir_name: str | None = None,
 ) -> Path:
     """Generate a performance report; format inferred from suffix."""
 
@@ -349,6 +356,7 @@ def generate_report(
             include_equity_chart=include_equity_chart,
             include_distribution_chart=include_distribution_chart,
             periods_per_year=periods_per_year,
+            charts_dir_name=charts_dir_name,
         )
     return generate_markdown_report(
         predictions,
@@ -360,6 +368,7 @@ def generate_report(
         include_equity_chart=include_equity_chart,
         include_distribution_chart=include_distribution_chart,
         periods_per_year=periods_per_year,
+        charts_dir_name=charts_dir_name,
     )
 
 
