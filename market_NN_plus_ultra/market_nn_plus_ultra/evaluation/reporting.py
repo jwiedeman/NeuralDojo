@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Mapping, Optional
+from typing import Dict, Iterable, Mapping, Optional, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,6 +22,27 @@ class ReportSummary:
     start_timestamp: str | None
     end_timestamp: str | None
     symbols: int
+
+
+@dataclass(slots=True)
+class MilestoneReference:
+    """Reference to a research agenda milestone included in a report."""
+
+    phase: str
+    milestone: str
+    summary: str | None = None
+
+    def to_markdown(self) -> str:
+        details = f": {self.summary}" if self.summary else ""
+        return f"- **{self.phase} — {self.milestone}**{details}"
+
+    def to_html(self) -> str:
+        details = f": {self.summary}" if self.summary else ""
+        return (
+            "<li>"
+            f"<strong>{self.phase}</strong> — {self.milestone}{details}"
+            "</li>"
+        )
 
 
 def _coerce_returns(predictions: pd.DataFrame, return_column: str) -> np.ndarray:
@@ -116,6 +137,33 @@ def _generate_charts(
     return charts
 
 
+def _normalise_milestones(
+    milestones: Optional[Iterable[MilestoneReference | Mapping[str, str]]],
+) -> list[MilestoneReference]:
+    if not milestones:
+        return []
+    normalised: list[MilestoneReference] = []
+    for item in milestones:
+        if isinstance(item, MilestoneReference):
+            normalised.append(item)
+            continue
+        phase = item.get("phase")
+        milestone = item.get("milestone") or item.get("title") or item.get("name")
+        if not phase or not milestone:
+            raise ValueError(
+                "Milestone references must include at least 'phase' and 'milestone' keys"
+            )
+        summary = item.get("summary") or item.get("notes")
+        normalised.append(
+            MilestoneReference(
+                phase=str(phase),
+                milestone=str(milestone),
+                summary=str(summary) if summary is not None else None,
+            )
+        )
+    return normalised
+
+
 def _build_markdown(
     *,
     title: str,
@@ -124,6 +172,7 @@ def _build_markdown(
     metrics: Mapping[str, float],
     charts: Mapping[str, Path],
     output_dir: Path,
+    milestones: Sequence[MilestoneReference] = (),
 ) -> str:
     lines: list[str] = [f"# {title}"]
     if description:
@@ -143,6 +192,12 @@ def _build_markdown(
     for name in sorted(metrics.keys()):
         lines.append(f"| {name.replace('_', ' ').title()} | {_format_metric(metrics[name])} |")
     lines.append("")
+
+    if milestones:
+        lines.append("## Research Agenda Alignment")
+        lines.append("")
+        lines.extend(ms.to_markdown() for ms in milestones)
+        lines.append("")
 
     if charts:
         lines.append("## Visualisations")
@@ -164,6 +219,7 @@ def _build_html(
     metrics: Mapping[str, float],
     charts: Mapping[str, Path],
     output_dir: Path,
+    milestones: Sequence[MilestoneReference] = (),
 ) -> str:
     overview_items = [
         f"<li><strong>Total samples:</strong> {summary.num_rows}</li>",
@@ -187,6 +243,13 @@ def _build_html(
 
     description_html = f"<p>{description.strip()}</p>" if description else ""
 
+    milestone_list = (
+        "<h2>Research Agenda Alignment</h2>"
+        f"<ul>{''.join(ms.to_html() for ms in milestones)}</ul>"
+        if milestones
+        else ""
+    )
+
     body = "\n".join(
         [
             f"<h1>{title}</h1>",
@@ -194,8 +257,9 @@ def _build_html(
             "<h2>Overview</h2>",
             f"<ul>{''.join(overview_items)}</ul>",
             "<h2>Risk Metrics</h2>",
-            "<table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>"
+            "<table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>",
             f"{metrics_rows}</tbody></table>",
+            milestone_list,
             "<h2>Visualisations</h2>" if charts else "",
             figures,
         ]
@@ -240,6 +304,7 @@ def generate_markdown_report(
     include_distribution_chart: bool = True,
     periods_per_year: int = 252,
     charts_dir_name: str | None = None,
+    milestones: Optional[Iterable[MilestoneReference | Mapping[str, str]]] = None,
 ) -> Path:
     """Write a Markdown performance report and return the file path."""
 
@@ -273,6 +338,7 @@ def generate_markdown_report(
         metrics=final_metrics,
         charts=charts,
         output_dir=output.parent,
+        milestones=_normalise_milestones(milestones),
     )
     output.write_text(markdown_text, encoding="utf-8")
     return output
@@ -290,6 +356,7 @@ def generate_html_report(
     include_distribution_chart: bool = True,
     periods_per_year: int = 252,
     charts_dir_name: str | None = None,
+    milestones: Optional[Iterable[MilestoneReference | Mapping[str, str]]] = None,
 ) -> Path:
     """Write an HTML performance report and return the file path."""
 
@@ -323,6 +390,7 @@ def generate_html_report(
         metrics=final_metrics,
         charts=charts,
         output_dir=output.parent,
+        milestones=_normalise_milestones(milestones),
     )
     output.write_text(html_text, encoding="utf-8")
     return output
@@ -340,6 +408,7 @@ def generate_report(
     include_distribution_chart: bool = True,
     periods_per_year: int = 252,
     charts_dir_name: str | None = None,
+    milestones: Optional[Iterable[MilestoneReference | Mapping[str, str]]] = None,
 ) -> Path:
     """Generate a performance report; format inferred from suffix."""
 
@@ -357,6 +426,7 @@ def generate_report(
             include_distribution_chart=include_distribution_chart,
             periods_per_year=periods_per_year,
             charts_dir_name=charts_dir_name,
+            milestones=milestones,
         )
     return generate_markdown_report(
         predictions,
@@ -369,11 +439,13 @@ def generate_report(
         include_distribution_chart=include_distribution_chart,
         periods_per_year=periods_per_year,
         charts_dir_name=charts_dir_name,
+        milestones=milestones,
     )
 
 
 __all__ = [
     "ReportSummary",
+    "MilestoneReference",
     "generate_markdown_report",
     "generate_html_report",
     "generate_report",

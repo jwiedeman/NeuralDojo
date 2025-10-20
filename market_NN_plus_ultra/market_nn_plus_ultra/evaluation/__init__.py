@@ -16,6 +16,7 @@ from .metrics import (
     value_at_risk,
 )
 from .reporting import (
+    MilestoneReference,
     ReportSummary,
     generate_html_report,
     generate_markdown_report,
@@ -42,6 +43,7 @@ __all__ = [
     "sortino_ratio",
     "ulcer_index",
     "value_at_risk",
+    "MilestoneReference",
     "ReportSummary",
     "generate_markdown_report",
     "generate_html_report",
