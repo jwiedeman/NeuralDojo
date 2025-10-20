@@ -15,6 +15,7 @@ from market_nn_plus_ultra.training import (
     OptimizerConfig,
     PretrainingConfig,
     ReinforcementConfig,
+    ReplayBufferConfig,
     TrainerConfig,
     run_reinforcement_finetuning,
 )
@@ -112,7 +113,66 @@ def test_reinforcement_finetuning_smoke(tmp_path: Path) -> None:
     assert np.isfinite(update.policy_loss)
     assert np.isfinite(update.value_loss)
     assert np.isfinite(update.entropy)
+    assert update.samples == reinforcement_config.steps_per_rollout
     assert result.policy_state_dict
+
+
+def test_reinforcement_with_replay_buffer(tmp_path: Path) -> None:
+    db_path = tmp_path / "ppo_fixture.db"
+    _build_sqlite_fixture(db_path)
+
+    data_config = DataConfig(
+        sqlite_path=db_path,
+        symbol_universe=["TEST"],
+        feature_set=[],
+        window_size=16,
+        horizon=4,
+        stride=4,
+        normalise=True,
+        val_fraction=0.0,
+    )
+    model_config = ModelConfig(
+        feature_dim=5,
+        model_dim=64,
+        depth=2,
+        heads=4,
+        dropout=0.1,
+        conv_kernel_size=3,
+        conv_dilations=(1, 2),
+        horizon=4,
+        output_dim=1,
+        architecture="temporal_transformer",
+    )
+    trainer_config = TrainerConfig(
+        batch_size=4,
+        num_workers=0,
+        accelerator="cpu",
+        precision="32-true",
+        checkpoint_dir=tmp_path / "checkpoints",
+    )
+    reinforcement_config = ReinforcementConfig(
+        total_updates=2,
+        steps_per_rollout=8,
+        policy_epochs=1,
+        minibatch_size=4,
+        learning_rate=1e-3,
+        replay_buffer=ReplayBufferConfig(enabled=True, capacity=32, sample_ratio=1.0, min_samples=8),
+    )
+    experiment = ExperimentConfig(
+        seed=21,
+        data=data_config,
+        model=model_config,
+        optimizer=OptimizerConfig(lr=1e-3),
+        trainer=trainer_config,
+        reinforcement=reinforcement_config,
+    )
+
+    result = run_reinforcement_finetuning(experiment, device="cpu")
+
+    assert len(result.updates) == reinforcement_config.total_updates
+    # First update uses only fresh rollout data; second should include replay samples.
+    assert result.updates[0].samples == reinforcement_config.steps_per_rollout
+    assert result.updates[1].samples > reinforcement_config.steps_per_rollout
 
 
 def test_reinforcement_warm_start_from_pretraining_checkpoint(tmp_path: Path) -> None:

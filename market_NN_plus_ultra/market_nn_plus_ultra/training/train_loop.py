@@ -42,6 +42,7 @@ from .config import (
     ModelConfig,
     OptimizerConfig,
     PretrainingConfig,
+    ReplayBufferConfig,
     ReinforcementConfig,
     TrainerConfig,
     MarketStateConfig,
@@ -728,6 +729,15 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
             costs_section = reinforcement_section["costs"]
             if isinstance(costs_section, dict):
                 reinforcement_section["costs"] = TradingCosts(**costs_section)
+        buffer_section = reinforcement_section.get("replay_buffer")
+        if buffer_section is not None:
+            buffer_dict = dict(buffer_section)
+            reinforcement_section["replay_buffer"] = ReplayBufferConfig(
+                enabled=bool(buffer_dict.get("enabled", False)),
+                capacity=int(buffer_dict.get("capacity", 16384)),
+                sample_ratio=float(buffer_dict.get("sample_ratio", 0.5)),
+                min_samples=int(buffer_dict.get("min_samples", 2048)),
+            )
         reinforcement_cfg = ReinforcementConfig(**reinforcement_section)
     diagnostics_section = raw.get("diagnostics")
     if diagnostics_section is None:

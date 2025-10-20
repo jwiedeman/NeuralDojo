@@ -105,7 +105,7 @@ def main() -> None:
         print(
             f"Update {update.update:03d} | Reward: {update.mean_reward:.6f} | "
             f"Policy Loss: {update.policy_loss:.6f} | Value Loss: {update.value_loss:.6f} | "
-            f"Entropy: {update.entropy:.6f}"
+            f"Entropy: {update.entropy:.6f} | Samples: {update.samples}"
         )
 
 
