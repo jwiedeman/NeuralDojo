@@ -11,6 +11,7 @@ from typing import Any, Dict, Mapping
 
 import pytorch_lightning as pl
 import torch
+import torch.nn as nn
 import yaml
 from torch.utils.data import DataLoader, random_split
 
@@ -23,9 +24,11 @@ from ..models.omni_mixture import MarketOmniBackbone, OmniBackboneConfig
 from ..models.moe_transformer import MixtureOfExpertsBackbone, MixtureOfExpertsConfig
 from ..models.state_space import StateSpaceBackbone, StateSpaceConfig
 from ..models.losses import CompositeTradingLoss
+from ..models.calibration import CalibratedPolicyHead, CalibrationHeadOutput
 from ..trading.pnl import TradingCosts
 from ..utils.wandb import maybe_create_wandb_logger
 from .config import (
+    CalibrationConfig,
     CurriculumConfig,
     CurriculumStage,
     DataConfig,
@@ -147,12 +150,18 @@ class MarketLightningModule(pl.LightningModule):
             self.backbone = StateSpaceBackbone(ssm_config)
         else:
             raise ValueError(f"Unknown architecture '{model_config.architecture}'")
-        self.head = TemporalPolicyHead(model_config.model_dim, model_config.horizon, model_config.output_dim)
+        self.head = self._build_head(model_config.horizon)
         self.loss_fn = CompositeTradingLoss()
+        self._latest_head_output: CalibrationHeadOutput | None = None
 
     def forward(self, features: torch.Tensor) -> torch.Tensor:
         hidden = self.backbone(features)
-        return self.head(hidden)
+        head_output = self.head(hidden)
+        if isinstance(head_output, CalibrationHeadOutput):
+            self._latest_head_output = head_output
+            return head_output.prediction
+        self._latest_head_output = None
+        return head_output
 
     def update_horizon(self, horizon: int) -> None:
         """Refresh the policy head when the training horizon changes."""
@@ -161,12 +170,31 @@ class MarketLightningModule(pl.LightningModule):
             return
         self.model_config.horizon = horizon
         self.hparams["model"]["horizon"] = horizon
-        new_head = TemporalPolicyHead(
+        new_head = self._build_head(horizon)
+        self.head = new_head.to(self.device)
+        self._latest_head_output = None
+
+    def _build_head(self, horizon: int) -> nn.Module:
+        if self.model_config.calibration.enabled:
+            return CalibratedPolicyHead(
+                self.model_config.model_dim,
+                horizon,
+                self.model_config.output_dim,
+                quantile_levels=self.model_config.calibration.quantiles,
+                dirichlet_temperature=self.model_config.calibration.temperature,
+                min_concentration=self.model_config.calibration.min_concentration,
+            )
+        return TemporalPolicyHead(
             self.model_config.model_dim,
             horizon,
             self.model_config.output_dim,
         )
-        self.head = new_head.to(self.device)
+
+    @property
+    def latest_head_output(self) -> CalibrationHeadOutput | None:
+        """Return the most recent head output, if calibration is enabled."""
+
+        return self._latest_head_output
 
     @classmethod
     def from_checkpoint(
@@ -455,6 +483,22 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
         model_section["conv_dilations"] = (1, 2, 4, 8, 16, 32)
     if "architecture" in model_section:
         model_section["architecture"] = str(model_section["architecture"]).lower()
+    calibration_section = model_section.get("calibration")
+    if calibration_section is not None:
+        calib_section = dict(calibration_section)
+        quantiles = calib_section.get("quantiles")
+        if quantiles is not None:
+            quantiles_tuple = tuple(float(q) for q in quantiles)
+        else:
+            quantiles_tuple = (0.05, 0.5, 0.95)
+        model_section["calibration"] = CalibrationConfig(
+            enabled=bool(calib_section.get("enabled", False)),
+            quantiles=quantiles_tuple,
+            temperature=float(calib_section.get("temperature", 1.0)),
+            min_concentration=float(calib_section.get("min_concentration", 1e-2)),
+        )
+    else:
+        model_section["calibration"] = CalibrationConfig()
     model_cfg = ModelConfig(**model_section)
     optimizer_cfg = OptimizerConfig(**raw.get("optimizer", {}))
     trainer_section = dict(raw.get("trainer", {}))

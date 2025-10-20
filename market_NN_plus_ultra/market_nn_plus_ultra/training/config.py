@@ -30,6 +30,16 @@ class DataConfig:
 
 
 @dataclass(slots=True)
+class CalibrationConfig:
+    """Configuration controlling calibration-aware policy heads."""
+
+    enabled: bool = False
+    quantiles: Tuple[float, ...] = (0.05, 0.5, 0.95)
+    temperature: float = 1.0
+    min_concentration: float = 1e-2
+
+
+@dataclass(slots=True)
 class ModelConfig:
     feature_dim: int
     model_dim: int = 512
@@ -54,6 +64,7 @@ class ModelConfig:
     encoder_layers: Optional[int] = None
     decoder_layers: Optional[int] = None
     gradient_checkpointing: bool = False
+    calibration: CalibrationConfig = field(default_factory=CalibrationConfig)
 
 
 @dataclass(slots=True)

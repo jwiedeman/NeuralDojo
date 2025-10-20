@@ -57,22 +57,24 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-10-19): Telemetry schema draft enumerates gradient noise, calibration drift, throughput, and data freshness metrics to ensure future instrumentation plugs into reporting without rework.
   - Notes (2025-10-23): Prototyping `TrainingDiagnosticsCallback` scaffolding with CLI toggles for opt-in telemetry (`--diagnostics-profile`, `--diagnostics-interval`) while drafting regression hooks that compare diagnostics across fixture runs.
   - Notes (2025-10-24): Landed CLI/YAML toggles, callback thresholds, and tests for diagnostics parsing plus metric emission so supervised runs expose stability telemetry by default.
-- [ ] Integrate calibration-aware (Dirichlet/quantile) heads for safe scaling to deeper models. — Notes: Pending concentration prior research captured in the implementation plan.
+- [x] Integrate calibration-aware (Dirichlet/quantile) heads for safe scaling to deeper models. — Notes: `CalibratedPolicyHead` + Lightning integration landed with config toggles and regression coverage.
   - Notes (2024-02-25): Calibration head design will inherit empirical priors collected during the optimisation plan resync; keeping dependency on stability tooling explicit.
   - Notes (2025-10-25): Tagged diagnostics callback outputs and cross-asset fill-rate telemetry as required inputs for calibration-head validation, sequenced prototype tasks (loss wrappers, config toggles, regression fixtures) for the next sprint.
   - Notes (2025-10-26): Drafted calibration sweep plan pairing Dirichlet temperature/quantile spacing with PPO warm-start checkpoints for reinforcement-aware validation.
   - Notes (2025-10-28): Locked `CalibrationHeadAdapter` API sketch, mapped config validation coverage, and tracked simulator cost-tracing dependency to align calibrated confidence intervals with PPO reward shaping.
   - Notes (2025-10-29): Scheduled prototype implementation pairing embedding heads with calibration adapters, defined synthetic datasets for deterministic expectation checks, and coordinated telemetry schema changes with reporting/monitoring milestones.
+  - Notes (2025-10-30): Implemented `market_nn_plus_ultra.models.calibration.CalibratedPolicyHead`, surfaced calibrated payloads through `MarketLightningModule.latest_head_output`, parsed YAML `model.calibration` blocks, and added `tests/test_calibration_head.py` to guard quantile monotonicity + concentration positivity.
 
 ## 2. Trading Objective & Reinforcement Learning
 - [x] Add differentiable PnL simulator with position sizing, transaction costs, and slippage.
 - [x] Implement utility-aware losses (Sharpe, Sortino, drawdown penalties) in `models.losses`.
 - [x] Wrap policy gradient (PPO/IMPALA) fine-tuning on top of the supervised forecaster.
 - [x] Support batched scenario simulations to stress-test policies.
-- [ ] Explore calibration-aware heads (Dirichlet / quantile) for action confidence.
+- [x] Explore calibration-aware heads (Dirichlet / quantile) for action confidence.
   - Notes (2025-10-26): Outlined PPO-compatible inference wrappers and captured simulator latency constraints for sampling action confidences online.
   - Notes (2025-10-28): Split implementation into head-training experiments piggybacking on supervised checkpoints and policy-evaluation harness updates emitting confidence telemetry for reporting.
   - Notes (2025-10-29): Drafted PPO evaluation checklist covering confidence calibration metrics, defined simulator integration tests for latency impact, and coordinated telemetry outputs with the operations playbook.
+  - Notes (2025-10-30): Baseline calibration head now emits quantile intervals + Dirichlet confidence suitable for PPO warm starts; follow-up tasks will wire outputs into reinforcement evaluation harnesses.
 - [ ] Warm-start RL fine-tuning runs from the masked/contrastive pretraining checkpoints via CLI switches.
   - Notes (2025-10-25): Drafted warm-start experiment matrix and telemetry capture checklist (diagnostics aggregates, rollout stability traces) to align with PPO upgrade planning in the implementation log.
   - Notes (2025-10-26): Finalised CLI contract draft (`--warm-start-checkpoint`, `--warm-start-tuning`) and mapped regression fixtures combining diagnostics snapshots with rollout summaries.
