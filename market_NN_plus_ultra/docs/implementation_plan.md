@@ -16,6 +16,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * **2025-10-21 — Sprint 3 kickoff:** Locked optimisation focus on landing cross-asset feature views, establishing profiling harnesses for the new joins, and translating telemetry requirements into concrete instrumentation tickets ahead of the Phase 2 simulator work. Sequenced deliverables so documentation, fixtures, and CLI toggles evolve together without blocking PPO upgrades.
 * **2025-10-22 — Cross-asset alignment landing:** Implemented the alignment engine in `market_nn_plus_ultra.data.cross_asset`, wired the `--cross-asset-view` CLI flag with validation and structured logging, published the accompanying Pandera schema, and added the `scripts/benchmarks/cross_asset_profile.py` probe so profiling runs capture fill rates, dropped rows, and feature breadth for every dataset refresh.
 * **2025-10-23 — Stability diagnostics instrumentation kickoff:** Sequenced the gradient-noise and calibration-drift callback prototypes, mapped CLI toggles for opt-in diagnostics runs, and scheduled telemetry schema reviews so reporting milestones can ingest the new metrics without refactors.
+* **2025-10-24 — Diagnostics callback landing:** Shipped the production `TrainingDiagnosticsCallback` with gradient-noise ratio estimates, calibration drift summaries, CLI/YAML toggles, and regression coverage so stability telemetry is now part of every supervised run.
 
 ## Phase 1 — Data & Feature Depth (Weeks 1-2)
 
@@ -74,11 +75,12 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 
 1. **Benchmark harness** — Create benchmarking scripts under `scripts/benchmarks/` that automate sweeps over architecture type, depth, horizon, dilation schedules, and temporal resolutions, storing metrics in a parquet catalogue. Integrate with `docs/research_agenda.md` so results feed back into planning and highlight optimal 4090 utilisation. **Status:** ✅ Completed — `scripts/benchmarks/architecture_sweep.py` now orchestrates configurable sweeps, disables W&B by default for lab runs, and emits parquet catalogues summarising metrics + dataset stats for downstream analysis.
    - *Notes (2024-02-25):* Scheduling reruns post-schema enforcement to validate training throughput deltas once datasets are regenerated.
-2. **Stability tooling** — Implement gradient noise scale diagnostics, calibration drift monitoring, and loss landscape plots within `market_nn_plus_ultra.training.train_loop`. Persist diagnostics to disk for every experiment and surface warnings in the CLI. **Status:** 🚧 In Progress — Lightning callback scaffolding under development to host gradient-noise trackers and calibration alerts without destabilising existing training loops.
+2. **Stability tooling** — Implement gradient noise scale diagnostics, calibration drift monitoring, and loss landscape plots within `market_nn_plus_ultra.training.train_loop`. Persist diagnostics to disk for every experiment and surface warnings in the CLI. **Status:** ✅ Completed — Gradient-noise and calibration telemetry now ship via `TrainingDiagnosticsCallback` with configurable thresholds, CLI toggles, and regression coverage.
    - *Next steps (2024-02-25):* Prototype callback scaffolding while awaiting validated datasets so optimisation metrics (noise scale, calibration drift) have trustworthy baselines.
    - *Scaffolding plan (2024-03-05):* Draft `TrainingDiagnosticsCallback` with pluggable collectors, outline gradient-noise estimation utilities, and sketch telemetry schema so outputs flow into Phase 4 reporting without refactors.
    - *Sprint 1 instrumentation (2025-10-18):* (i) Ship a thin callback shell that records batch-level noise scale estimates to parquet, (ii) wire calibration drift probes against existing validation splits, and (iii) log CLI warnings when diagnostics exceed thresholds defined in the optimisation log.
    - *Implementation kickoff (2025-10-23):* Lock callback lifecycles and CLI toggles (`--diagnostics-profile`, `--diagnostics-interval`) while drafting regression hooks that compare telemetry outputs across fixture runs to guard against silent drift.
+   - *Landing notes (2025-10-24):* Production callback now emits gradient-noise ratios, calibration drift statistics, and threshold-based warnings while respecting YAML/CLI overrides.
 3. **Calibration head** — Introduce a Dirichlet/quantile hybrid head in `market_nn_plus_ultra.models` with supporting loss terms, enabling probability-calibrated signals for downstream risk controls and readying models for reinforcement fine-tuning. **Status:** 🗓 Planned — surveying prior experiments to determine default concentration priors before coding the head.
    - *Preparation (2024-02-25):* Collecting empirical priors from current supervised checkpoints to parameterise the calibration head once optimisation diagnostics are ready.
    - *Modelling notes (2024-03-05):* Catalogue supervised checkpoint metrics to anchor default Dirichlet concentration, design YAML config knobs for calibration modes, and plan unit tests that compare calibration error pre/post head integration.
@@ -191,6 +193,12 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * Kicked off stability tooling implementation by drafting the `TrainingDiagnosticsCallback` lifecycle, focusing on lightweight hooks for gradient-noise sampling and calibration drift measurements.
 * Outlined CLI integration strategy (`--diagnostics-profile`, `--diagnostics-interval`) so researchers can enable richer telemetry without modifying experiment YAML files.
 * Began mapping telemetry artefacts (parquet diagnostics, alert thresholds) into the reporting schema to maintain traceability from optimisation runs to forthcoming monitoring dashboards.
+
+### Progress Notes — 2025-10-24
+
+* Landed the production `TrainingDiagnosticsCallback` with gradient-noise ratio tracking, calibration drift summaries, and threshold-based warnings tied to YAML/CLI toggles.
+* Added regression coverage for diagnostics statistics and configuration parsing to prevent silent regressions as telemetry expands.
+* Updated default experiment configs and the CLI so researchers can opt into richer diagnostics profiles or adjust alert thresholds without editing source.
 
 ### Progress Notes — 2024-02-24
 

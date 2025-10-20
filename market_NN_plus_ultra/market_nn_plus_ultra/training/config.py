@@ -8,6 +8,7 @@ from typing import Optional, Tuple
 
 from ..data.alternative_data import AlternativeDataSpec
 from ..trading.pnl import TradingCosts
+from .diagnostics import DiagnosticsThresholds
 
 
 @dataclass(slots=True)
@@ -85,12 +86,32 @@ class TrainerConfig:
 
 
 @dataclass(slots=True)
+class DiagnosticsConfig:
+    """Toggle and tune training-time telemetry."""
+
+    enabled: bool = False
+    log_interval: int = 50
+    profile: bool = False
+    gradient_noise_threshold: float | None = None
+    calibration_bias_threshold: float | None = None
+    calibration_error_threshold: float | None = None
+
+    def as_thresholds(self) -> DiagnosticsThresholds:
+        return DiagnosticsThresholds(
+            gradient_noise=self.gradient_noise_threshold,
+            calibration_bias=self.calibration_bias_threshold,
+            calibration_error=self.calibration_error_threshold,
+        )
+
+
+@dataclass(slots=True)
 class ExperimentConfig:
     seed: int
     data: DataConfig
     model: ModelConfig
     optimizer: OptimizerConfig = field(default_factory=OptimizerConfig)
     trainer: TrainerConfig = field(default_factory=TrainerConfig)
+    diagnostics: DiagnosticsConfig = field(default_factory=DiagnosticsConfig)
     wandb_project: Optional[str] = None
     wandb_entity: Optional[str] = None
     wandb_run_name: Optional[str] = None

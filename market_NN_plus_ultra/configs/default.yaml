@@ -70,6 +70,14 @@ trainer:
   monitor_mode: min
   save_top_k: 1
 
+diagnostics:
+  enabled: true
+  log_interval: 50
+  profile: false
+  gradient_noise_threshold: 4.0
+  calibration_bias_threshold: 0.05
+  calibration_error_threshold: 0.15
+
 wandb_project: null
 wandb_entity: null
 wandb_run_name: null

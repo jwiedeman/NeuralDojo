@@ -29,6 +29,7 @@ from .config import (
     CurriculumConfig,
     CurriculumStage,
     DataConfig,
+    DiagnosticsConfig,
     ExperimentConfig,
     ModelConfig,
     OptimizerConfig,
@@ -41,6 +42,7 @@ from .curriculum import (
     CurriculumParameters,
     CurriculumScheduler,
 )
+from .diagnostics import TrainingDiagnosticsCallback
 
 
 logger = logging.getLogger(__name__)
@@ -482,6 +484,25 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
             if isinstance(costs_section, dict):
                 reinforcement_section["costs"] = TradingCosts(**costs_section)
         reinforcement_cfg = ReinforcementConfig(**reinforcement_section)
+    diagnostics_section = raw.get("diagnostics")
+    if diagnostics_section is None:
+        diagnostics_cfg = DiagnosticsConfig()
+    else:
+        diag_section = dict(diagnostics_section)
+        def _optional_float(key: str) -> float | None:
+            value = diag_section.get(key)
+            if value is None:
+                return None
+            return float(value)
+
+        diagnostics_cfg = DiagnosticsConfig(
+            enabled=bool(diag_section.get("enabled", True)),
+            log_interval=int(diag_section.get("log_interval", 50)),
+            profile=bool(diag_section.get("profile", False)),
+            gradient_noise_threshold=_optional_float("gradient_noise_threshold"),
+            calibration_bias_threshold=_optional_float("calibration_bias_threshold"),
+            calibration_error_threshold=_optional_float("calibration_error_threshold"),
+        )
     wandb_tags = raw.get("wandb_tags")
     if wandb_tags is None:
         tags_tuple: tuple[str, ...] = ()
@@ -501,6 +522,7 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
         notes=raw.get("notes"),
         pretraining=pretraining_cfg,
         reinforcement=reinforcement_cfg,
+        diagnostics=diagnostics_cfg,
     )
 
 
@@ -604,6 +626,14 @@ def run_training(config: ExperimentConfig) -> TrainingRunResult:
     callbacks: list[pl.Callback] = [checkpoint_callback, lr_monitor]
     if config.data.curriculum is not None:
         callbacks.append(CurriculumCallback())
+    if config.diagnostics.enabled:
+        callbacks.append(
+            TrainingDiagnosticsCallback(
+                log_interval=max(1, config.diagnostics.log_interval),
+                profile=config.diagnostics.profile,
+                thresholds=config.diagnostics.as_thresholds(),
+            )
+        )
 
     loggers: list[pl.loggers.logger.Logger] = []
     wandb_logger = maybe_create_wandb_logger(config, run_kind="train")

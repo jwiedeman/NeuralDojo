@@ -41,9 +41,10 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Extend pretraining tasks with contrastive (TS2Vec-style) objectives for regime discrimination.
 - [x] Introduce curriculum over window sizes and horizons to stabilise very deep models. (See `CurriculumScheduler`)
 - [ ] Automate architecture sweeps over depth, horizon, and dilation for omni-scale, MoE, transformer, and state-space backbones. — Notes: Planned to extend the benchmark harness CLI once baseline sweeps are in place.
-- [ ] Add gradient-noise diagnostics and calibration drift alerts to the training loop telemetry. — Notes: Aligning with Phase 2 stability tooling design before implementation.
+- [x] Add gradient-noise diagnostics and calibration drift alerts to the training loop telemetry. — Notes: `TrainingDiagnosticsCallback` now logs gradient-noise ratios and calibration drift with configurable thresholds plus regression coverage.
   - Notes (2025-10-19): Telemetry schema draft enumerates gradient noise, calibration drift, throughput, and data freshness metrics to ensure future instrumentation plugs into reporting without rework.
   - Notes (2025-10-23): Prototyping `TrainingDiagnosticsCallback` scaffolding with CLI toggles for opt-in telemetry (`--diagnostics-profile`, `--diagnostics-interval`) while drafting regression hooks that compare diagnostics across fixture runs.
+  - Notes (2025-10-24): Landed CLI/YAML toggles, callback thresholds, and tests for diagnostics parsing plus metric emission so supervised runs expose stability telemetry by default.
 - [ ] Integrate calibration-aware (Dirichlet/quantile) heads for safe scaling to deeper models. — Notes: Pending concentration prior research captured in the implementation plan.
   - Notes (2024-02-25): Calibration head design will inherit empirical priors collected during the optimisation plan resync; keeping dependency on stability tooling explicit.
 
@@ -107,6 +108,12 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 * Initiated stability diagnostics implementation by defining callback lifecycles for gradient-noise estimation and calibration drift monitoring.
 * Mapped CLI integration work for opt-in diagnostics, ensuring researchers can trigger telemetry without editing experiment YAML.
 * Scheduled telemetry schema reviews so the new diagnostics artefacts feed Phase 2 reporting and Phase 4 monitoring milestones without rework.
+
+### Active Work Log — 2025-10-24
+
+* Shipped the production diagnostics callback with gradient-noise ratio tracking, calibration drift summaries, and thresholded warnings tied to config toggles.
+* Added regression coverage for diagnostics statistics and YAML parsing so telemetry remains trustworthy as instrumentation expands.
+* Updated default experiment configs and training CLI overrides to surface diagnostics controls without manual YAML edits.
 
 ---
 

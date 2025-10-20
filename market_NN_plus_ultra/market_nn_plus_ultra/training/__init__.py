@@ -4,6 +4,7 @@ from .config import (
     CurriculumConfig,
     CurriculumStage,
     DataConfig,
+    DiagnosticsConfig,
     ExperimentConfig,
     ModelConfig,
     OptimizerConfig,
@@ -31,6 +32,11 @@ from .curriculum import (
     CurriculumParameters,
     CurriculumScheduler,
 )
+from .diagnostics import (
+    DiagnosticsThresholds,
+    RunningMoments,
+    TrainingDiagnosticsCallback,
+)
 from .pretrain_loop import (
     ContrastiveTimeSeriesLightningModule,
     MaskedTimeSeriesLightningModule,
@@ -46,6 +52,7 @@ from .reinforcement import (
 
 __all__ = [
     "DataConfig",
+    "DiagnosticsConfig",
     "ModelConfig",
     "OptimizerConfig",
     "TrainerConfig",
@@ -57,6 +64,9 @@ __all__ = [
     "CurriculumScheduler",
     "CurriculumParameters",
     "CurriculumCallback",
+    "TrainingDiagnosticsCallback",
+    "DiagnosticsThresholds",
+    "RunningMoments",
     "MarketLightningModule",
     "MarketDataModule",
     "instantiate_modules",
