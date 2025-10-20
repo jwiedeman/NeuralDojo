@@ -12,7 +12,14 @@ from torch import nn
 from torch.distributions import Normal
 
 from ..trading.pnl import TradingCosts, differentiable_pnl, price_to_returns
-from .config import ExperimentConfig, ModelConfig, OptimizerConfig, ReinforcementConfig
+from ..trading.risk import compute_risk_metrics
+from .config import (
+    ExperimentConfig,
+    ModelConfig,
+    OptimizerConfig,
+    ReinforcementConfig,
+    RiskObjectiveConfig,
+)
 from .train_loop import MarketDataModule, MarketLightningModule
 
 
@@ -156,6 +163,33 @@ class ReinforcementRunResult:
     policy_state_dict: dict[str, torch.Tensor]
 
 
+def _apply_risk_objectives(pnl: torch.Tensor, config: RiskObjectiveConfig) -> torch.Tensor:
+    """Blend risk metrics into the per-step reward signal when configured."""
+
+    if pnl.ndim < 2:
+        raise ValueError("PnL tensor must have shape [batch, horizon] or higher")
+
+    if not config.is_active():
+        return pnl
+
+    metrics = compute_risk_metrics(pnl, alpha=config.cvar_alpha, dim=-1)
+    horizon = pnl.size(-1)
+
+    bonus = torch.zeros_like(metrics.sharpe)
+    if config.sharpe_weight != 0.0:
+        bonus = bonus + config.sharpe_weight * metrics.sharpe
+    if config.sortino_weight != 0.0:
+        bonus = bonus + config.sortino_weight * metrics.sortino
+    if config.drawdown_weight != 0.0:
+        bonus = bonus - config.drawdown_weight * metrics.drawdown
+    if config.cvar_weight != 0.0:
+        cvar_penalty = torch.clamp(-metrics.cvar, min=0.0)
+        bonus = bonus - config.cvar_weight * cvar_penalty
+
+    per_step_adjustment = (config.reward_scale * bonus).unsqueeze(-1) / float(horizon)
+    return pnl + per_step_adjustment
+
+
 def _compute_gae(
     rewards: torch.Tensor, values: torch.Tensor, gamma: float, gae_lambda: float
 ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -215,7 +249,9 @@ def _collect_rollout(
             actions_buf.append(actions)
             log_prob_buf.append(log_prob)
             value_buf.append(values)
-            reward_buf.append(pnl)
+            adjusted_pnl = _apply_risk_objectives(pnl, reinforcement.risk_objective)
+
+            reward_buf.append(adjusted_pnl)
             total_samples += features.size(0)
 
     features_tensor = torch.cat(features_buf, dim=0)

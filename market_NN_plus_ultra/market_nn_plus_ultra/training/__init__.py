@@ -9,6 +9,7 @@ from .config import (
     ModelConfig,
     OptimizerConfig,
     PretrainingConfig,
+    RiskObjectiveConfig,
     ReinforcementConfig,
     TrainerConfig,
 )
@@ -59,6 +60,7 @@ __all__ = [
     "ExperimentConfig",
     "PretrainingConfig",
     "ReinforcementConfig",
+    "RiskObjectiveConfig",
     "CurriculumConfig",
     "CurriculumStage",
     "CurriculumScheduler",

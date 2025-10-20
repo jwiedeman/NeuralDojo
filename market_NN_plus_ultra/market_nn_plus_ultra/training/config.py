@@ -50,6 +50,27 @@ class MarketStateConfig:
 
 
 @dataclass(slots=True)
+class RiskObjectiveConfig:
+    """Configuration for reinforcement risk-aware reward shaping."""
+
+    enabled: bool = False
+    sharpe_weight: float = 0.0
+    sortino_weight: float = 0.0
+    drawdown_weight: float = 0.0
+    cvar_weight: float = 0.0
+    cvar_alpha: float = 0.05
+    reward_scale: float = 1.0
+
+    def is_active(self) -> bool:
+        if not self.enabled:
+            return False
+        return any(
+            weight != 0.0
+            for weight in (self.sharpe_weight, self.sortino_weight, self.drawdown_weight, self.cvar_weight)
+        )
+
+
+@dataclass(slots=True)
 class ModelConfig:
     feature_dim: int
     model_dim: int = 512
@@ -180,6 +201,7 @@ class ReinforcementConfig:
     targets_are_returns: bool = False
     activation: str = "tanh"
     costs: Optional[TradingCosts] = None
+    risk_objective: RiskObjectiveConfig = field(default_factory=RiskObjectiveConfig)
 
 
 @dataclass(slots=True)
