@@ -109,6 +109,26 @@ alpha sources.
 
 ## Integrity & Validation
 
+Market NN Plus Ultra ships a dedicated validation layer in
+`market_nn_plus_ultra/data/validation.py` that mirrors the schema above with
+Pandera models. Each table documented here has a corresponding helper:
+
+| Table | Validation helper |
+| --- | --- |
+| `assets` | [`validate_assets_frame`](../market_nn_plus_ultra/data/validation.py) |
+| `series` | [`validate_price_frame`](../market_nn_plus_ultra/data/validation.py) |
+| `indicators` | [`validate_indicator_frame`](../market_nn_plus_ultra/data/validation.py) |
+| `regimes` | [`validate_regime_frame`](../market_nn_plus_ultra/data/validation.py) |
+| `trades` | [`validate_trades_frame`](../market_nn_plus_ultra/data/validation.py) |
+| `benchmarks` | [`validate_benchmark_frame`](../market_nn_plus_ultra/data/validation.py) |
+| `cross_asset_views` | [`validate_cross_asset_view_frame`](../market_nn_plus_ultra/data/validation.py) |
+
+These functions wrap explicit Pandera schemas (`ASSET_SCHEMA`, `PRICE_SCHEMA`,
+etc.) to enforce types, column presence, and uniqueness constraints while
+providing structured error payloads for CLI and pipeline consumers.
+
+Additional guardrails applied during validation:
+
 * Enforce foreign key relationships: `series.symbol`, `indicators.symbol`, and
   `trades.symbol` should reference `assets.symbol` to avoid orphaned records.
 * Timestamps must be stored in UTC. Apply timezone conversions during
