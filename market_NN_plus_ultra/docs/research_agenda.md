@@ -26,8 +26,8 @@ keeping the stack maintainable and research-friendly.
 * ✅ Integrate differentiable PnL simulators with position sizing, friction (fees, slippage), and risk budgets to align training
   signals with deploy-time objectives (`market_nn_plus_ultra.trading.pnl`).
 * ✅ Implement utility-aware losses (Sharpe/Sortino, drawdown penalties, downside deviation) and calibration-aware action heads
-  (Dirichlet or quantile forecasts) to control risk appetite explicitly is partially complete—losses ship today, calibration
-  heads remain on the roadmap.
+  (Dirichlet or quantile forecasts) to control risk appetite explicitly — losses ship alongside the new `CalibratedPolicyHead`,
+  exposing quantile confidence intervals and Dirichlet concentration metrics via configuration toggles.
 * ✅ Layer reinforcement learning fine-tuning (PPO-style) on top of the pretrained backbone, leveraging batched scenario
   generation via `_collect_rollout` to explore alternative market regimes.
 

@@ -16,6 +16,7 @@ from .state_space import (
     initialise_state_space_backbone,
 )
 from .losses import composite_trading_loss, sharpe_ratio_loss
+from .calibration import CalibratedPolicyHead, CalibrationHeadOutput
 
 __all__ = [
     "TemporalBackbone",
@@ -38,4 +39,6 @@ __all__ = [
     "initialise_state_space_backbone",
     "composite_trading_loss",
     "sharpe_ratio_loss",
+    "CalibratedPolicyHead",
+    "CalibrationHeadOutput",
 ]
