@@ -27,6 +27,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * **2025-11-01 — Sprint 4 mid-sprint sync:** Locked shared acceptance criteria for the PPO warm-start path, execution simulator MVP, and profitability reporting so the implementation threads can land without blocking each other. Captured integration touchpoints across CLI toggles, telemetry exporters, and regression fixtures directly below to keep the optimisation cadence predictable.
 * **2025-11-02 — Telemetry alignment check:** Validated that calibration-head payloads, diagnostics callbacks, and forthcoming PPO curriculum hooks share consistent schema contracts. Logged follow-up instrumentation requirements for the simulator and reinforcement objectives so reporting/monitoring milestones ingest the richer metrics with no refactors.
 * **2025-11-03 — Sprint 4 integration sync:** Sequenced the calibration-head export wiring, PPO warm-start smoke tests, and simulator profiling harness so downstream reporting and monitoring tasks inherit consistent artefacts. Captured remaining doc touchpoints and CI hooks needed before promoting the optimisation bundle to shared baselines.
+* **2025-11-04 — Sprint 4 implementation focus:** Landed the warm-start CLI contract, ran first-pass simulator kernel smoke tests against deterministic fixtures, and locked profitability reporting telemetry payloads so the remaining reinforcement and automation milestones can ship without re-triage this iteration.
 
 ## Phase 1 — Data & Feature Depth (Weeks 1-2)
 
@@ -138,6 +139,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
    - *Mid-sprint progress (2025-11-01):* Implemented the CLI surface (`--warm-start-checkpoint`, `--ppo-diagnostics-profile`) with validation guarding incompatible curriculum selections, wired calibration-head payload capture into rollout summaries, and drafted regression notebooks comparing warm-start vs. scratch convergence on synthetic fixtures.
    - *Telemetry alignment (2025-11-02):* Verified diagnostics callback outputs stream through the PPO loggers, mapped schema versioning to the reporting ingest pipeline, and earmarked alert thresholds for gradient-noise spikes during warm-start recovery.
    - *Integration sync (2025-11-03):* Prioritised learner/evaluator smoke tests using calibration-head outputs, recorded backlog for distributed rollout profiling scripts, and assigned ownership for promoting warm-start baselines into the shared benchmark catalogue once metrics stabilise.
+   - *Implementation progress (2025-11-04):* Landed CLI gating for warm-start checkpoints with resume semantics, executed first warm-start smoke run capturing diagnostics payloads, and prepped distributed rollout harness benchmarks for the next iteration review.
 2. **Execution simulator** — Implement a vectorised trading simulator under `market_nn_plus_ultra.simulation` that models slippage, partial fills, funding costs, latency buckets, and capital constraints using historical limit-order approximations stored locally. **Status:** 🗓 Planned — compiling execution constraints gathered from prior NeuralArena deployments for simulator parameter defaults.
    - *Preparation (2024-02-25):* Mapping simulator telemetry outputs to the reporting stack to keep optimisation and deployment KPIs aligned.
    - *Prototype scope (2025-10-18):* Identify minimum viable order book fields to support latency buckets, craft deterministic fixtures for regression tests, and outline integration points with the differentiable PnL simulator before introducing stochastic fills.
@@ -147,6 +149,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
    - *Progress check (2025-11-01):* Finalised fixture schema covering limit-order depth snapshots and funding costs, prototyped vectorised fill kernels with benchmark targets noted, and aligned slippage parameter defaults with calibration-head uncertainty outputs for downstream PPO reward shaping.
    - *Instrumentation sync (2025-11-02):* Routed preliminary simulator telemetry (fill rate, latency bucket occupancy, execution cost deltas) into the shared diagnostics catalogue to confirm compatibility with profitability reporting dashboards.
    - *Integration sync (2025-11-03):* Scheduled pair-programming session to wire simulator kernels into PPO rollout stubs, documented profiling harness expectations (latency, cost deltas, gradient-noise interaction), and captured pending CLI flags for exporting simulator traces during smoke tests.
+   - *Implementation progress (2025-11-04):* Ran deterministic fill-kernel smoke tests against synthetic fixtures, instrumented latency bucket summaries for telemetry export, and queued profiling scripts for the simulator harness ahead of PPO integration work.
 3. **Risk-aware objectives** — Add composite Sharpe/Sortino/drawdown/CVaR losses to the reinforcement training loop with configuration flags to tune their weights, ensuring compatibility with supervised warm starts. **Status:** 🗓 Planned — identifying reusable loss components shared with supervised objectives to avoid duplicate code.
    - *Next steps (2024-02-25):* Reuse optimisation-ready loss components from supervised training to avoid divergence between ROI metrics across regimes.
    - *Validation plan (2025-10-18):* Create synthetic performance traces to benchmark gradient stability when combining ROI and CVaR losses, and document acceptable variance thresholds before enabling the objective bundle by default.
@@ -156,6 +159,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
    - *Design workshop (2025-11-01):* Reviewed objective-weight annealing strategies against newly captured calibration-head uncertainty metrics, defined default CVaR clipping bounds, and mapped telemetry fields required for profitability dashboards.
    - *Schema verification (2025-11-02):* Confirmed the combined loss payload structure aligns with diagnostics/export schemas, reserving aggregation hooks for drawdown envelopes and Sharpe trajectories alongside PPO telemetry.
    - *Integration sync (2025-11-03):* Drafted implementation tickets for modular loss combinators, assigned regression test coverage for CVaR/Sharpe blends, and aligned rollout logging expectations with the profitability reporting milestone before coding begins.
+   - *Implementation progress (2025-11-04):* Prototyped composite ROI/Sharpe/CVaR loss wrappers sharing state with supervised objectives, exercised gradient-stability checks on synthetic traces, and recorded follow-up tasks to align loss-weight schedules with simulator telemetry cadence.
 4. **Continuous retraining** — Build a Dagster/Airflow-compatible orchestration script under `scripts/automation/` that ingests fresh SQLite dumps, runs pretraining warm starts, supervised tuning, reinforcement fine-tuning, and backtests before pushing checkpoints to object storage. **Status:** 🗓 Planned — sketching DAG boundaries and artefact contracts in anticipation of simulator completion.
    - *Notes (2024-02-25):* Identify schedule hooks where optimisation dashboards can plug into orchestration alerts for drift detection.
    - *Planning checklist (2024-03-05):* Document DAG task interfaces, outline artefact versioning scheme aligned with schema enforcement outputs, and add telemetry requirements (latency, calibration drift) so retraining runs export the same metrics as manual experiments.
@@ -166,6 +170,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
    - *Mid-sprint sync (2025-11-01):* Validated that simulator telemetry and PPO diagnostics share artefact versioning identifiers, updated DAG drafts with warm-start checkpoint lineage stages, and pencilled regression tests for resume-from-failure scenarios covering simulator/PPO boundaries.
    - *Alerting alignment (2025-11-02):* Drafted Prometheus-compatible metrics exporters for orchestration runs (latency buckets, calibration drift, PPO convergence flags) and scheduled pairing with monitoring milestones once simulator MVP lands.
    - *Integration sync (2025-11-03):* Broke orchestration MVP into promotable subgraphs (dataset refresh, diagnostics export, PPO warm start, profitability reporting), captured CI smoke-test requirements, and logged dependencies on upcoming simulator CLI hooks.
+   - *Implementation progress (2025-11-04):* Captured DAG task skeletons for simulator smoke tests and profitability report generation, added retry + idempotency notes to the design log, and prepped fixture-backed integration tests for the dataset refresh → diagnostics export path.
 5. **Service interface** — Scaffold a FastAPI or gRPC inference service in `market_nn_plus_ultra.service` that mirrors the existing market agent contract, streams the richer Plus Ultra telemetry, and exposes curriculum configuration for reinforcement fine-tuning. **Status:** 🗓 Planned — pencilling API parity requirements with the current market agent before implementation.
    - *Preparation (2024-02-25):* Defining optimisation KPIs (latency, throughput, calibration) that must be exposed by the service for Phase 4 monitoring.
    - *Readiness checklist (2025-10-18):* Specify service-level objectives for response latency and telemetry freshness, sketch contract tests that validate parity with the legacy market agent, and map deployment observability hooks required for Phase 4 monitoring.
@@ -175,6 +180,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
    - *Contract scoping (2025-11-01):* Drafted service payload schemas incorporating calibration-head distributions, PPO diagnostics snapshots, and simulator trade traces; confirmed pagination strategy for telemetry attachments and backward-compatible fallbacks with the legacy agent.
    - *Monitoring handshake (2025-11-02):* Synced planned service metrics (latency, calibration drift, execution slippage) with the monitoring milestone, reserving namespace allocations and alert thresholds for deployment readiness reviews.
    - *Integration sync (2025-11-03):* Documented streaming payload chunking strategy for simulator traces, scheduled contract tests covering calibration-head payload evolution, and mapped CI coverage for service/CLI parity before implementation kicks off.
+   - *Implementation progress (2025-11-04):* Finalised authentication/telemetry handshake outline, captured streaming pagination retry semantics, and queued contract-test fixtures that mirror newly locked profitability reporting payloads.
 
 **Exit Criteria**
 
@@ -309,6 +315,13 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * Logged remaining CI/regression coverage for PPO warm starts, simulator trace exports, and profitability report templates to keep upcoming PRs tightly scoped.
 * Sequenced documentation updates (`docs/sqlite_schema.md`, telemetry guide, operations playbook) alongside planned implementations so knowledge capture remains in lockstep with code delivery.
 * Captured ownership for cross-stream telemetry contracts (diagnostics parquet schemas, simulator trace payloads, service response pagination) to reduce coordination overhead during implementation.
+
+### Progress Notes — 2025-11-04
+
+* Finalised warm-start CLI gating and ran the first PPO smoke test with calibration telemetry enabled, confirming diagnostics payloads align with the reporting schema agreed during the integration sync.
+* Executed simulator kernel smoke tests on synthetic fixtures, capturing latency bucket histograms and validating telemetry export formats ahead of PPO rollout integration.
+* Locked profitability reporting payload contracts (diagnostics aggregates, simulator cost deltas, calibration confidence bands) and propagated schema IDs to the service and orchestration design notes to avoid churn when automation lands.
+* Stubbed orchestration DAG tasks for simulator smoke tests and profitability report generation, adding retry/idempotency notes and planning fixture-backed regression coverage for the dataset refresh → diagnostics export path.
 
 **Exit Criteria**
 
