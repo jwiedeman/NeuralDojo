@@ -40,14 +40,20 @@ def test_architecture_sweep_generates_stable_results(tmp_path: Path, monkeypatch
     architecture_sweep = _load_architecture_sweep()
 
     base_config = SimpleNamespace(
-        model=SimpleNamespace(architecture="omni_mixture", model_dim=768, depth=12, horizon=5),
+        model=SimpleNamespace(
+            architecture="omni_mixture",
+            model_dim=768,
+            depth=12,
+            horizon=5,
+            conv_dilations=(1, 2, 4, 8),
+        ),
         data=SimpleNamespace(horizon=5),
     )
 
     scenarios = [
-        BenchmarkScenario("omni_mixture", 768, 12, 5, label="omni-gpu"),
-        BenchmarkScenario("hybrid_transformer", 512, 8, 5, label="hybrid-gpu"),
-        BenchmarkScenario("state_space", 256, 6, 5, label="baseline-cpu"),
+        BenchmarkScenario("omni_mixture", 768, 12, 5, (1, 2, 4, 8), label="omni-gpu"),
+        BenchmarkScenario("hybrid_transformer", 512, 8, 5, (1, 3, 9, 27), label="hybrid-gpu"),
+        BenchmarkScenario("state_space", 256, 6, 5, (1, 2, 2, 2), label="baseline-cpu"),
     ]
 
     perf_counter_values = iter([10.0, 10.1, 20.0, 20.25, 30.0, 30.22])
@@ -117,6 +123,7 @@ def test_architecture_sweep_generates_stable_results(tmp_path: Path, monkeypatch
                 "model_dim",
                 "depth",
                 "horizon",
+                "conv_dilations",
                 "duration_seconds",
                 "best_model_path",
                 "metric_val_loss",
@@ -133,6 +140,7 @@ def test_architecture_sweep_generates_stable_results(tmp_path: Path, monkeypatch
         assert obs["model_dim"] == exp["model_dim"]
         assert obs["depth"] == exp["depth"]
         assert obs["horizon"] == exp["horizon"]
+        assert obs["conv_dilations"] == exp["conv_dilations"]
         assert obs["best_model_path"] == exp["best_model_path"]
         assert pytest.approx(obs["duration_seconds"], rel=1e-6) == exp["duration_seconds"]
         assert pytest.approx(obs["metric_val_loss"], rel=1e-6) == exp["metric_val_loss"]

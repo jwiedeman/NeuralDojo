@@ -42,6 +42,33 @@ def _parse_int_list(value: str | None, *, default: Sequence[int]) -> list[int]:
     return items or list(default)
 
 
+def _parse_dilation_schedules(
+    value: str | None, *, default: Sequence[Sequence[int]]
+) -> list[tuple[int, ...]]:
+    if value is None:
+        return [tuple(schedule) for schedule in default]
+
+    schedules: list[tuple[int, ...]] = []
+    for chunk in value.split("|"):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        parts = [part.strip() for part in chunk.split(",") if part.strip()]
+        if not parts:
+            continue
+        schedule: list[int] = []
+        for part in parts:
+            try:
+                schedule.append(int(part))
+            except ValueError as exc:
+                raise argparse.ArgumentTypeError(
+                    f"Invalid dilation value: '{part}'"
+                ) from exc
+        schedules.append(tuple(schedule))
+
+    return schedules or [tuple(schedule) for schedule in default]
+
+
 def _build_overrides(args: argparse.Namespace) -> TrainerOverrides | None:
     overrides = TrainerOverrides(
         max_epochs=args.max_epochs,
@@ -77,6 +104,14 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
         "--horizons",
         type=str,
         help="Comma separated list of forecast horizons to evaluate (defaults to config value)",
+    )
+    parser.add_argument(
+        "--dilation-schedules",
+        type=str,
+        help=(
+            "Dilation schedule search space expressed as comma-separated lists separated by '|' "
+            "(defaults to config value, e.g. '1,2,4,8|1,3,9,27')"
+        ),
     )
     parser.add_argument(
         "--max-epochs",
@@ -136,11 +171,13 @@ def main(argv: Iterable[str] | None = None) -> int:
     default_model_dim = [base_config.model.model_dim]
     default_depth = [base_config.model.depth]
     default_horizon = [base_config.model.horizon]
+    default_dilations: Sequence[Sequence[int]] = [tuple(base_config.model.conv_dilations)]
 
     architectures = _parse_str_list(args.architectures, default=default_architecture)
     model_dims = _parse_int_list(args.model_dims, default=default_model_dim)
     depths = _parse_int_list(args.depths, default=default_depth)
     horizons = _parse_int_list(args.horizons, default=default_horizon)
+    dilation_schedules = _parse_dilation_schedules(args.dilation_schedules, default=default_dilations)
 
     overrides = _build_overrides(args)
     scenarios = list(
@@ -149,6 +186,7 @@ def main(argv: Iterable[str] | None = None) -> int:
             model_dims,
             depths,
             horizons,
+            dilation_schedules,
             label_template=args.label_template,
         )
     )

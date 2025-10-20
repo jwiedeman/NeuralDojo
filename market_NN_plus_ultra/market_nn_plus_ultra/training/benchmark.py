@@ -10,6 +10,10 @@ from .config import ExperimentConfig, TrainerConfig
 from .train_loop import TrainingRunResult
 
 
+def _format_dilations(values: tuple[int, ...]) -> str:
+    return "-".join(str(value) for value in values)
+
+
 @dataclass(slots=True)
 class BenchmarkScenario:
     """Represents one combination of model hyper-parameters to benchmark."""
@@ -18,6 +22,7 @@ class BenchmarkScenario:
     model_dim: int
     depth: int
     horizon: int
+    conv_dilations: tuple[int, ...]
     label: str | None = None
 
     def to_dict(self) -> dict[str, object]:
@@ -26,6 +31,7 @@ class BenchmarkScenario:
             "model_dim": self.model_dim,
             "depth": self.depth,
             "horizon": self.horizon,
+            "conv_dilations": _format_dilations(self.conv_dilations),
         }
         if self.label is not None:
             data["label"] = self.label
@@ -90,6 +96,7 @@ def prepare_config_for_scenario(
     model.model_dim = scenario.model_dim
     model.depth = scenario.depth
     model.horizon = scenario.horizon
+    model.conv_dilations = scenario.conv_dilations
 
     data = config.data
     data.horizon = scenario.horizon
@@ -112,6 +119,7 @@ def iter_scenarios(
     model_dims: Sequence[int],
     depths: Sequence[int],
     horizons: Sequence[int],
+    dilation_schedules: Sequence[tuple[int, ...]],
     *,
     label_template: str | None = None,
 ) -> Iterator[BenchmarkScenario]:
@@ -121,21 +129,24 @@ def iter_scenarios(
         for model_dim in model_dims:
             for depth in depths:
                 for horizon in horizons:
-                    label = None
-                    if label_template is not None:
-                        label = label_template.format(
+                    for dilations in dilation_schedules:
+                        label = None
+                        if label_template is not None:
+                            label = label_template.format(
+                                architecture=arch,
+                                model_dim=model_dim,
+                                depth=depth,
+                                horizon=horizon,
+                                dilations=_format_dilations(dilations),
+                            )
+                        yield BenchmarkScenario(
                             architecture=arch,
                             model_dim=model_dim,
                             depth=depth,
                             horizon=horizon,
+                            conv_dilations=tuple(dilations),
+                            label=label,
                         )
-                    yield BenchmarkScenario(
-                        architecture=arch,
-                        model_dim=model_dim,
-                        depth=depth,
-                        horizon=horizon,
-                        label=label,
-                    )
 
 
 def flatten_benchmark_result(

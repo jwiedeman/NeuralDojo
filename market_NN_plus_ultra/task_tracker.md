@@ -51,7 +51,8 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
    - Notes (2025-11-07): Sequenced GPU allocation requests alongside upcoming PPO rollout profiling, recorded dependency on profitability reporting schema updates, and outlined fallback CPU smoke tests to keep configs exercised while waiting for hardware.
 - [x] Extend pretraining tasks with contrastive (TS2Vec-style) objectives for regime discrimination.
 - [x] Introduce curriculum over window sizes and horizons to stabilise very deep models. (See `CurriculumScheduler`)
-- [ ] Automate architecture sweeps over depth, horizon, and dilation for omni-scale, MoE, transformer, and state-space backbones. — Notes: Planned to extend the benchmark harness CLI once baseline sweeps are in place.
+- [x] Automate architecture sweeps over depth, horizon, and dilation for omni-scale, MoE, transformer, and state-space backbones. — Notes: Planned to extend the benchmark harness CLI once baseline sweeps are in place.
+  - Notes (2025-11-10): Extended `scripts/benchmarks/architecture_sweep.py` to parse multi-schedule dilation grids, persist schedules alongside metrics, and updated regression fixtures to lock the expanded search surface.
    - Notes (2025-10-26): Drafted CLI flag matrix tying sweep dimensions to diagnostics sampling intervals and documented GPU memory heuristics from recent telemetry runs.
    - Notes (2025-10-28): Outlined experiment-tracker batching to surface partial results, captured requirement to persist profiler traces, and aligned outputs with upcoming reporting automation.
    - Notes (2025-10-29): Stubbed CLI flag validation tests, scheduled integration with telemetry catalogue exports, and earmarked automation hooks for pushing sweep results into the reporting pipeline.

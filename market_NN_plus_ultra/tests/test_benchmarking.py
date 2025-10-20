@@ -28,6 +28,7 @@ def test_prepare_config_for_scenario_applies_overrides(base_config: ExperimentCo
         model_dim=1024,
         depth=12,
         horizon=15,
+        conv_dilations=(1, 2, 4, 8),
         label="omni-large",
     )
     overrides = TrainerOverrides(max_epochs=2, batch_size=64)
@@ -38,6 +39,7 @@ def test_prepare_config_for_scenario_applies_overrides(base_config: ExperimentCo
     assert config.model.model_dim == 1024
     assert config.model.depth == 12
     assert config.model.horizon == 15
+    assert config.model.conv_dilations == (1, 2, 4, 8)
     assert config.data.horizon == 15
     assert config.trainer.max_epochs == overrides.max_epochs
     assert config.trainer.batch_size == overrides.batch_size
@@ -48,13 +50,14 @@ def test_prepare_config_for_scenario_applies_overrides(base_config: ExperimentCo
 
 
 def test_flatten_benchmark_result_sanitises_keys() -> None:
-    scenario = BenchmarkScenario("hybrid_transformer", 512, 8, 5)
+    scenario = BenchmarkScenario("hybrid_transformer", 512, 8, 5, (1, 2, 4, 8))
     result = TrainingRunResult(
         best_model_path="checkpoints/model.ckpt",
         logged_metrics={"val/loss": 0.1234, "train/loss": 0.5678},
         dataset_summary={"train_windows": 100, "val_windows": 20},
     )
     row = flatten_benchmark_result(scenario, result, duration_seconds=3.5)
+    assert row["conv_dilations"] == "1-2-4-8"
     assert row["metric_val_loss"] == pytest.approx(0.1234)
     assert row["metric_train_loss"] == pytest.approx(0.5678)
     assert row["dataset_train_windows"] == 100
