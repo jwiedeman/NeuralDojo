@@ -21,6 +21,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * **2025-10-27 — Signal coverage publication:** Promoted the alternative-data + technical pairing matrix to `docs/signal_coverage.md`, aligning CLI toggles, validation hooks, and regime-aware workflows so documentation unlocks the pending feature registry milestone.
 * **2025-10-26 — Sprint 3 close-out & Sprint 4 kickoff prep:** Compiled telemetry from the new diagnostics callback, prioritised calibration-head research, and mapped the execution simulator + PPO warm-start contracts needed for the next optimisation slice. Sequenced doc/reporting updates with simulator milestones so Phase 3 remains unblocked once implementation starts.
 * **2025-10-28 — Sprint 4 roadmap refinement:** Broke the pending calibration-head, PPO warm-start, and profitability reporting milestones into experiment-ready slices. Captured benchmarking artefact requirements (diagnostics exports, simulator traces, cross-asset tensors) so architecture sweeps and checkpoint comparisons can run in parallel once GPU time is secured. Logged automation hooks that the orchestration and monitoring milestones must expose to consume the upcoming telemetry bundle without rework.
+* **2025-10-29 — Sprint 4 execution kickoff:** Locked day-one tasks around calibration-head prototyping, PPO warm-start smoke tests, and profitability reporting scaffolds. Sequenced shared dependencies (telemetry catalogues, simulator cost exports, config validation hooks) so each milestone can make progress without blocking others, and recorded coordination checkpoints with the monitoring and orchestration workstreams.
 
 ## Phase 1 — Data & Feature Depth (Weeks 1-2)
 
@@ -100,6 +101,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 5. **Market-state embeddings** — Train volatility and regime embedding heads that feed into the policy layers, ensuring the configuration system can toggle them for ablation studies. **Status:** 🗓 Planned — designing embedding interfaces compatible with the forthcoming labelling pipeline.
    - *Notes (2024-02-25):* Waiting on market-regime labelling outputs to set embedding dimensionality and regularisation schedules that will feed optimisation metrics.
    - *Telemetry sync (2025-10-26):* Coordinated embedding metrics (regime coverage, volatility reconstruction loss) with diagnostics logging so future experiments surface embedding health alongside calibration stats.
+   - *Kickoff tasks (2025-10-29):* Drafted embedding module API sketch aligned with calibration-head adapters, stubbed config toggles for embedding ablations, and scheduled fixture updates that include the new embedding tensors for upcoming PPO warm-start experiments.
 
 **Exit Criteria**
 
@@ -125,16 +127,19 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
    - *Sprint 3 checkpoint (2025-10-25):* Locked experiment matrix covering warm-start baselines, diagnostics-enriched rollouts, and curriculum variants; enumerated telemetry exports (diagnostics aggregates, cross-asset fill metrics, Sharpe/drawdown snapshots) for integration with reporting and monitoring milestones.
    - *Distributed design (2025-10-26):* Finalised evaluator/learner RPC boundaries, telemetry batching cadence, and fault-tolerance expectations so the upcoming implementation sprint can start with a clear interface contract.
    - *Experiment staging (2025-10-28):* Seeded deterministic PPO fixtures referencing the latest pretraining checkpoints, documented replay-buffer initialisation for reproducible warm starts, and added rollback criteria if curriculum schedules destabilise early episodes.
+   - *Implementation kickoff (2025-10-29):* Stubbed learner/evaluator scaffolding with placeholder interfaces, scheduled smoke tests for warm-start checkpoints using reduced fixture slices, and synced telemetry export schemas with the reporting milestone to avoid duplication.
 2. **Execution simulator** — Implement a vectorised trading simulator under `market_nn_plus_ultra.simulation` that models slippage, partial fills, funding costs, latency buckets, and capital constraints using historical limit-order approximations stored locally. **Status:** 🗓 Planned — compiling execution constraints gathered from prior NeuralArena deployments for simulator parameter defaults.
    - *Preparation (2024-02-25):* Mapping simulator telemetry outputs to the reporting stack to keep optimisation and deployment KPIs aligned.
    - *Prototype scope (2025-10-18):* Identify minimum viable order book fields to support latency buckets, craft deterministic fixtures for regression tests, and outline integration points with the differentiable PnL simulator before introducing stochastic fills.
    - *Data dependency checklist (2025-10-21):* Confirm cross-asset feature tensors expose bid/ask depth surrogates required by the simulator, document required sampling frequencies, and reserve CLI hooks for exporting simulator-ready parquet bundles once the join pipeline lands.
    - *Interface sync (2025-10-26):* Drafted API sketch aligning simulator slippage hooks with PPO reward shaping inputs and earmarked latency budget benchmarks sourced from diagnostics telemetry.
+   - *Kickoff notes (2025-10-29):* Assigned engineering spikes for vectorised fill kernels and latency bucket calibration, prepared fixture export scripts for deterministic smoke tests, and mapped simulator logging fields to the profitability reporting milestone.
 3. **Risk-aware objectives** — Add composite Sharpe/Sortino/drawdown/CVaR losses to the reinforcement training loop with configuration flags to tune their weights, ensuring compatibility with supervised warm starts. **Status:** 🗓 Planned — identifying reusable loss components shared with supervised objectives to avoid duplicate code.
    - *Next steps (2024-02-25):* Reuse optimisation-ready loss components from supervised training to avoid divergence between ROI metrics across regimes.
    - *Validation plan (2025-10-18):* Create synthetic performance traces to benchmark gradient stability when combining ROI and CVaR losses, and document acceptable variance thresholds before enabling the objective bundle by default.
    - *Telemetry alignment (2025-10-21):* Map simulator output fields (slippage, drawdown envelopes) to loss-scheduling knobs so once the simulator prototype is ready the objective bundle can ingest telemetry without rework; capture placeholder metrics in the optimisation log to backfill reports during implementation.
    - *Scheduling heuristics (2025-10-26):* Outlined loss-weight annealing strategies tied to gradient-noise ratios and queued experiment templates comparing ROI vs. CVaR emphasis under identical simulator traces.
+   - *Implementation prep (2025-10-29):* Drafted reusable loss wrapper interfaces shared with supervised objectives, earmarked integration tests combining Sharpe/CVaR penalties, and aligned configuration defaults with the calibration-head planning notes.
 4. **Continuous retraining** — Build a Dagster/Airflow-compatible orchestration script under `scripts/automation/` that ingests fresh SQLite dumps, runs pretraining warm starts, supervised tuning, reinforcement fine-tuning, and backtests before pushing checkpoints to object storage. **Status:** 🗓 Planned — sketching DAG boundaries and artefact contracts in anticipation of simulator completion.
    - *Notes (2024-02-25):* Identify schedule hooks where optimisation dashboards can plug into orchestration alerts for drift detection.
    - *Planning checklist (2024-03-05):* Document DAG task interfaces, outline artefact versioning scheme aligned with schema enforcement outputs, and add telemetry requirements (latency, calibration drift) so retraining runs export the same metrics as manual experiments.
@@ -147,6 +152,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
    - *Readiness checklist (2025-10-18):* Specify service-level objectives for response latency and telemetry freshness, sketch contract tests that validate parity with the legacy market agent, and map deployment observability hooks required for Phase 4 monitoring.
    - *Interface alignment (2025-10-25):* Captured telemetry payload requirements (diagnostics aggregates, cross-asset profiling summaries, PPO curriculum metadata) to ensure the service contract lands with the metrics Phase 4 monitoring expects.
    - *Protocol evaluation (2025-10-26):* Compared gRPC vs. REST transport trade-offs, documenting compression strategies for diagnostics-heavy responses and fallback handling when calibration metadata is delayed.
+   - *Kickoff planning (2025-10-29):* Scheduled design review covering streaming payload schemas, aligned authentication hooks with operations playbook requirements, and queued stub implementations for telemetry pagination ahead of full service scaffolding.
 
 **Exit Criteria**
 
@@ -171,17 +177,21 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
    - *Narrative prep (2025-10-21):* Draft storyline templates that incorporate cross-asset benchmarking results and simulator calibration summaries, ensuring future reports connect feature breadth to execution realism without duplicating instrumentation work.
    - *Template sync (2025-10-26):* Linked simulator cost breakdown placeholders and calibration-head diagnostics into the draft templates, scheduling design review ahead of report automation implementation.
    - *Milestone linkage (2025-10-28):* Drafted milestone-referenced narrative stubs so automated reports can summarise roadmap progress alongside ROI metrics without manual curation.
+   - *Execution kickoff (2025-10-29):* Prioritised profitability dashboard components, scoped chart-generation performance tests, and scheduled telemetry schema alignment with PPO and calibration milestones to guarantee consistent report inputs.
 2. **Live monitoring** — Integrate Prometheus metrics and alerting hooks into the inference service. Document SLOs and alert policies in `docs/operations.md`, including live decision support for extending or branching experiments. **Status:** 🗓 Planned — deferring until the service scaffold from Phase 3 establishes telemetry contracts.
    - *Observability draft (2025-10-18):* Record required Prometheus exporters, define minimum alert set (latency, calibration drift, guardrail breaches), and align metric naming with the optimisation log for traceability.
    - *Alert cadence (2025-10-26):* Matched diagnostics sampling intervals with Prometheus scrape settings and outlined simulator-derived latency histograms for future alert rules.
    - *Dashboard spec (2025-10-28):* Listed required panels (calibration confidence, ROI trend, drawdown guardrails), alert routing rules, and dependencies on the telemetry payload contract for the inference service.
+   - *Kickoff prep (2025-10-29):* Coordinated with service interface planning to reserve metric namespaces, drafted alert escalation paths tied to the operations playbook, and pencilled load-test scenarios for validating monitoring throughput once the service scaffold lands.
 3. **Risk guardrails** — Build guardrail modules that enforce exposure, turnover, tail-risk thresholds, and sector/factor caps during inference, configurable via YAML, and aligned with reinforcement fine-tuning outputs. **Status:** 🗓 Planned — aligning guardrail thresholds with upcoming calibration head outputs.
    - *Design hooks (2025-10-18):* Enumerate guardrail evaluation order, map fallback actions when violations occur, and earmark simulation scenarios to regression-test guardrail logic before production rollout.
    - *Calibration alignment (2025-10-26):* Logged requirement for calibration-confidence-aware overrides and synced guardrail threshold drafts with planned reporting dashboards for consistent narratives.
+   - *Implementation prep (2025-10-29):* Drafted guardrail configuration schema aligned with PPO telemetry, scheduled simulator-backed regression tests, and linked guardrail alert outputs to the live monitoring escalation plan.
 4. **Analyst feedback loop** — Add review tooling in `market_nn_plus_ultra.reporting` that lets human supervisors annotate trades, flag anomalies, and record veto rationales stored in SQLite for future offline RL. **Status:** 🗓 Planned — capturing analyst workflow requirements while reinforcement hooks are designed.
    - *Workflow blueprint (2025-10-18):* Detail annotation schema extensions, draft UX flow for CLI-based annotations, and specify how feedback integrates with the reinforcement replay buffer.
    - *Review tooling prep (2025-10-26):* Identified telemetry fields (calibration confidence, simulator slippage) that analysts need for context and aligned annotation export format with upcoming reporting automation.
    - *Escalation outline (2025-10-28):* Defined override approval flow tied to monitoring alerts, captured rollback SOP referencing checkpoint lineage, and documented review cadence expectations.
+   - *Kickoff actions (2025-10-29):* Prepared annotation storage schema drafts, mapped CLI prompts to analyst workflows, and queued integration tests that validate replay-buffer enrichment with human feedback metadata.
 
 ### Progress Notes — 2024-03-08
 
@@ -234,6 +244,13 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * Registered benchmarking artefact requirements (diagnostics exports, simulator traces, cross-asset tensors) so checkpoint comparisons and architecture sweeps can run concurrently once GPU time is available.
 * Expanded orchestration design notes with change-data-capture polling, calibration-drift alerting, and storage budgeting requirements in preparation for automation tasks.
 * Captured service/monitoring integration hooks (streaming inference payloads, dashboard specs, escalation workflows) to reduce re-triage when implementation begins.
+
+### Progress Notes — 2025-10-29
+
+* Initiated Sprint 4 execution by staffing calibration-head prototyping, PPO warm-start smoke tests, profitability reporting automation, and monitoring scaffolding in parallel with shared telemetry artefacts.
+* Produced day-one implementation checklists for each open milestone, covering interface sketches, fixture updates, and regression-test scaffolds required before shipping production code.
+* Coordinated cross-stream dependencies by aligning simulator telemetry exports, reporting inputs, and monitoring alert schemas so downstream services can ingest new signals without schema churn.
+* Scheduled mid-sprint review checkpoints to validate API surface decisions (embeddings, service payloads, guardrail configs) before deeper implementation begins.
 
 ### Progress Notes — 2025-10-25
 

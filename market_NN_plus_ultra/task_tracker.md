@@ -41,15 +41,18 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [ ] Benchmark omni-scale backbone versus hybrid baseline across multiple asset universes with 4090 VRAM profiling. — Notes: Harness scaffolding shipped via `scripts/benchmarks/architecture_sweep.py`; awaiting GPU allocation to run full comparisons.
   - Notes (2025-10-26): Queued telemetry exports (diagnostics, fill-rate metrics) and prepared fixture variants with/without cross-asset tensors to accelerate analysis once GPU time is secured.
   - Notes (2025-10-28): Drafted GPU scheduling matrix, enumerated regression checkpoints for incremental sweeps, and recorded CPU-only smoke-test fallback to keep configs exercised until dedicated hardware is available.
+  - Notes (2025-10-29): Prioritised telemetry ingestion automation, lined up profiler trace storage budgets, and scheduled dry-run sweeps using reduced fixtures to validate harness changes before full GPU allocation.
 - [x] Pretrain on masked time-series reconstruction before supervised fine-tuning (`scripts/pretrain.py`).
 - [ ] Benchmark pretraining checkpoints vs. scratch initialisation across asset classes. — Notes: Will run after schema enforcement lands to guarantee clean fixtures.
   - Notes (2025-10-26): Defined evaluation splits aligned with diagnostics outputs so calibration drift and gradient-noise comparisons remain reproducible.
   - Notes (2025-10-28): Synced checkpoint catalogue with latest fixtures, earmarked masked/contrastive pairs for comparative runs, and listed telemetry exports required for profitability dashboards.
+  - Notes (2025-10-29): Reserved benchmarking slots following warm-start smoke tests, documented metric rollups shared with profitability reporting, and queued automation scripts to publish comparison summaries alongside diagnostics logs.
 - [x] Extend pretraining tasks with contrastive (TS2Vec-style) objectives for regime discrimination.
 - [x] Introduce curriculum over window sizes and horizons to stabilise very deep models. (See `CurriculumScheduler`)
 - [ ] Automate architecture sweeps over depth, horizon, and dilation for omni-scale, MoE, transformer, and state-space backbones. — Notes: Planned to extend the benchmark harness CLI once baseline sweeps are in place.
   - Notes (2025-10-26): Drafted CLI flag matrix tying sweep dimensions to diagnostics sampling intervals and documented GPU memory heuristics from recent telemetry runs.
   - Notes (2025-10-28): Outlined experiment-tracker batching to surface partial results, captured requirement to persist profiler traces, and aligned outputs with upcoming reporting automation.
+  - Notes (2025-10-29): Stubbed CLI flag validation tests, scheduled integration with telemetry catalogue exports, and earmarked automation hooks for pushing sweep results into the reporting pipeline.
 - [x] Add gradient-noise diagnostics and calibration drift alerts to the training loop telemetry. — Notes: `TrainingDiagnosticsCallback` now logs gradient-noise ratios and calibration drift with configurable thresholds plus regression coverage.
   - Notes (2025-10-19): Telemetry schema draft enumerates gradient noise, calibration drift, throughput, and data freshness metrics to ensure future instrumentation plugs into reporting without rework.
   - Notes (2025-10-23): Prototyping `TrainingDiagnosticsCallback` scaffolding with CLI toggles for opt-in telemetry (`--diagnostics-profile`, `--diagnostics-interval`) while drafting regression hooks that compare diagnostics across fixture runs.
@@ -59,6 +62,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-10-25): Tagged diagnostics callback outputs and cross-asset fill-rate telemetry as required inputs for calibration-head validation, sequenced prototype tasks (loss wrappers, config toggles, regression fixtures) for the next sprint.
   - Notes (2025-10-26): Drafted calibration sweep plan pairing Dirichlet temperature/quantile spacing with PPO warm-start checkpoints for reinforcement-aware validation.
   - Notes (2025-10-28): Locked `CalibrationHeadAdapter` API sketch, mapped config validation coverage, and tracked simulator cost-tracing dependency to align calibrated confidence intervals with PPO reward shaping.
+  - Notes (2025-10-29): Scheduled prototype implementation pairing embedding heads with calibration adapters, defined synthetic datasets for deterministic expectation checks, and coordinated telemetry schema changes with reporting/monitoring milestones.
 
 ## 2. Trading Objective & Reinforcement Learning
 - [x] Add differentiable PnL simulator with position sizing, transaction costs, and slippage.
@@ -68,14 +72,17 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [ ] Explore calibration-aware heads (Dirichlet / quantile) for action confidence.
   - Notes (2025-10-26): Outlined PPO-compatible inference wrappers and captured simulator latency constraints for sampling action confidences online.
   - Notes (2025-10-28): Split implementation into head-training experiments piggybacking on supervised checkpoints and policy-evaluation harness updates emitting confidence telemetry for reporting.
+  - Notes (2025-10-29): Drafted PPO evaluation checklist covering confidence calibration metrics, defined simulator integration tests for latency impact, and coordinated telemetry outputs with the operations playbook.
 - [ ] Warm-start RL fine-tuning runs from the masked/contrastive pretraining checkpoints via CLI switches.
   - Notes (2025-10-25): Drafted warm-start experiment matrix and telemetry capture checklist (diagnostics aggregates, rollout stability traces) to align with PPO upgrade planning in the implementation log.
   - Notes (2025-10-26): Finalised CLI contract draft (`--warm-start-checkpoint`, `--warm-start-tuning`) and mapped regression fixtures combining diagnostics snapshots with rollout summaries.
   - Notes (2025-10-28): Seeded synthetic PPO fixtures referencing latest pretraining checkpoints, documented replay-buffer initialisation for deterministic comparisons, and recorded rollback plan for unstable warm starts.
+  - Notes (2025-10-29): Scheduled smoke-test executions against reduced fixtures, aligned checkpoint catalogue updates with reporting automation, and captured alerting requirements for failed warm starts in the monitoring milestone draft.
 - [ ] Extend PPO-style upgrades to optimise ROI directly using the differentiable PnL simulator after supervised convergence.
   - Notes (2024-02-25): PPO upgrades will reuse optimisation telemetry (latency, gradient noise) once Phase 2 diagnostics are instrumented, keeping action-confidence work grounded in measurable improvements.
   - Notes (2025-10-26): Sequenced simulator integration milestones (slippage hooks, latency buckets) with PPO reward-shaping toggles to align ROI optimisation with execution realism.
   - Notes (2025-10-28): Defined convergence gates (calibration drift threshold, drawdown guardrails) for enabling ROI-centric updates and queued benchmarking harness updates for ROI vs. risk comparisons.
+  - Notes (2025-10-29): Planned incremental rollout of ROI-tuned objectives following warm-start smoke tests, allocated profiling windows for simulator latency validation, and aligned KPI reporting with profitability automation tasks.
 
 ## 3. Evaluation & Monitoring
 - [x] Build evaluation harness for daily/weekly backtests with walk-forward splits.
@@ -96,22 +103,28 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [ ] Containerise training + inference pipelines with GPU support. — Notes: Blocked until simulator + service interface prototypes settle.
   - Notes (2025-10-26): Drafted base-image requirements bundling diagnostics tooling and simulator dependencies to minimise integration friction once implementation begins.
   - Notes (2025-10-28): Selected candidate CUDA runtime baselines aligned with profiler expectations and listed smoke tests (dataset build, diagnostics callback, PPO rollout) containers must execute before publishing.
+  - Notes (2025-10-29): Documented container layer caching strategy for telemetry artefacts, outlined GPU runtime validation scripts, and coordinated dependency pinning with upcoming service scaffolding.
 - [ ] Expose REST/gRPC service that mirrors the existing market agent API but uses the new brain. — Notes: Capturing parity requirements while Phase 3 service scaffold is planned.
   - Notes (2025-10-26): Outlined telemetry payload schema aligning calibration heads, PPO warm starts, and simulator metrics for service contract readiness.
   - Notes (2025-10-28): Sketched streaming inference mode for multi-horizon forecasts, defined pagination contract for telemetry attachments, and logged authentication hooks required for deployment parity.
+  - Notes (2025-10-29): Scheduled API review with monitoring/reporting leads, mapped response schema versioning to deployment automation, and prepared stub tests covering backward-compatible payloads.
 - [ ] Schedule continuous retraining jobs triggered by new data arrival. — Notes: Will reuse orchestration DAG from Phase 3 Milestone 4 once prototyped.
   - Notes (2025-10-26): Scheduled spike for diagnostics ingestion operator and defined retry semantics for warm-start stages.
   - Notes (2025-10-28): Added change-data-capture polling requirements, calibration-drift alert thresholds, and storage budgets for rolling checkpoint windows.
+  - Notes (2025-10-29): Broke DAG implementation into schema-validation, warm-start, PPO, and reporting tasks; queued integration tests for checkpoint lineage tracking; and aligned orchestration alerts with monitoring escalation paths.
 - [ ] Set up online monitoring for live performance and drift detection. — Notes: Pending telemetry surface defined in Phase 4 Milestone 2.
   - Notes (2025-10-26): Matched diagnostics sampling cadence with Prometheus scrape intervals and scoped simulator latency histograms for alerting.
   - Notes (2025-10-28): Specified dashboard panels (calibration confidence, ROI trend, drawdown guardrails), alert routing rules, and dependencies on the service telemetry payload contract.
+  - Notes (2025-10-29): Drafted alert playbooks with escalation timing, synchronised metric namespaces with service planning, and catalogued synthetic drift scenarios for end-to-end monitoring tests.
 - [ ] Build playbook for human-in-the-loop overrides and risk manager approvals. — Notes: Drafting outline alongside analyst feedback tooling requirements.
   - Notes (2025-10-26): Added placeholders for calibration-confidence dashboards and simulator what-if analyses to inform override decisions.
   - Notes (2025-10-28): Defined escalation tree integrating monitoring alerts with analyst annotations, added rollback SOP referencing checkpoint lineage, and documented review cadence expectations.
+  - Notes (2025-10-29): Outlined approval runbooks tied to guardrail violations, mapped decision logging to analyst feedback tooling, and scheduled doc reviews alongside monitoring/service milestones.
 - [ ] Integrate live monitoring, automated reporting, and risk guardrails into a single operations playbook for extend/branch decisions. — Notes: Will consolidate once reporting, monitoring, and guardrail milestones reach MVP.
   - Notes (2024-02-25): Operations playbook will surface optimisation KPIs (latency, calibration, guardrail triggers) defined in the implementation plan so deployment readiness decisions remain data-driven.
   - Notes (2025-10-26): Synced reporting and monitoring schema drafts to ensure playbook embeds linked dashboards and playback logs without refactors.
   - Notes (2025-10-28): Outlined chapter structure tying each milestone to operational runbooks so continuous retraining outputs feed directly into decision-support tooling when milestones land.
+  - Notes (2025-10-29): Identified content owners for each playbook section, drafted cross-references to service and reporting updates, and scheduled validation workshops once MVP dashboards are available.
 
 ### Active Work Log — 2024-02-24
 
