@@ -49,6 +49,7 @@ class _SymbolData:
     features: np.ndarray
     targets: np.ndarray
     index: pd.Index
+    state_tokens: np.ndarray | None = None
 
 
 class SlidingWindowDataset(Dataset):
@@ -63,6 +64,7 @@ class SlidingWindowDataset(Dataset):
         horizon: int = 5,
         stride: int = 1,
         normalise: bool = True,
+        state_columns: Optional[Sequence[str]] = None,
     ) -> None:
         if not isinstance(panel.index, pd.MultiIndex) or panel.index.names != ["timestamp", "symbol"]:
             raise ValueError("Panel must be indexed by ('timestamp', 'symbol')")
@@ -74,6 +76,7 @@ class SlidingWindowDataset(Dataset):
         self.horizon = horizon
         self.stride = stride
         self.normalise = normalise
+        self.state_columns = list(state_columns or [])
 
         self._symbol_data: dict[str, _SymbolData] = self._precompute_symbol_data()
         self._indices: list[Tuple[str, int]] = self._build_indices()
@@ -84,10 +87,14 @@ class SlidingWindowDataset(Dataset):
             sym_df = self.panel.xs(symbol, level="symbol")
             feature_array = sym_df[self.feature_columns].to_numpy(dtype=np.float32, copy=True)
             target_array = sym_df[self.target_columns].to_numpy(dtype=np.float32, copy=True)
+            state_array: np.ndarray | None = None
+            if self.state_columns:
+                state_array = sym_df[self.state_columns].to_numpy(dtype=np.int64, copy=True)
             symbol_data[symbol] = _SymbolData(
                 features=feature_array,
                 targets=target_array,
                 index=sym_df.index,
+                state_tokens=state_array,
             )
         return symbol_data
 
@@ -147,12 +154,16 @@ class SlidingWindowDataset(Dataset):
 
         reference = data.targets[start + self.window_size - 1]
         reference = _nan_to_num(reference).astype(np.float32, copy=False)
-        return {
+        sample = {
             "symbol": symbol,
             "features": torch.from_numpy(window.copy()),
             "targets": torch.from_numpy(targets.copy()),
             "reference": torch.from_numpy(reference.copy()),
         }
+        if data.state_tokens is not None:
+            state_window = data.state_tokens[window_slice]
+            sample["state_tokens"] = torch.from_numpy(state_window.copy()).to(torch.long)
+        return sample
 
     def get_metadata(self, idx: int) -> WindowMetadata:
         """Return metadata for a specific window without disturbing training."""

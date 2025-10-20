@@ -23,6 +23,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * **2025-10-28 — Sprint 4 roadmap refinement:** Broke the pending calibration-head, PPO warm-start, and profitability reporting milestones into experiment-ready slices. Captured benchmarking artefact requirements (diagnostics exports, simulator traces, cross-asset tensors) so architecture sweeps and checkpoint comparisons can run in parallel once GPU time is secured. Logged automation hooks that the orchestration and monitoring milestones must expose to consume the upcoming telemetry bundle without rework.
 * **2025-10-29 — Sprint 4 execution kickoff:** Locked day-one tasks around calibration-head prototyping, PPO warm-start smoke tests, and profitability reporting scaffolds. Sequenced shared dependencies (telemetry catalogues, simulator cost exports, config validation hooks) so each milestone can make progress without blocking others, and recorded coordination checkpoints with the monitoring and orchestration workstreams.
 * **2025-10-30 — Calibration head release:** Landed the calibration-aware policy head, Lightning integration, YAML toggles, and regression coverage so telemetry, reporting, and PPO warm-start planning can consume calibrated confidence intervals without bespoke hooks.
+* **2025-10-31 — Market-state embedding release:** Added categorical regime ingestion to the dataset loader, wired state-token windows through the DataModule, exposed YAML toggles, and shipped the `MarketStateEmbedding` module with regression coverage so policy backbones ingest volatility/liquidity context without manual feature engineering.
 
 ## Phase 1 — Data & Feature Depth (Weeks 1-2)
 
@@ -100,10 +101,11 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
    - *Preparation (2024-02-25):* Aligning config templates with optimisation sweep requirements (depth, dilation, device budgeting) so experiments start with consistent measurement hooks.
    - *Profiling queue (2025-10-26):* Reserved GPU profiling slots and drafted telemetry capture checklist (gradient noise, calibration drift, throughput) so multi-scale trials align with the diagnostics cadence introduced in Sprint 3.
    - *Sweep scheduling (2025-10-28):* Outlined batching/queueing strategy using the experiment tracker to publish interim results and persisting profiler traces for downstream reporting automation.
-5. **Market-state embeddings** — Train volatility and regime embedding heads that feed into the policy layers, ensuring the configuration system can toggle them for ablation studies. **Status:** 🗓 Planned — designing embedding interfaces compatible with the forthcoming labelling pipeline.
+5. **Market-state embeddings** — Train volatility and regime embedding heads that feed into the policy layers, ensuring the configuration system can toggle them for ablation studies. **Status:** ✅ Completed — categorical regime signals now flow through the dataset, DataModule, and Lightning module with configurable embedding heads and regression coverage.
    - *Notes (2024-02-25):* Waiting on market-regime labelling outputs to set embedding dimensionality and regularisation schedules that will feed optimisation metrics.
    - *Telemetry sync (2025-10-26):* Coordinated embedding metrics (regime coverage, volatility reconstruction loss) with diagnostics logging so future experiments surface embedding health alongside calibration stats.
    - *Kickoff tasks (2025-10-29):* Drafted embedding module API sketch aligned with calibration-head adapters, stubbed config toggles for embedding ablations, and scheduled fixture updates that include the new embedding tensors for upcoming PPO warm-start experiments.
+   - *Implementation (2025-10-31):* Landed regime-token ingestion in `SQLiteMarketDataset`, extended `SlidingWindowDataset` and the DataModule with state-token windows, introduced `MarketStateEmbedding`, wired YAML toggles, and added unit coverage exercising the new embedding path.
 
 **Exit Criteria**
 

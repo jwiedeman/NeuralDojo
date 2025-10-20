@@ -17,6 +17,7 @@ from .state_space import (
 )
 from .losses import composite_trading_loss, sharpe_ratio_loss
 from .calibration import CalibratedPolicyHead, CalibrationHeadOutput
+from .market_state import MarketStateEmbedding, MarketStateMetadata, MarketStateFeature
 
 __all__ = [
     "TemporalBackbone",
@@ -41,4 +42,7 @@ __all__ = [
     "sharpe_ratio_loss",
     "CalibratedPolicyHead",
     "CalibrationHeadOutput",
+    "MarketStateEmbedding",
+    "MarketStateMetadata",
+    "MarketStateFeature",
 ]

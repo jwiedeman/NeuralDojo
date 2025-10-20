@@ -34,6 +34,11 @@ model:
   cross_every: 2
   max_seq_len: 4096
   gradient_checkpointing: true
+  market_state:
+    enabled: false
+    embedding_dim: 16
+    dropout: 0.05
+    include: []
 
 optimizer:
   lr: 0.0003
