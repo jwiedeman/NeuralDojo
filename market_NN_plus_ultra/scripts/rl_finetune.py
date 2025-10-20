@@ -16,7 +16,23 @@ from market_nn_plus_ultra.training import (
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run PPO fine-tuning for the Plus Ultra agent")
     parser.add_argument("--config", type=Path, required=True, help="Path to experiment YAML config")
-    parser.add_argument("--checkpoint", type=Path, help="Optional supervised checkpoint to warm-start from")
+    parser.add_argument(
+        "--checkpoint",
+        "--warm-start-checkpoint",
+        dest="checkpoint",
+        type=Path,
+        help="Optional supervised checkpoint to warm-start from",
+    )
+    parser.add_argument(
+        "--pretrain-checkpoint",
+        type=Path,
+        help="Self-supervised checkpoint to initialise the backbone before PPO",
+    )
+    parser.add_argument(
+        "--warm-start-tuning",
+        action="store_true",
+        help="Require that a warm-start checkpoint is supplied before launching PPO",
+    )
     parser.add_argument("--device", type=str, default="cpu", help="Device identifier (cpu, cuda:0, etc.)")
     parser.add_argument("--updates", type=int, help="Override the number of PPO updates to perform")
     parser.add_argument("--steps-per-rollout", type=int, help="Override rollout size in samples")
@@ -71,10 +87,17 @@ def main() -> None:
     experiment = load_experiment_from_file(args.config)
     reinforcement = experiment.reinforcement or ReinforcementConfig()
     reinforcement = apply_overrides(reinforcement, args)
+    if args.warm_start_tuning and not (args.checkpoint or args.pretrain_checkpoint):
+        raise SystemExit("--warm-start-tuning requires a warm-start checkpoint to be provided")
+
+    if args.checkpoint and args.pretrain_checkpoint:
+        raise SystemExit("Specify either --checkpoint or --pretrain-checkpoint, not both")
+
     result = run_reinforcement_finetuning(
         experiment,
         reinforcement_config=reinforcement,
         checkpoint_path=args.checkpoint,
+        pretrain_checkpoint_path=args.pretrain_checkpoint,
         device=args.device,
     )
     print("\n=== PPO Fine-tuning Summary ===")

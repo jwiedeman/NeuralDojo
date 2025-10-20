@@ -75,12 +75,13 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-10-28): Split implementation into head-training experiments piggybacking on supervised checkpoints and policy-evaluation harness updates emitting confidence telemetry for reporting.
   - Notes (2025-10-29): Drafted PPO evaluation checklist covering confidence calibration metrics, defined simulator integration tests for latency impact, and coordinated telemetry outputs with the operations playbook.
   - Notes (2025-10-30): Baseline calibration head now emits quantile intervals + Dirichlet confidence suitable for PPO warm starts; follow-up tasks will wire outputs into reinforcement evaluation harnesses.
-- [ ] Warm-start RL fine-tuning runs from the masked/contrastive pretraining checkpoints via CLI switches.
+- [x] Warm-start RL fine-tuning runs from the masked/contrastive pretraining checkpoints via CLI switches.
   - Notes (2025-10-25): Drafted warm-start experiment matrix and telemetry capture checklist (diagnostics aggregates, rollout stability traces) to align with PPO upgrade planning in the implementation log.
   - Notes (2025-10-26): Finalised CLI contract draft (`--warm-start-checkpoint`, `--warm-start-tuning`) and mapped regression fixtures combining diagnostics snapshots with rollout summaries.
   - Notes (2025-10-28): Seeded synthetic PPO fixtures referencing latest pretraining checkpoints, documented replay-buffer initialisation for deterministic comparisons, and recorded rollback plan for unstable warm starts.
   - Notes (2025-10-29): Scheduled smoke-test executions against reduced fixtures, aligned checkpoint catalogue updates with reporting automation, and captured alerting requirements for failed warm starts in the monitoring milestone draft.
   - Notes (2025-11-04): Implemented warm-start CLI gating with resume semantics, executed the first diagnostics-enabled smoke run, and staged distributed rollout harness benchmarks for the next Sprint 4 review.
+  - Notes (2025-11-05): Finalised backbone weight loading from masked/contrastive checkpoints via the PPO runner, added `--pretrain-checkpoint` validation to the CLI, and extended regression coverage to assert weights transfer before PPO updates.
 - [ ] Extend PPO-style upgrades to optimise ROI directly using the differentiable PnL simulator after supervised convergence.
   - Notes (2024-02-25): PPO upgrades will reuse optimisation telemetry (latency, gradient noise) once Phase 2 diagnostics are instrumented, keeping action-confidence work grounded in measurable improvements.
   - Notes (2025-10-26): Sequenced simulator integration milestones (slippage hooks, latency buckets) with PPO reward-shaping toggles to align ROI optimisation with execution realism.

@@ -2,14 +2,18 @@ import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
+
 import numpy as np
 import pandas as pd
+import torch
 
 from market_nn_plus_ultra.training import (
     DataConfig,
     ExperimentConfig,
+    MaskedTimeSeriesLightningModule,
     ModelConfig,
     OptimizerConfig,
+    PretrainingConfig,
     ReinforcementConfig,
     TrainerConfig,
     run_reinforcement_finetuning,
@@ -109,3 +113,81 @@ def test_reinforcement_finetuning_smoke(tmp_path: Path) -> None:
     assert np.isfinite(update.value_loss)
     assert np.isfinite(update.entropy)
     assert result.policy_state_dict
+
+
+def test_reinforcement_warm_start_from_pretraining_checkpoint(tmp_path: Path) -> None:
+    db_path = tmp_path / "ppo_fixture.db"
+    _build_sqlite_fixture(db_path)
+
+    data_config = DataConfig(
+        sqlite_path=db_path,
+        symbol_universe=["TEST"],
+        feature_set=[],
+        window_size=16,
+        horizon=4,
+        stride=4,
+        normalise=True,
+        val_fraction=0.0,
+    )
+    model_config = ModelConfig(
+        feature_dim=5,
+        model_dim=64,
+        depth=2,
+        heads=4,
+        dropout=0.1,
+        conv_kernel_size=3,
+        conv_dilations=(1, 2),
+        horizon=4,
+        output_dim=1,
+        architecture="temporal_transformer",
+    )
+    trainer_config = TrainerConfig(
+        batch_size=4,
+        num_workers=0,
+        accelerator="cpu",
+        precision="32-true",
+        checkpoint_dir=tmp_path / "checkpoints",
+    )
+    reinforcement_config = ReinforcementConfig(
+        total_updates=0,
+        steps_per_rollout=8,
+        policy_epochs=1,
+        minibatch_size=4,
+    )
+    pretraining_config = PretrainingConfig(objective="masked")
+    optimizer_config = OptimizerConfig(lr=1e-3)
+    experiment = ExperimentConfig(
+        seed=7,
+        data=data_config,
+        model=model_config,
+        optimizer=optimizer_config,
+        trainer=trainer_config,
+        reinforcement=reinforcement_config,
+        pretraining=pretraining_config,
+    )
+
+    pretrain_module = MaskedTimeSeriesLightningModule(model_config, optimizer_config, pretraining_config)
+    checkpoint_path = tmp_path / "pretrain.ckpt"
+    torch.save({"state_dict": pretrain_module.state_dict()}, checkpoint_path)
+
+    result = run_reinforcement_finetuning(
+        experiment,
+        pretrain_checkpoint_path=checkpoint_path,
+        device="cpu",
+    )
+
+    assert result.updates == []
+    policy_backbone = {
+        key: tensor
+        for key, tensor in result.policy_state_dict.items()
+        if key.startswith("backbone.")
+    }
+    pretrain_backbone = {
+        key: tensor
+        for key, tensor in pretrain_module.state_dict().items()
+        if key.startswith("backbone.")
+    }
+    assert policy_backbone
+    assert pretrain_backbone
+    for key, tensor in pretrain_backbone.items():
+        torch.testing.assert_close(policy_backbone[key], tensor)
