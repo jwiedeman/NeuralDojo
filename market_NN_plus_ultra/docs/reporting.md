@@ -40,6 +40,21 @@ living roadmap in `docs/research_agenda.md`. Each milestone entry supports
 `phase`, `milestone`, and optional `summary` fields, making it easy to annotate
 reports with the roadmap slice they unlock.
 
+## Training Run Summaries
+
+`python scripts/train.py ...` now emits lightweight profitability summaries for
+every supervised training run. Once validation completes, the Lightning module
+aggregates ROI, Sharpe, and maximum drawdown across the epoch and writes two
+artefacts next to the configured checkpoint directory:
+
+* `profitability_summary.json` — machine-friendly metrics for automation.
+* `profitability_summary.md` — a Markdown table ready for experiment notebooks
+  or status updates.
+
+The same metrics are exposed via `TrainingRunResult.profitability_summary`, so
+benchmark sweeps and follow-on tooling can merge the diagnostics into their own
+reports without reloading checkpoints.
+
 ### Experiment Tracking
 
 Training and pretraining runs can stream metrics directly to Weights & Biases.

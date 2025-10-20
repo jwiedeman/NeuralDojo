@@ -55,6 +55,8 @@ def test_flatten_benchmark_result_sanitises_keys() -> None:
         best_model_path="checkpoints/model.ckpt",
         logged_metrics={"val/loss": 0.1234, "train/loss": 0.5678},
         dataset_summary={"train_windows": 100, "val_windows": 20},
+        profitability_summary={"roi": 0.42, "sharpe": 1.5},
+        profitability_reports={"json": "reports/profit.json"},
     )
     row = flatten_benchmark_result(scenario, result, duration_seconds=3.5)
     assert row["conv_dilations"] == "1-2-4-8"
@@ -62,6 +64,9 @@ def test_flatten_benchmark_result_sanitises_keys() -> None:
     assert row["metric_train_loss"] == pytest.approx(0.5678)
     assert row["dataset_train_windows"] == 100
     assert row["duration_seconds"] == pytest.approx(3.5)
+    assert row["profitability_roi"] == pytest.approx(0.42)
+    assert row["profitability_sharpe"] == pytest.approx(1.5)
+    assert row["profitability_report_json"] == "reports/profit.json"
 
 
 def test_normalise_logged_metrics_handles_tensors() -> None:

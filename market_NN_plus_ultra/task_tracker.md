@@ -107,7 +107,8 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-11-08): Baseline report generation path validated end-to-end with CLI chart-directory overrides; next iteration will wire attribution/agenda context once telemetry contracts unblock.
   - Notes (2025-10-28): Drafted milestone-referenced narrative stubs so automation can link experiment artefacts back to roadmap status without manual editing.
   - Notes (2025-11-10): Reporting code now embeds Research Agenda Alignment sections from CLI-supplied milestone JSON, shipping regression coverage and docs updates alongside the new configuration flag.
-- [ ] Automate profitability summaries (ROI, Sharpe, drawdown) for every long training session. — Notes: Targeting the same reporting stack as Phase 4 Milestone 1.
+- [x] Automate profitability summaries (ROI, Sharpe, drawdown) for every long training session. — Notes: Targeting the same reporting stack as Phase 4 Milestone 1.
+  - Notes (2025-11-11): Lightning validation now aggregates ROI/Sharpe/drawdown each epoch, writes `profitability_summary.json` and `.md` alongside checkpoints, and surfaces the metrics via `TrainingRunResult` for downstream reporting hooks.
    - Notes (2024-02-25): Report automation will ingest optimisation KPIs defined in the implementation log so profitability summaries capture calibration and stability diagnostics alongside ROI.
    - Notes (2025-10-26): Captured integration tasks for incorporating simulator-derived execution costs into summary tables and queued fixtures for validating drawdown aggregation under new telemetry fields.
    - Notes (2025-10-28): Added experiment-tracker upload cadence for interim profitability snapshots and documented schema extensions for calibration-derived confidence intervals.

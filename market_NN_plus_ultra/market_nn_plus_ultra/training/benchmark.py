@@ -169,6 +169,12 @@ def flatten_benchmark_result(
         row[f"metric_{safe_key}"] = value
     for key, value in result.dataset_summary.items():
         row[f"dataset_{key}"] = value
+    for key, value in result.profitability_summary.items():
+        safe_key = key.replace("/", "_")
+        row[f"profitability_{safe_key}"] = value
+    if result.profitability_reports:
+        for kind, path in result.profitability_reports.items():
+            row[f"profitability_report_{kind}"] = path
     return row
 
 
