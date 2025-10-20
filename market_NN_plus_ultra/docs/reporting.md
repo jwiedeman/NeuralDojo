@@ -25,6 +25,7 @@ Key flags:
 | `--predictions` | Path to a predictions table produced by `run_agent.py` or custom backtests. |
 | `--output` | Report destination. Use `.md` for Markdown or `.html` for a styled web page. |
 | `--metrics` | Optional JSON file containing extra metrics (e.g. benchmark stats) to merge into the report. |
+| `--milestones` | JSON file referencing research agenda milestones to surface in the generated narrative. |
 | `--return-column` | Which column represents realised returns; defaults to `realised_return`. |
 | `--no-equity` / `--no-distribution` | Disable chart generation to speed up quick summaries. |
 | `--charts-dir-name` | Custom name for the folder that stores generated charts (defaults to `<output>_assets`). |
@@ -32,6 +33,12 @@ Key flags:
 Reports automatically create a sibling folder (e.g. `latest_assets/`) that stores
 chart images referenced by the Markdown or HTML output. Both formats are
 designed to drop directly into research notebooks, investor letters, or PRDs.
+
+When milestones are supplied—either via the CLI flag or the Python API—the report
+adds a **Research Agenda Alignment** section that links the run back to the
+living roadmap in `docs/research_agenda.md`. Each milestone entry supports
+`phase`, `milestone`, and optional `summary` fields, making it easy to annotate
+reports with the roadmap slice they unlock.
 
 ### Experiment Tracking
 
@@ -72,6 +79,13 @@ report_path = generate_report(
     "reports/alpha_study.md",
     title="Alpha Study",
     description="30-day walk-forward evaluation across the top 20 symbols.",
+    milestones=[
+        {
+            "phase": "Phase 3 — Evaluation & Monitoring",
+            "milestone": "Publish automated run reports",
+            "summary": "Walk-forward study wired into the reporting automation backlog.",
+        }
+    ],
 )
 ```
 

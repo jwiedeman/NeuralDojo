@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from market_nn_plus_ultra.evaluation import (
+    MilestoneReference,
     generate_html_report,
     generate_markdown_report,
     generate_report,
@@ -44,6 +45,28 @@ def test_generate_markdown_report(tmp_path: Path) -> None:
     assert any(p.name.endswith(".png") for p in assets_dir.iterdir())
 
 
+def test_markdown_includes_milestones(tmp_path: Path) -> None:
+    predictions = _sample_predictions()
+    output = tmp_path / "milestones.md"
+    milestone = MilestoneReference(
+        phase="Phase 3 — Evaluation & Monitoring",
+        milestone="Publish automated run reports",
+        summary="First automated alignment with research agenda milestones.",
+    )
+
+    report_path = generate_markdown_report(
+        predictions,
+        output,
+        milestones=[milestone],
+    )
+
+    contents = report_path.read_text(encoding="utf-8")
+    assert "## Research Agenda Alignment" in contents
+    assert "Phase 3 — Evaluation & Monitoring" in contents
+    assert "Publish automated run reports" in contents
+    assert "First automated alignment" in contents
+
+
 def test_generate_html_report(tmp_path: Path) -> None:
     predictions = _sample_predictions()
     output = tmp_path / "web.html"
@@ -54,6 +77,28 @@ def test_generate_html_report(tmp_path: Path) -> None:
     assert "<!DOCTYPE html>" in html
     assert "HTML Report" in html
     assert "table" in html
+
+
+def test_html_includes_milestones(tmp_path: Path) -> None:
+    predictions = _sample_predictions()
+    output = tmp_path / "milestones.html"
+    milestone = {
+        "phase": "Phase 3 — Evaluation & Monitoring",
+        "milestone": "Publish automated run reports",
+        "summary": "HTML narrative includes research agenda context.",
+    }
+
+    report_path = generate_html_report(
+        predictions,
+        output,
+        milestones=[milestone],
+    )
+
+    html = report_path.read_text(encoding="utf-8")
+    assert "<h2>Research Agenda Alignment</h2>" in html
+    assert "Phase 3 — Evaluation & Monitoring" in html
+    assert "Publish automated run reports" in html
+    assert "HTML narrative includes research agenda context." in html
 
 
 def test_generate_report_infers_format(tmp_path: Path) -> None:

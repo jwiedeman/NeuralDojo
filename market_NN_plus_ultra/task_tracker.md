@@ -101,10 +101,11 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-11-08): Added configurable charts-directory overrides, expanded regression coverage (custom assets test), and confirmed CLI parity for Markdown/HTML outputs while preparing attribution table follow-ups.
 - [x] Wire up experiment tracking (Weights & Biases or MLflow) for metadata and artefacts.
 - [x] Add automated guardrail metrics (exposure, turnover, tail percentiles) for live trading readiness.
-- [ ] Publish automated run reports referencing the research agenda milestones. — Notes: Will piggyback on Phase 4 reporting upgrades after telemetry contracts stabilise.
+- [x] Publish automated run reports referencing the research agenda milestones. — Notes: Will piggyback on Phase 4 reporting upgrades after telemetry contracts stabilise.
   - Notes (2025-10-26): Logged telemetry exports (diagnostics aggregates, calibration sweeps, simulator cost breakdowns) that the reporting automation must ingest.
   - Notes (2025-11-08): Baseline report generation path validated end-to-end with CLI chart-directory overrides; next iteration will wire attribution/agenda context once telemetry contracts unblock.
   - Notes (2025-10-28): Drafted milestone-referenced narrative stubs so automation can link experiment artefacts back to roadmap status without manual editing.
+  - Notes (2025-11-10): Reporting code now embeds Research Agenda Alignment sections from CLI-supplied milestone JSON, shipping regression coverage and docs updates alongside the new configuration flag.
 - [ ] Automate profitability summaries (ROI, Sharpe, drawdown) for every long training session. — Notes: Targeting the same reporting stack as Phase 4 Milestone 1.
    - Notes (2024-02-25): Report automation will ingest optimisation KPIs defined in the implementation log so profitability summaries capture calibration and stability diagnostics alongside ROI.
    - Notes (2025-10-26): Captured integration tasks for incorporating simulator-derived execution costs into summary tables and queued fixtures for validating drawdown aggregation under new telemetry fields.

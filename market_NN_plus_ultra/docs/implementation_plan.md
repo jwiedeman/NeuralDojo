@@ -34,6 +34,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * **2025-11-08 — Reporting CLI hardening:** Added a configurable charts directory override, expanded regression coverage for the reporting helpers, and validated Markdown/HTML parity through `tests/test_reporting.py` so profitability reporting scaffolds remain execution-ready for Sprint 5.
 * **2025-11-09 — Execution simulator MVP:** Landed the vectorised execution engine in `market_nn_plus_ultra.simulation`, covering partial fills, latency penalties, funding costs, slippage, and position limits with dedicated regression tests so PPO and reporting workstreams can consume realistic execution telemetry.
 * **2025-11-10 — Risk-aware reward shaping release:** Enabled configurable Sharpe/Sortino bonuses with drawdown and CVaR penalties via `RiskObjectiveConfig`, shipping reusable risk metric utilities and regression coverage so PPO runs inherit the new reward tuning knobs out of the box.
+* **2025-11-10 — Research agenda reporting alignment:** Added milestone-aware report generation (`MilestoneReference`), CLI ingestion for agenda annotations, and regression coverage so automated reports now surface roadmap context by default.
 
 ## Phase 1 — Data & Feature Depth (Weeks 1-2)
 
@@ -224,6 +225,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
    - *Stability pass (2025-11-08):* Introduced a configurable charts assets directory, refreshed CLI/docs coverage, and re-ran `tests/test_reporting.py` (including the new custom-directory regression) ahead of attribution table implementation.
    - *Integration sync (2025-11-03):* Assigned owners for profitability narrative templates, logged dependency on simulator telemetry exports, and planned snapshot-test coverage for calibration-confidence tables before coding.
    - *Template detailing (2025-11-06):* Produced reference notebook rendering profitability + diagnostics composites, itemised reusable chart components (calibration fan charts, simulator cost waterfalls), and drafted regression snapshot strategy to keep Markdown/HTML parity once implementation begins.
+   - *Research agenda alignment (2025-11-10):* Wired milestone annotations into Markdown/HTML reports (`MilestoneReference`), added CLI JSON ingestion, and expanded regression/docs coverage so automation can tag outputs with roadmap context.
 2. **Live monitoring** — Integrate Prometheus metrics and alerting hooks into the inference service. Document SLOs and alert policies in `docs/operations.md`, including live decision support for extending or branching experiments. **Status:** 🗓 Planned — deferring until the service scaffold from Phase 3 establishes telemetry contracts.
    - *Observability draft (2025-10-18):* Record required Prometheus exporters, define minimum alert set (latency, calibration drift, guardrail breaches), and align metric naming with the optimisation log for traceability.
    - *Alert cadence (2025-10-26):* Matched diagnostics sampling intervals with Prometheus scrape settings and outlined simulator-derived latency histograms for future alert rules.
