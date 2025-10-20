@@ -80,6 +80,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-10-26): Finalised CLI contract draft (`--warm-start-checkpoint`, `--warm-start-tuning`) and mapped regression fixtures combining diagnostics snapshots with rollout summaries.
   - Notes (2025-10-28): Seeded synthetic PPO fixtures referencing latest pretraining checkpoints, documented replay-buffer initialisation for deterministic comparisons, and recorded rollback plan for unstable warm starts.
   - Notes (2025-10-29): Scheduled smoke-test executions against reduced fixtures, aligned checkpoint catalogue updates with reporting automation, and captured alerting requirements for failed warm starts in the monitoring milestone draft.
+  - Notes (2025-11-04): Implemented warm-start CLI gating with resume semantics, executed the first diagnostics-enabled smoke run, and staged distributed rollout harness benchmarks for the next Sprint 4 review.
 - [ ] Extend PPO-style upgrades to optimise ROI directly using the differentiable PnL simulator after supervised convergence.
   - Notes (2024-02-25): PPO upgrades will reuse optimisation telemetry (latency, gradient noise) once Phase 2 diagnostics are instrumented, keeping action-confidence work grounded in measurable improvements.
   - Notes (2025-10-26): Sequenced simulator integration milestones (slippage hooks, latency buckets) with PPO reward-shaping toggles to align ROI optimisation with execution realism.
@@ -114,14 +115,17 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-10-26): Scheduled spike for diagnostics ingestion operator and defined retry semantics for warm-start stages.
   - Notes (2025-10-28): Added change-data-capture polling requirements, calibration-drift alert thresholds, and storage budgets for rolling checkpoint windows.
   - Notes (2025-10-29): Broke DAG implementation into schema-validation, warm-start, PPO, and reporting tasks; queued integration tests for checkpoint lineage tracking; and aligned orchestration alerts with monitoring escalation paths.
+  - Notes (2025-11-04): Drafted DAG task skeletons for simulator smoke tests and profitability report generation, added retry/idempotency guidance, and planned fixture-backed regression coverage for the dataset refresh → diagnostics export path.
 - [ ] Set up online monitoring for live performance and drift detection. — Notes: Pending telemetry surface defined in Phase 4 Milestone 2.
   - Notes (2025-10-26): Matched diagnostics sampling cadence with Prometheus scrape intervals and scoped simulator latency histograms for alerting.
   - Notes (2025-10-28): Specified dashboard panels (calibration confidence, ROI trend, drawdown guardrails), alert routing rules, and dependencies on the service telemetry payload contract.
   - Notes (2025-10-29): Drafted alert playbooks with escalation timing, synchronised metric namespaces with service planning, and catalogued synthetic drift scenarios for end-to-end monitoring tests.
+  - Notes (2025-11-04): Locked profitability reporting payload schema IDs with the service planning thread, reserved telemetry pagination retry semantics, and ensured monitoring dashboards can ingest the new diagnostics aggregates without schema churn.
 - [ ] Build playbook for human-in-the-loop overrides and risk manager approvals. — Notes: Drafting outline alongside analyst feedback tooling requirements.
   - Notes (2025-10-26): Added placeholders for calibration-confidence dashboards and simulator what-if analyses to inform override decisions.
   - Notes (2025-10-28): Defined escalation tree integrating monitoring alerts with analyst annotations, added rollback SOP referencing checkpoint lineage, and documented review cadence expectations.
   - Notes (2025-10-29): Outlined approval runbooks tied to guardrail violations, mapped decision logging to analyst feedback tooling, and scheduled doc reviews alongside monitoring/service milestones.
+  - Notes (2025-11-04): Captured telemetry ownership assignments (diagnostics parquet, simulator traces) so override workflows can surface provenance and profitability context during reviews.
 - [ ] Integrate live monitoring, automated reporting, and risk guardrails into a single operations playbook for extend/branch decisions. — Notes: Will consolidate once reporting, monitoring, and guardrail milestones reach MVP.
   - Notes (2024-02-25): Operations playbook will surface optimisation KPIs (latency, calibration, guardrail triggers) defined in the implementation plan so deployment readiness decisions remain data-driven.
   - Notes (2025-10-26): Synced reporting and monitoring schema drafts to ensure playbook embeds linked dashboards and playback logs without refactors.
@@ -165,6 +169,13 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 * Logged regression/CI coverage gaps for PPO warm starts, simulator trace exports, and profitability report templates so upcoming PRs remain incremental.
 * Sequenced documentation updates (`docs/sqlite_schema.md`, telemetry guide, operations playbook) with planned implementations to keep stakeholder onboarding smooth.
 * Captured telemetry contract owners across diagnostics parquet exports, simulator trace payloads, and service response schemas to reduce cross-stream coordination overhead during implementation.
+
+### Active Work Log — 2025-11-04
+
+* Completed warm-start CLI gating, executed the PPO smoke run with calibration telemetry enabled, and staged distributed rollout benchmarks for the next Sprint 4 review.
+* Ran deterministic simulator kernel smoke tests, capturing latency bucket histograms and validating telemetry payload schemas ahead of PPO integration.
+* Locked profitability reporting payload contracts and propagated schema identifiers to service/orchestration planning to keep monitoring dashboards in sync.
+* Sketched orchestration DAG skeletons for simulator smoke tests and profitability report generation with retry/idempotency notes and planned fixture-backed regression coverage.
 
 ### Active Work Log — 2025-10-24
 
