@@ -39,6 +39,46 @@ signals to be merged alongside prices. Regression coverage in
 join semantics are deterministic: forward-filled values for sparse timestamps
 remain stable across runs and each spec prefixes its columns consistently.
 
+### Pairing Matrix for Long-Horizon Experiments
+
+The optimisation plan calls for coupling technical indicators with
+alternative-data feeds so multi-quarter experiments ingest complementary
+signals. The following matrix captures the supported pairings and the CLI
+toggles needed to activate them:
+
+| Alternative Source | Technical Bundle | CLI / Config Toggle | Notes |
+| --- | --- | --- | --- |
+| Macro calendar surprises (`macro_calendar` table) | Multi-horizon moving averages + volatility bands | `--feature-set macro_ma_vol` | Aligns macro releases with volatility responses; relies on regime labels to gate post-event drift windows. |
+| On-chain activity (exchange flows, active addresses) | Momentum + order-book imbalance | `--feature-set onchain_momo_obi` | Designed for crypto universes; combines alternative data lag features with cross-asset ETF hedges when `--cross-asset-view` is enabled. |
+| Funding rates & basis spreads | Carry & term-structure factors | `--feature-set funding_carry_term` | Couples futures funding with yield-curve derived PCA factors for duration-aware carry trades. |
+| Corporate actions & buyback cadence | Relative strength & liquidity ranks | `--feature-set corp_rslr` | Useful for equities; deterministic joins keep split/dividend adjustments aligned with liquidity filters. |
+
+Each bundle ships with validation hooks under
+[`market_nn_plus_ultra.data.validation`](../market_nn_plus_ultra/data/validation.py)
+to guarantee the merged frame satisfies the same null, duplicate, and key
+integrity rules as the base tables. When running the dataset builder, combine
+`--strict-validation` with the appropriate `--feature-set` entry so the
+expanded joins fail fast if dependencies drift.
+
+### Regime-Aware Pairings
+
+The new bundles integrate directly with the regime labelling pipeline. By
+enabling `--regime-labels` alongside a pairing, the dataset builder will attach
+regime IDs and the corresponding embedding inputs so downstream training jobs
+can filter or weight samples by market state. This is especially useful for
+long-horizon runs where alternative-data signals exhibit regime-dependent
+predictive power.
+
+For reproducibility, recommended workflows:
+
+1. Run `market-nn-plus-ultra-dataset-build --feature-set <bundle> --regime-labels --strict-validation` to materialise the fused dataset.
+2. Inspect the generated Markdown report from the dataset build (see
+   [`docs/reporting.md`](reporting.md)) to confirm signal coverage and guardrail
+   metrics.
+3. Record the resulting bundle name in experiment YAML under
+   `feature_pipeline.active_bundles` so training and evaluation runs remain in
+   sync with the dataset artefacts.
+
 ## Regime Labelling Determinism
 
 Regime generation uses
