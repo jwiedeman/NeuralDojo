@@ -33,6 +33,11 @@ model:
   coarse_factor: 4
   cross_every: 2
   max_seq_len: 4096
+  market_state:
+    enabled: false
+    embedding_dim: 16
+    dropout: 0.05
+    include: []
 
 optimizer:
   lr: 0.0003

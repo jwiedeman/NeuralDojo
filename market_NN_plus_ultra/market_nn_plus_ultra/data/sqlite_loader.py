@@ -20,7 +20,12 @@ import pandas as pd
 from sqlalchemy import create_engine
 
 from .alternative_data import AlternativeDataConnector, AlternativeDataSpec
-from .validation import validate_assets_frame, validate_indicator_frame, validate_price_frame
+from .validation import (
+    validate_assets_frame,
+    validate_indicator_frame,
+    validate_price_frame,
+    validate_regime_frame,
+)
 
 
 @dataclass(slots=True)
@@ -199,6 +204,25 @@ class SQLiteMarketDataset:
                     merged = merged.set_index(index_columns).sort_index()
                 else:
                     merged = base
+
+            if self._table_exists(conn, "regimes"):
+                regime_df = pd.read_sql_query(
+                    "SELECT * FROM regimes",
+                    conn,
+                    parse_dates=["timestamp"],
+                )
+                if self.validate:
+                    regime_df = validate_regime_frame(regime_df, assets=assets_df)
+                if not regime_df.empty:
+                    regime_wide = regime_df.pivot_table(
+                        index=["timestamp", "symbol"],
+                        columns="name",
+                        values="value",
+                        aggfunc="last",
+                    )
+                    regime_wide.columns = [f"regime__{col}" for col in regime_wide.columns]
+                    regime_wide = regime_wide.sort_index()
+                    merged = merged.join(regime_wide, how="left")
 
         return merged
 

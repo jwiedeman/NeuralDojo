@@ -40,6 +40,16 @@ class CalibrationConfig:
 
 
 @dataclass(slots=True)
+class MarketStateConfig:
+    """Configuration controlling categorical market-state embeddings."""
+
+    enabled: bool = False
+    embedding_dim: int = 16
+    dropout: float = 0.0
+    include: Tuple[str, ...] = tuple()
+
+
+@dataclass(slots=True)
 class ModelConfig:
     feature_dim: int
     model_dim: int = 512
@@ -65,6 +75,7 @@ class ModelConfig:
     decoder_layers: Optional[int] = None
     gradient_checkpointing: bool = False
     calibration: CalibrationConfig = field(default_factory=CalibrationConfig)
+    market_state: MarketStateConfig = field(default_factory=MarketStateConfig)
 
 
 @dataclass(slots=True)

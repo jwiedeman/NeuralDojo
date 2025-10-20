@@ -9,7 +9,9 @@ from pathlib import Path
 import sys
 from typing import Any, Dict, Mapping
 
+import numpy as np
 import pytorch_lightning as pl
+import pandas as pd
 import torch
 import torch.nn as nn
 import yaml
@@ -25,6 +27,7 @@ from ..models.moe_transformer import MixtureOfExpertsBackbone, MixtureOfExpertsC
 from ..models.state_space import StateSpaceBackbone, StateSpaceConfig
 from ..models.losses import CompositeTradingLoss
 from ..models.calibration import CalibratedPolicyHead, CalibrationHeadOutput
+from ..models.market_state import MarketStateEmbedding, MarketStateMetadata
 from ..trading.pnl import TradingCosts
 from ..utils.wandb import maybe_create_wandb_logger
 from .config import (
@@ -39,6 +42,7 @@ from .config import (
     PretrainingConfig,
     ReinforcementConfig,
     TrainerConfig,
+    MarketStateConfig,
 )
 from .curriculum import (
     CurriculumCallback,
@@ -70,12 +74,21 @@ def _parameter_counts(module: pl.LightningModule) -> tuple[int, int]:
 
 
 class MarketLightningModule(pl.LightningModule):
-    """Lightning module combining the backbone and policy head."""
+    """Lightning module combining the backbone, policy head, and state embeddings."""
 
-    def __init__(self, model_config: ModelConfig, optimizer_config: OptimizerConfig) -> None:
+    def __init__(
+        self,
+        model_config: ModelConfig,
+        optimizer_config: OptimizerConfig,
+        *,
+        market_state_metadata: MarketStateMetadata | None = None,
+    ) -> None:
         super().__init__()
         self.model_config = model_config
         self.save_hyperparameters({"model": asdict(model_config), "optimizer": asdict(optimizer_config)})
+        self.market_state_embedding: MarketStateEmbedding | None = None
+        self._state_indices: tuple[int, ...] | None = None
+        self._market_state_metadata: MarketStateMetadata | None = None
         architecture = model_config.architecture.lower()
         if architecture in {"hybrid_transformer", "temporal_transformer"}:
             backbone_config = TemporalBackboneConfig(
@@ -154,7 +167,55 @@ class MarketLightningModule(pl.LightningModule):
         self.loss_fn = CompositeTradingLoss()
         self._latest_head_output: CalibrationHeadOutput | None = None
 
-    def forward(self, features: torch.Tensor) -> torch.Tensor:
+        if self.model_config.market_state.enabled:
+            metadata = market_state_metadata
+            if metadata is None or metadata.feature_count() == 0:
+                logger.warning(
+                    "Market-state embeddings enabled but no metadata provided; continuing without embeddings."
+                )
+            else:
+                selected = metadata.select(self.model_config.market_state.include)
+                if selected.feature_count() == 0:
+                    logger.warning(
+                        "Market-state embeddings enabled but none of the requested features %s are available.",
+                        self.model_config.market_state.include,
+                    )
+                else:
+                    self.market_state_embedding = MarketStateEmbedding(
+                        selected,
+                        embedding_dim=self.model_config.market_state.embedding_dim,
+                        dropout=self.model_config.market_state.dropout,
+                    )
+                    self._state_indices = selected.indices()
+                    self._market_state_metadata = selected
+
+    def _compute_state_embedding(
+        self,
+        features: torch.Tensor,
+        state_tokens: torch.Tensor | None,
+    ) -> torch.Tensor:
+        assert self.market_state_embedding is not None
+        if state_tokens is None:
+            return self.market_state_embedding.zero_state(features)
+        tokens = state_tokens
+        if tokens.dtype != torch.long:
+            tokens = tokens.to(dtype=torch.long)
+        if self._state_indices:
+            index = torch.as_tensor(self._state_indices, device=tokens.device, dtype=torch.long)
+            tokens = torch.index_select(tokens, dim=-1, index=index)
+        tokens = tokens.to(device=features.device)
+        embeddings = self.market_state_embedding(tokens)
+        return embeddings.to(features.dtype)
+
+    def forward(
+        self,
+        features: torch.Tensor,
+        *,
+        state_tokens: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        if self.market_state_embedding is not None:
+            state_embed = self._compute_state_embedding(features, state_tokens)
+            features = torch.cat([features, state_embed], dim=-1)
         hidden = self.backbone(features)
         head_output = self.head(hidden)
         if isinstance(head_output, CalibrationHeadOutput):
@@ -214,7 +275,7 @@ class MarketLightningModule(pl.LightningModule):
         return module
 
     def training_step(self, batch: Dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
-        preds = self(batch["features"])
+        preds = self(batch["features"], state_tokens=batch.get("state_tokens"))
         targets = batch["targets"]
         reference = batch.get("reference")
         loss = self.loss_fn(preds, targets, reference=reference)
@@ -222,7 +283,7 @@ class MarketLightningModule(pl.LightningModule):
         return loss
 
     def validation_step(self, batch: Dict[str, torch.Tensor], batch_idx: int) -> None:
-        preds = self(batch["features"])
+        preds = self(batch["features"], state_tokens=batch.get("state_tokens"))
         reference = batch.get("reference")
         loss = self.loss_fn(preds, batch["targets"], reference=reference)
         self.log("val/loss", loss, prog_bar=True)
@@ -261,6 +322,8 @@ class MarketDataModule(pl.LightningDataModule):
         self._feature_columns: list[str] = []
         self._target_columns: list[str] = []
         self._persistent_workers: bool | None = None
+        self._state_token_columns: list[str] = []
+        self._market_state_metadata: MarketStateMetadata | None = None
 
     def setup(self, stage: str | None = None) -> None:
         source = SQLiteMarketSource(path=str(self.data_config.sqlite_path))
@@ -275,10 +338,14 @@ class MarketDataModule(pl.LightningDataModule):
         panel = dataset.as_panel()
         pipeline = self.registry.build_pipeline(self.data_config.feature_set)
         enriched = pipeline.transform_panel(panel)
+        enriched = self._prepare_market_state(enriched)
         if self.data_config.feature_set:
-            available = [f for f in self.data_config.feature_set if f in enriched.columns]
+            requested = [f for f in self.data_config.feature_set if f in enriched.columns]
+            numeric_cols = enriched[requested].select_dtypes(include=[np.number]).columns.tolist()
+            available = [col for col in numeric_cols if col not in self._state_token_columns]
         else:
-            available = [c for c in enriched.columns if c not in ("symbol",)]
+            numeric_panel = enriched.select_dtypes(include=[np.number])
+            available = [c for c in numeric_panel.columns if c not in self._state_token_columns]
         self._enriched_panel = enriched
         self._feature_columns = available
         self._target_columns = list(self.data_config.target_columns)
@@ -307,6 +374,7 @@ class MarketDataModule(pl.LightningDataModule):
             horizon=params.horizon,
             stride=params.stride,
             normalise=params.normalise,
+            state_columns=self._state_token_columns,
         )
 
     def _assign_splits(self, dataset: SlidingWindowDataset) -> None:
@@ -345,6 +413,28 @@ class MarketDataModule(pl.LightningDataModule):
             return None
         self.apply_curriculum(params)
         return params
+
+    def _prepare_market_state(self, panel: pd.DataFrame) -> pd.DataFrame:
+        self._state_token_columns = []
+        self._market_state_metadata = None
+        regime_columns = [col for col in panel.columns if col.startswith("regime__")]
+        if not regime_columns:
+            return panel
+
+        enriched = panel.copy()
+        metadata_columns: list[tuple[str, str, list[str]]] = []
+        for column in sorted(regime_columns):
+            base_name = column.split("regime__", 1)[1] or column
+            token_column = f"{column}__token"
+            filled = enriched[column].fillna("__missing__").astype(str)
+            categorical = pd.Categorical(filled)
+            enriched[token_column] = categorical.codes.astype(np.int64)
+            self._state_token_columns.append(token_column)
+            metadata_columns.append((base_name, token_column, categorical.categories.astype(str).tolist()))
+
+        if metadata_columns:
+            self._market_state_metadata = MarketStateMetadata.from_columns(metadata_columns)
+        return enriched
 
     @property
     def has_curriculum(self) -> bool:
@@ -404,6 +494,7 @@ class MarketDataModule(pl.LightningDataModule):
             "train_batches": math.ceil(train_len / batch_size),
             "val_batches": math.ceil(val_len / batch_size),
             "feature_dim": self.feature_dim,
+            "market_state_features": self.market_state_feature_count,
         }
 
     @property
@@ -415,6 +506,16 @@ class MarketDataModule(pl.LightningDataModule):
         if not self._feature_columns:
             raise RuntimeError("DataModule.setup must populate feature columns before access")
         return len(self._feature_columns)
+
+    @property
+    def market_state_metadata(self) -> MarketStateMetadata | None:
+        return self._market_state_metadata
+
+    @property
+    def market_state_feature_count(self) -> int:
+        if self._market_state_metadata is None:
+            return 0
+        return self._market_state_metadata.feature_count()
 
 
 def load_experiment_from_file(path: Path) -> ExperimentConfig:
@@ -499,6 +600,23 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
         )
     else:
         model_section["calibration"] = CalibrationConfig()
+    market_state_section = model_section.get("market_state")
+    if market_state_section is not None:
+        state_section = dict(market_state_section)
+        include = state_section.get("include")
+        include_tuple = (
+            tuple(str(name) for name in include)
+            if include is not None
+            else tuple()
+        )
+        model_section["market_state"] = MarketStateConfig(
+            enabled=bool(state_section.get("enabled", False)),
+            embedding_dim=int(state_section.get("embedding_dim", 16)),
+            dropout=float(state_section.get("dropout", 0.0)),
+            include=include_tuple,
+        )
+    else:
+        model_section["market_state"] = MarketStateConfig()
     model_cfg = ModelConfig(**model_section)
     optimizer_cfg = OptimizerConfig(**raw.get("optimizer", {}))
     trainer_section = dict(raw.get("trainer", {}))
@@ -576,20 +694,40 @@ def ensure_feature_dim_alignment(
     """Synchronise the model feature dimension with the engineered features."""
 
     try:
-        inferred_dim = data_module.feature_dim
+        base_dim = data_module.feature_dim
     except RuntimeError:
         # Setup has not been called yet – build once to reveal the engineered columns.
         data_module.setup(stage="fit")
-        inferred_dim = data_module.feature_dim
+        base_dim = data_module.feature_dim
 
-    if inferred_dim <= 0:
+    if base_dim <= 0:
         raise ValueError("No features available after preprocessing; check the feature pipeline configuration.")
 
+    extra_dim = 0
+    metadata = data_module.market_state_metadata
+    if config.model.market_state.enabled:
+        if metadata is None or metadata.feature_count() == 0:
+            logger.warning(
+                "Market-state embeddings enabled but no categorical state metadata is available; proceeding without the extra inputs."
+            )
+        else:
+            selected = metadata.select(config.model.market_state.include)
+            if selected.feature_count() == 0:
+                logger.warning(
+                    "Requested market-state features %s are unavailable; proceeding without embeddings.",
+                    config.model.market_state.include,
+                )
+            else:
+                extra_dim = config.model.market_state.embedding_dim * selected.feature_count()
+
+    inferred_dim = base_dim + extra_dim
     if config.model.feature_dim != inferred_dim:
         logger.info(
-            "Adjusting model feature dimension from %s to match engineered features (%s columns)",
+            "Adjusting model feature dimension from %s to %s (base=%s, market-state extra=%s)",
             config.model.feature_dim,
             inferred_dim,
+            base_dim,
+            extra_dim,
         )
         config.model.feature_dim = inferred_dim
 
@@ -598,7 +736,20 @@ def instantiate_modules(config: ExperimentConfig) -> tuple[MarketLightningModule
     pl.seed_everything(config.seed)
     data_module = MarketDataModule(config.data, config.trainer, seed=config.seed)
     ensure_feature_dim_alignment(config, data_module)
-    lightning_module = MarketLightningModule(config.model, config.optimizer)
+    if config.model.market_state.enabled and data_module.market_state_metadata is None:
+        # ensure metadata is available when embeddings are requested
+        data_module.setup(stage="fit")
+    metadata = data_module.market_state_metadata
+    selected_metadata: MarketStateMetadata | None = None
+    if metadata is not None and config.model.market_state.enabled:
+        selected = metadata.select(config.model.market_state.include)
+        if selected.feature_count() > 0:
+            selected_metadata = selected
+    lightning_module = MarketLightningModule(
+        config.model,
+        config.optimizer,
+        market_state_metadata=selected_metadata,
+    )
     return lightning_module, data_module
 
 
