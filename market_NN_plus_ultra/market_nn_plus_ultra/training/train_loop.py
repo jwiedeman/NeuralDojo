@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 import logging
 import math
 from pathlib import Path
@@ -28,8 +28,10 @@ from ..models.state_space import StateSpaceBackbone, StateSpaceConfig
 from ..models.losses import CompositeTradingLoss
 from ..models.calibration import CalibratedPolicyHead, CalibrationHeadOutput
 from ..models.market_state import MarketStateEmbedding, MarketStateMetadata
-from ..trading.pnl import TradingCosts
+from ..trading.pnl import TradingCosts, differentiable_pnl, price_to_returns
+from ..trading.risk import compute_risk_metrics
 from ..utils.wandb import maybe_create_wandb_logger
+from ..utils.reporting import write_metrics_report
 from .config import (
     CalibrationConfig,
     CurriculumConfig,
@@ -63,6 +65,8 @@ class TrainingRunResult:
     best_model_path: str
     logged_metrics: dict[str, float]
     dataset_summary: dict[str, int]
+    profitability_summary: dict[str, float] = field(default_factory=dict)
+    profitability_reports: dict[str, str] = field(default_factory=dict)
 
 
 def _parameter_counts(module: pl.LightningModule) -> tuple[int, int]:
@@ -166,6 +170,8 @@ class MarketLightningModule(pl.LightningModule):
         self.head = self._build_head(model_config.horizon)
         self.loss_fn = CompositeTradingLoss()
         self._latest_head_output: CalibrationHeadOutput | None = None
+        self._profitability_buffer: dict[str, float] | None = None
+        self._latest_profitability: dict[str, float] | None = None
 
         if self.model_config.market_state.enabled:
             metadata = market_state_metadata
@@ -257,6 +263,12 @@ class MarketLightningModule(pl.LightningModule):
 
         return self._latest_head_output
 
+    @property
+    def latest_profitability_summary(self) -> dict[str, float] | None:
+        """Return the most recently aggregated profitability metrics."""
+
+        return None if self._latest_profitability is None else dict(self._latest_profitability)
+
     @classmethod
     def from_checkpoint(
         cls,
@@ -287,6 +299,77 @@ class MarketLightningModule(pl.LightningModule):
         reference = batch.get("reference")
         loss = self.loss_fn(preds, batch["targets"], reference=reference)
         self.log("val/loss", loss, prog_bar=True)
+        pnl_series = self._compute_pnl_series(preds, batch["targets"], reference)
+        if pnl_series is not None:
+            self._accumulate_profitability(pnl_series)
+
+    def _compute_pnl_series(
+        self,
+        preds: torch.Tensor,
+        targets: torch.Tensor,
+        reference: torch.Tensor | None,
+    ) -> torch.Tensor | None:
+        """Return per-sample PnL series used for profitability diagnostics."""
+
+        if targets.ndim != 3 or preds.ndim != 3:
+            logger.warning(
+                "Skipping profitability accumulation; expected 3D tensors got preds=%s targets=%s",
+                tuple(preds.shape),
+                tuple(targets.shape),
+            )
+            return None
+
+        try:
+            future_returns = price_to_returns(targets.detach(), reference.detach() if isinstance(reference, torch.Tensor) else None)
+        except ValueError as exc:  # pragma: no cover - defensive guard
+            logger.warning("Failed to compute future returns for profitability summary: %s", exc)
+            return None
+
+        pnl_series = differentiable_pnl(
+            preds.detach(),
+            future_returns.detach(),
+            costs=self.loss_fn.trading_costs,
+            activation=self.loss_fn.activation,
+        )
+        return pnl_series.detach()
+
+    def _accumulate_profitability(self, pnl_series: torch.Tensor) -> None:
+        if self._profitability_buffer is None or pnl_series.ndim != 2:
+            return
+
+        pnl = pnl_series.detach()
+        metrics = compute_risk_metrics(pnl, dim=-1)
+        roi = pnl.sum(dim=-1)
+
+        self._profitability_buffer["roi_sum"] += float(roi.sum().item())
+        self._profitability_buffer["sharpe_sum"] += float(metrics.sharpe.sum().item())
+        self._profitability_buffer["drawdown_sum"] += float(metrics.drawdown.sum().item())
+        self._profitability_buffer["sample_count"] += float(pnl.size(0))
+
+    def on_validation_epoch_start(self) -> None:
+        self._profitability_buffer = {
+            "roi_sum": 0.0,
+            "sharpe_sum": 0.0,
+            "drawdown_sum": 0.0,
+            "sample_count": 0.0,
+        }
+
+    def on_validation_epoch_end(self) -> None:
+        if not self._profitability_buffer:
+            return
+        count = self._profitability_buffer["sample_count"]
+        if count <= 0:
+            self._latest_profitability = None
+            return
+        summary = {
+            "roi": self._profitability_buffer["roi_sum"] / count,
+            "sharpe": self._profitability_buffer["sharpe_sum"] / count,
+            "max_drawdown": self._profitability_buffer["drawdown_sum"] / count,
+        }
+        self._latest_profitability = summary
+        for name, value in summary.items():
+            self.log(f"val/profitability/{name}", value, prog_bar=False)
+        self._profitability_buffer = None
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
@@ -863,9 +946,28 @@ def run_training(config: ExperimentConfig) -> TrainingRunResult:
     trainer.fit(module, datamodule=data_module)
     best_model_path = checkpoint_callback.best_model_path or ""
     metrics = _normalise_logged_metrics(trainer.logged_metrics)
+    profitability_summary = module.latest_profitability_summary or {}
+    profitability_reports: dict[str, str] = {}
+    if profitability_summary:
+        json_path = write_metrics_report(
+            profitability_summary,
+            checkpoint_dir / "profitability_summary.json",
+            format_hint="json",
+        )
+        md_path = write_metrics_report(
+            profitability_summary,
+            checkpoint_dir / "profitability_summary.md",
+            format_hint="md",
+        )
+        profitability_reports = {
+            "json": str(json_path),
+            "markdown": str(md_path),
+        }
     return TrainingRunResult(
         best_model_path=str(best_model_path),
         logged_metrics=metrics,
         dataset_summary=dict(summary),
+        profitability_summary=profitability_summary,
+        profitability_reports=profitability_reports,
     )
 

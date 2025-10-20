@@ -88,6 +88,8 @@ def test_architecture_sweep_generates_stable_results(tmp_path: Path, monkeypatch
             best_model_path=f"artifacts/{label}.ckpt",
             logged_metrics=metrics,
             dataset_summary={"samples": 64, "batches": 4},
+            profitability_summary={"roi": 0.1, "sharpe": 1.0, "max_drawdown": 0.2},
+            profitability_reports={"json": f"artifacts/{label}-profit.json"},
         )
 
     monkeypatch.setattr(architecture_sweep, "load_experiment_from_file", fake_load_experiment)
