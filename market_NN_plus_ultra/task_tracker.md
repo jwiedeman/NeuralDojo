@@ -43,6 +43,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [ ] Automate architecture sweeps over depth, horizon, and dilation for omni-scale, MoE, transformer, and state-space backbones. — Notes: Planned to extend the benchmark harness CLI once baseline sweeps are in place.
 - [ ] Add gradient-noise diagnostics and calibration drift alerts to the training loop telemetry. — Notes: Aligning with Phase 2 stability tooling design before implementation.
   - Notes (2025-10-19): Telemetry schema draft enumerates gradient noise, calibration drift, throughput, and data freshness metrics to ensure future instrumentation plugs into reporting without rework.
+  - Notes (2025-10-23): Prototyping `TrainingDiagnosticsCallback` scaffolding with CLI toggles for opt-in telemetry (`--diagnostics-profile`, `--diagnostics-interval`) while drafting regression hooks that compare diagnostics across fixture runs.
 - [ ] Integrate calibration-aware (Dirichlet/quantile) heads for safe scaling to deeper models. — Notes: Pending concentration prior research captured in the implementation plan.
   - Notes (2024-02-25): Calibration head design will inherit empirical priors collected during the optimisation plan resync; keeping dependency on stability tooling explicit.
 
@@ -100,6 +101,12 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 * Completed cross-asset alignment implementation, wiring the dataset-build CLI toggle, validation schema, and documentation updates into the release plan.
 * Added regression coverage for the cross-asset view builder and CLI entry point to guarantee deterministic fills and feature naming.
 * Published the cross-asset profiling script and recorded new telemetry fields (fill rate, dropped rows/features) for upcoming benchmarking runs.
+
+### Active Work Log — 2025-10-23
+
+* Initiated stability diagnostics implementation by defining callback lifecycles for gradient-noise estimation and calibration drift monitoring.
+* Mapped CLI integration work for opt-in diagnostics, ensuring researchers can trigger telemetry without editing experiment YAML.
+* Scheduled telemetry schema reviews so the new diagnostics artefacts feed Phase 2 reporting and Phase 4 monitoring milestones without rework.
 
 ---
 
