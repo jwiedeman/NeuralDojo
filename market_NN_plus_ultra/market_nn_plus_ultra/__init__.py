@@ -5,7 +5,16 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
-__all__ = ["data", "models", "trading", "training", "evaluation", "utils", "cli"]
+__all__ = [
+    "data",
+    "models",
+    "trading",
+    "training",
+    "evaluation",
+    "utils",
+    "cli",
+    "simulation",
+]
 
 
 def __getattr__(name: str) -> Any:  # pragma: no cover - simple passthrough

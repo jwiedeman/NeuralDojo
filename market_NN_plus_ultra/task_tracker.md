@@ -91,6 +91,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
    - Notes (2025-10-28): Defined convergence gates (calibration drift threshold, drawdown guardrails) for enabling ROI-centric updates and queued benchmarking harness updates for ROI vs. risk comparisons.
    - Notes (2025-10-29): Planned incremental rollout of ROI-tuned objectives following warm-start smoke tests, allocated profiling windows for simulator latency validation, and aligned KPI reporting with profitability automation tasks.
    - Notes (2025-11-07): Locked Sprint 5 spike to map PPO reward-shaping hooks onto the upcoming simulator telemetry schema, drafted replay-buffer instrumentation requirements, and catalogued regression scenarios exercising risk-aware losses alongside ROI objectives.
+   - Notes (2025-11-09): Simulator telemetry bundle (slippage, fees, funding, latency penalties) now exposed via `market_nn_plus_ultra.simulation.simulate_execution`; next steps wire traces into PPO rollouts and CLI toggles once profiling windows resume.
 
 ## 3. Evaluation & Monitoring
 - [x] Build evaluation harness for daily/weekly backtests with walk-forward splits.
@@ -184,6 +185,12 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 * Ran deterministic simulator kernel smoke tests, capturing latency bucket histograms and validating telemetry payload schemas ahead of PPO integration.
 * Locked profitability reporting payload contracts and propagated schema identifiers to service/orchestration planning to keep monitoring dashboards in sync.
 * Sketched orchestration DAG skeletons for simulator smoke tests and profitability report generation with retry/idempotency notes and planned fixture-backed regression coverage.
+
+### Active Work Log — 2025-11-09
+
+* Landed the vectorised execution simulator in `market_nn_plus_ultra.simulation`, covering partial fills, latency buckets, funding costs, and position caps with regression coverage.
+* Captured telemetry outputs (slippage, fees, funding, latency penalties) for PPO reward-shaping consumers and profitability reporting templates.
+* Logged follow-up integration tasks to wire simulator traces into CLI toggles and distributed PPO harness checkpoints once profiling runs resume.
 
 ### Active Work Log — 2025-10-24
 
