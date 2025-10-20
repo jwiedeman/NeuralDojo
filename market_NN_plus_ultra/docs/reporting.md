@@ -27,6 +27,7 @@ Key flags:
 | `--metrics` | Optional JSON file containing extra metrics (e.g. benchmark stats) to merge into the report. |
 | `--return-column` | Which column represents realised returns; defaults to `realised_return`. |
 | `--no-equity` / `--no-distribution` | Disable chart generation to speed up quick summaries. |
+| `--charts-dir-name` | Custom name for the folder that stores generated charts (defaults to `<output>_assets`). |
 
 Reports automatically create a sibling folder (e.g. `latest_assets/`) that stores
 chart images referenced by the Markdown or HTML output. Both formats are

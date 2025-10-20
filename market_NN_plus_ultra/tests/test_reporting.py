@@ -66,3 +66,22 @@ def test_generate_report_infers_format(tmp_path: Path) -> None:
 
     assert out1.suffix == ".md"
     assert out2.suffix == ".html"
+
+
+def test_custom_charts_dir_name(tmp_path: Path) -> None:
+    predictions = _sample_predictions()
+    output = tmp_path / "report.md"
+    charts_dir = "custom_assets"
+
+    report_path = generate_markdown_report(
+        predictions,
+        output,
+        charts_dir_name=charts_dir,
+    )
+
+    assert report_path.exists()
+    custom_assets = tmp_path / charts_dir
+    assert custom_assets.exists()
+    assert any(p.suffix == ".png" for p in custom_assets.iterdir())
+    default_assets = tmp_path / "report_assets"
+    assert not default_assets.exists()

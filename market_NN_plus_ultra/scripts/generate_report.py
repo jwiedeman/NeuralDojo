@@ -49,6 +49,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--format", choices=["auto", "markdown", "html"], default="auto", help="Force report format")
     parser.add_argument("--no-equity", action="store_true", help="Disable equity curve chart")
     parser.add_argument("--no-distribution", action="store_true", help="Disable return distribution chart")
+    parser.add_argument(
+        "--charts-dir-name",
+        type=str,
+        help="Override the directory name used to store generated charts",
+    )
     return parser.parse_args()
 
 
@@ -73,6 +78,7 @@ def main() -> None:
         include_equity_chart=not args.no_equity,
         include_distribution_chart=not args.no_distribution,
         periods_per_year=args.periods_per_year,
+        charts_dir_name=args.charts_dir_name,
     )
 
 
