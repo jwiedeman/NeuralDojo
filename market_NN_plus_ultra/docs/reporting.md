@@ -106,6 +106,11 @@ print(guardrails["gross_exposure_peak"], guardrails["tail_return_quantile"])
 Combine guardrails with the standard ROI metrics to build dashboards that catch
 over-levered policies or fat-tailed behaviour before they reach production.
 
+Guardrail enforcement is now packaged in `market_nn_plus_ultra.trading.guardrails`.
+Load `GuardrailPolicy` with your YAML-configured thresholds to clip or audit
+trade logs locally, or call the new `/guardrails` FastAPI endpoint to receive
+scaled trades, metrics, and violation summaries directly from the service.
+
 ## Operations Readiness Summary
 
 `compile_operations_summary` brings risk metrics and guardrail diagnostics into

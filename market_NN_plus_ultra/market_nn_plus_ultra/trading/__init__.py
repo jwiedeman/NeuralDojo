@@ -1,5 +1,6 @@
 """Trading and inference utilities for Market NN Plus Ultra."""
 
+from .guardrails import GuardrailConfig, GuardrailPolicy, GuardrailResult, GuardrailViolation
 from .pnl import TradingCosts, differentiable_pnl, price_to_returns
 from .risk import (
     RiskMetrics,
@@ -22,6 +23,10 @@ __all__ = [
     "max_drawdown",
     "sharpe_ratio",
     "sortino_ratio",
+    "GuardrailConfig",
+    "GuardrailPolicy",
+    "GuardrailResult",
+    "GuardrailViolation",
 ]
 
 

@@ -38,6 +38,7 @@ from .config import (
     CurriculumConfig,
     CurriculumStage,
     DataConfig,
+    GuardrailConfig,
     DiagnosticsConfig,
     ExperimentConfig,
     ModelConfig,
@@ -726,6 +727,49 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
         trainer_section["checkpoint_dir"] = Path(trainer_section["checkpoint_dir"])
     trainer_cfg = TrainerConfig(**trainer_section)
 
+    guardrails_section = raw.get("guardrails")
+
+    def _optional_float(section: dict[str, object], key: str) -> float | None:
+        value = section.get(key)
+        if value is None:
+            return None
+        return float(value)
+
+    if guardrails_section is None:
+        guardrail_cfg = GuardrailConfig()
+    else:
+        guardrail_dict = dict(guardrails_section)
+        sector_caps = {
+            str(name): float(limit)
+            for name, limit in (guardrail_dict.get("sector_caps") or {}).items()
+        }
+        factor_caps = {
+            str(name): float(limit)
+            for name, limit in (guardrail_dict.get("factor_caps") or {}).items()
+        }
+        guardrail_cfg = GuardrailConfig(
+            enabled=bool(guardrail_dict.get("enabled", False)),
+            capital_base=float(guardrail_dict.get("capital_base", 1.0)),
+            tail_percentile=float(guardrail_dict.get("tail_percentile", 5.0)),
+            max_gross_exposure=_optional_float(guardrail_dict, "max_gross_exposure"),
+            max_net_exposure=_optional_float(guardrail_dict, "max_net_exposure"),
+            max_turnover=_optional_float(guardrail_dict, "max_turnover"),
+            min_tail_return=_optional_float(guardrail_dict, "min_tail_return"),
+            max_tail_frequency=_optional_float(guardrail_dict, "max_tail_frequency"),
+            max_symbol_exposure=_optional_float(guardrail_dict, "max_symbol_exposure"),
+            sector_caps=sector_caps,
+            sector_column=str(guardrail_dict.get("sector_column", "sector")),
+            factor_caps=factor_caps,
+            factor_column=str(guardrail_dict.get("factor_column", "factor")),
+            timestamp_col=str(guardrail_dict.get("timestamp_col", "timestamp")),
+            symbol_col=str(guardrail_dict.get("symbol_col", "symbol")),
+            notional_col=str(guardrail_dict.get("notional_col", "notional")),
+            position_col=str(guardrail_dict.get("position_col", "position")),
+            price_col=str(guardrail_dict.get("price_col", "price")),
+            return_col=str(guardrail_dict.get("return_col", "pnl")),
+            enforcement=str(guardrail_dict.get("enforcement", "clip")),
+        )
+
     pretraining_cfg: PretrainingConfig | None = None
     if "pretraining" in raw:
         pretraining_section = dict(raw["pretraining"])
@@ -786,6 +830,7 @@ def load_experiment_from_file(path: Path) -> ExperimentConfig:
         data=data_cfg,
         model=model_cfg,
         optimizer=optimizer_cfg,
+        guardrails=guardrail_cfg,
         trainer=trainer_cfg,
         wandb_project=raw.get("wandb_project"),
         wandb_entity=raw.get("wandb_entity"),

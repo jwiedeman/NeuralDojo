@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 import yaml
 from fastapi.testclient import TestClient
 
@@ -73,6 +74,13 @@ def _write_config(path: Path, db_path: Path) -> None:
             "checkpoint_dir": str(path.parent / "checkpoints"),
             "max_epochs": 5,
         },
+        "guardrails": {
+            "enabled": True,
+            "capital_base": 400.0,
+            "max_gross_exposure": 0.6,
+            "max_symbol_exposure": 0.6,
+            "sector_caps": {"tech": 0.5},
+        },
     }
     path.write_text(yaml.safe_dump(config), encoding="utf-8")
 
@@ -112,8 +120,39 @@ def test_service_endpoints(tmp_path: Path) -> None:
     assert predict_payload["telemetry"]["horizon"] == 4
     assert len(predict_payload["telemetry"]["feature_columns"]) == 5
     assert predict_payload["metrics"] is not None
+    guardrail_info = predict_payload["telemetry"].get("guardrails")
+    assert guardrail_info is not None
+    assert guardrail_info["enabled"] is True
+    assert guardrail_info["max_gross_exposure"] == pytest.approx(0.6)
 
     reload_resp = client.post("/reload", json={})
     assert reload_resp.status_code == 200
     reload_payload = reload_resp.json()
     assert reload_payload["checkpoint_path"] is None
+
+    trades = [
+        {
+            "timestamp": "2024-01-01T00:00:00Z",
+            "symbol": "TEST",
+            "sector": "tech",
+            "notional": 320.0,
+            "price": 10.0,
+            "position": 32.0,
+            "pnl": -12.0,
+        },
+        {
+            "timestamp": "2024-01-01T01:00:00Z",
+            "symbol": "TEST",
+            "sector": "tech",
+            "notional": 280.0,
+            "price": 10.0,
+            "position": 28.0,
+            "pnl": -8.0,
+        },
+    ]
+    guardrail_resp = client.post("/guardrails", json={"trades": trades})
+    assert guardrail_resp.status_code == 200
+    guardrail_payload = guardrail_resp.json()
+    assert guardrail_payload["scaled"] is True
+    assert guardrail_payload["violations"] == []
+    assert guardrail_payload["metrics"]["gross_exposure_peak"] <= 0.6 + 1e-6

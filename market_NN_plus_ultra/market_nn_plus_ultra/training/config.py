@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from ..data.alternative_data import AlternativeDataSpec
+from ..trading.guardrails import GuardrailConfig
 from ..trading.pnl import TradingCosts
 from .diagnostics import DiagnosticsThresholds
 
@@ -156,6 +157,7 @@ class ExperimentConfig:
     data: DataConfig
     model: ModelConfig
     optimizer: OptimizerConfig = field(default_factory=OptimizerConfig)
+    guardrails: GuardrailConfig = field(default_factory=GuardrailConfig)
     trainer: TrainerConfig = field(default_factory=TrainerConfig)
     diagnostics: DiagnosticsConfig = field(default_factory=DiagnosticsConfig)
     wandb_project: Optional[str] = None
