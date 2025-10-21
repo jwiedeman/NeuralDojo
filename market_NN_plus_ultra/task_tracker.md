@@ -142,16 +142,18 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-11-23): Introduced `RetrainingScheduler` with file-change detection and cooldown handling so dataset refreshes automatically trigger `run_retraining_plan`, complete with regression coverage in `tests/test_retraining_scheduler.py`.
 - [x] Ship analyst feedback annotation tooling so human reviewers can log decisions, rationales, and escalation context into SQLite for offline RL and reporting workflows.
   - Notes (2025-11-27): Released `market_nn_plus_ultra.reporting.annotations`, validation hooks, and `scripts/annotate_trades.py` with regression coverage and documentation updates so annotations feed PPO replay buffers, operations dashboards, and reporting automation without bespoke notebooks.
-- [ ] Set up online monitoring for live performance and drift detection. — Notes: Pending telemetry surface defined in Phase 4 Milestone 2.
+- [x] Set up online monitoring for live performance and drift detection. — Notes: Pending telemetry surface defined in Phase 4 Milestone 2.
   - Notes (2025-10-26): Matched diagnostics sampling cadence with Prometheus scrape intervals and scoped simulator latency histograms for alerting.
   - Notes (2025-10-28): Specified dashboard panels (calibration confidence, ROI trend, drawdown guardrails), alert routing rules, and dependencies on the service telemetry payload contract.
   - Notes (2025-10-29): Drafted alert playbooks with escalation timing, synchronised metric namespaces with service planning, and catalogued synthetic drift scenarios for end-to-end monitoring tests.
   - Notes (2025-11-04): Locked profitability reporting payload schema IDs with the service planning thread, reserved telemetry pagination retry semantics, and ensured monitoring dashboards can ingest the new diagnostics aggregates without schema churn.
+  - Notes (2025-11-30): Landed `market_nn_plus_ultra.monitoring` with drift/risk snapshots, Prometheus exporters, and CLI tooling (`scripts/monitoring/live_monitor.py`) so live runs can stream alerts and dashboard metrics.
 - [ ] Build playbook for human-in-the-loop overrides and risk manager approvals. — Notes: Drafting outline alongside analyst feedback tooling requirements.
   - Notes (2025-10-26): Added placeholders for calibration-confidence dashboards and simulator what-if analyses to inform override decisions.
   - Notes (2025-10-28): Defined escalation tree integrating monitoring alerts with analyst annotations, added rollback SOP referencing checkpoint lineage, and documented review cadence expectations.
   - Notes (2025-10-29): Outlined approval runbooks tied to guardrail violations, mapped decision logging to analyst feedback tooling, and scheduled doc reviews alongside monitoring/service milestones.
   - Notes (2025-11-04): Captured telemetry ownership assignments (diagnostics parquet, simulator traces) so override workflows can surface provenance and profitability context during reviews.
+  - Notes (2025-11-30): Monitoring documentation (`docs/monitoring.md`) now anchors override guidance with live alert semantics, paving the way for the consolidated playbook.
 - [ ] Integrate live monitoring, automated reporting, and risk guardrails into a single operations playbook for extend/branch decisions. — Notes: Will consolidate once reporting, monitoring, and guardrail milestones reach MVP.
   - Notes (2024-02-25): Operations playbook will surface optimisation KPIs (latency, calibration, guardrail triggers) defined in the implementation plan so deployment readiness decisions remain data-driven.
   - Notes (2025-10-26): Synced reporting and monitoring schema drafts to ensure playbook embeds linked dashboards and playback logs without refactors.
