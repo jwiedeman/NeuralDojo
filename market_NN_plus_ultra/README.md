@@ -157,6 +157,19 @@ The commands below take you from a fresh clone to running both training and infe
 
    The benchmarking CLI disables Weights & Biases logging by default, runs each scenario sequentially, and emits a parquet catalogue under `benchmarks/` capturing dataset stats, runtime, and validation metrics for downstream analysis. Use `--enable-wandb` when you want each run to report into your tracking workspace.
 
+7. **Automate retraining with the orchestration CLI**
+
+   ```bash
+   python scripts/automation/retrain.py \
+       --dataset data/market.db \
+       --train-config configs/default.yaml \
+       --pretrain-config configs/pretrain.yaml \
+       --run-reinforcement \
+       --warm-start training
+   ```
+
+   The command above validates the SQLite dataset, optionally regenerates regime labels, runs pretraining, launches supervised training, and finishes with PPO fine-tuning. Artifacts land under `automation_runs/<timestamp>/`, including checkpoints, profitability summaries, and policy state dicts. Add flags such as `--regenerate-regimes`, `--skip-pretraining`, or `--skip-training` to tailor individual stages.
+
 ## Windows vs. WSL
 
 You can run the project either directly in Windows or inside Windows Subsystem for Linux (WSL):
