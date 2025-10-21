@@ -1,5 +1,12 @@
 """Evaluation utilities for Market NN Plus Ultra."""
 
+from .benchmarking import (
+    ArchitectureSummary,
+    format_markdown_table,
+    load_benchmark_frames,
+    summarise_architecture_performance,
+    summaries_to_frame,
+)
 from .metrics import (
     calmar_ratio,
     compute_equity_curve,
@@ -35,6 +42,11 @@ from .walkforward import (
 )
 
 __all__ = [
+    "ArchitectureSummary",
+    "format_markdown_table",
+    "load_benchmark_frames",
+    "summarise_architecture_performance",
+    "summaries_to_frame",
     "calmar_ratio",
     "compute_equity_curve",
     "downside_deviation",
