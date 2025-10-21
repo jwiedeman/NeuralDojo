@@ -43,6 +43,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * **2025-11-15 — PPO risk & cost overrides:** Expanded `scripts/rl_finetune.py` to expose activation, trading-cost, and risk-objective overrides with regression coverage, ensuring reinforcement experiments can tune reward shaping and execution assumptions directly from the CLI.
 * **2025-11-16 — PPO telemetry batching release:** Instrumented `market_nn_plus_ultra.training.reinforcement` with `RolloutTelemetry`, aggregated throughput/reward dispersion metrics across parallel rollout workers, refreshed the CLI summary, and expanded regression coverage so distributed profiling captures collection latency and sample rates alongside reward statistics.
 * **2025-11-17 — PPO curriculum release:** Wired PPO fine-tuning to honour dataset curriculum schedules, record per-update curriculum metadata, and added a CLI `--curriculum-profile` inspector so researchers can review staged window/horizon changes before launching runs.
+* **2025-11-18 — Reporting enrichment:** Completed the automated run-report upgrades with profitability summaries, attribution tables, scenario analysis, and bootstrapped confidence intervals, refreshing the CLI, documentation, and regression coverage so evaluation artefacts are investor-ready out of the box.
 
 ## Phase 1 — Data & Feature Depth (Weeks 1-2)
 
@@ -228,7 +229,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 
 **Milestones**
 
-1. **Run reporting** — Extend `scripts/generate_report.py` to incorporate backtest charts, attribution tables, scenario analysis, profitability summaries, and bootstrapped confidence intervals so every long training session outputs actionable ROI, Sharpe, and drawdown diagnostics. Emit both HTML and lightweight Markdown outputs. **Status:** 🚧 In Progress — baseline charts and metric exports are live; instrumentation now targets attribution tables and scenario analysis overlays.
+1. **Run reporting** — Extend `scripts/generate_report.py` to incorporate backtest charts, attribution tables, scenario analysis, profitability summaries, and bootstrapped confidence intervals so every long training session outputs actionable ROI, Sharpe, and drawdown diagnostics. Emit both HTML and lightweight Markdown outputs. **Status:** ✅ Completed — reports now bundle profitability snapshots, per-symbol attribution, scenario analysis (drawdown, best/worst windows), and bootstrapped confidence intervals with refreshed documentation and regression coverage.
    - *Notes (2024-03-05):* Enumerate telemetry inputs produced by the forthcoming diagnostics callbacks, map them to report sections, and draft a sample outline so implementation can start as soon as stability tooling lands.
    - *Notes (2024-03-08):* Extend the outline to reference schema validation artefacts (per-table failure summaries, CLI strict-mode logs) so automated reports surface data-quality provenance alongside performance metrics.
    - *Implementation notes (2025-10-18):* (a) Define templating slots for calibration drift, gradient noise, and PPO warm-start diagnostics, (b) script fixture-backed snapshot tests for Markdown/HTML parity, and (c) capture performance budgets to keep report generation under five minutes for 24 GB runs.

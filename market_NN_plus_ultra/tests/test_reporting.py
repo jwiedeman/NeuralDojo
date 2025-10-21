@@ -39,6 +39,10 @@ def test_generate_markdown_report(tmp_path: Path) -> None:
     contents = report_path.read_text(encoding="utf-8")
     assert "Test Report" in contents
     assert "Sharpe" in contents
+    assert "## Profitability Summary" in contents
+    assert "## Attribution by Symbol" in contents
+    assert "## Scenario Analysis" in contents
+    assert "## Bootstrapped Confidence Intervals" in contents
 
     assets_dir = tmp_path / "report_assets"
     assert assets_dir.exists()
@@ -77,6 +81,10 @@ def test_generate_html_report(tmp_path: Path) -> None:
     assert "<!DOCTYPE html>" in html
     assert "HTML Report" in html
     assert "table" in html
+    assert "<h2>Profitability Summary</h2>" in html
+    assert "<h2>Attribution by Symbol</h2>" in html
+    assert "<h2>Scenario Analysis</h2>" in html
+    assert "<h2>Bootstrapped Confidence Intervals</h2>" in html
 
 
 def test_html_includes_milestones(tmp_path: Path) -> None:

@@ -2,8 +2,9 @@
 
 The Market NN Plus Ultra stack now ships with a lightweight reporting utility
 that turns model predictions into investor-friendly summaries. Reports combine
-risk metrics, equity curves, and return distributions to highlight how a
-strategy behaves across time.
+profitability snapshots, attribution tables, scenario analysis, risk metrics,
+equity curves, return distributions, and bootstrapped confidence intervals to
+highlight how a strategy behaves across time.
 
 ## CLI Usage
 
@@ -34,6 +35,25 @@ Reports automatically create a sibling folder (e.g. `latest_assets/`) that store
 chart images referenced by the Markdown or HTML output. Both formats are
 designed to drop directly into research notebooks, investor letters, or PRDs.
 
+## Report Contents
+
+Every generated report contains the following sections:
+
+* **Overview** — dataset size, symbols covered, and backtest window.
+* **Risk Metrics** — Sharpe, Sortino, drawdown, volatility, and other ROI
+  diagnostics.
+* **Profitability Summary** — total and annualised returns, volatility,
+  hit rate, best/worst periods, and trade counts.
+* **Attribution by Symbol** — per-ticker sample weights, average returns,
+  cumulative PnL, and contribution percentages so desk leads can spot the
+  assets driving performance or losses.
+* **Scenario Analysis** — worst drawdown window plus best and worst periods
+  with timestamps and symbols for quick drill-downs.
+* **Bootstrapped Confidence Intervals** — 95% intervals for total return,
+  annualised return, and Sharpe derived from thousands of bootstrap resamples.
+* **Visualisations** — equity and return-distribution charts saved alongside
+  the report.
+
 When milestones are supplied—either via the CLI flag or the Python API—the report
 adds a **Research Agenda Alignment** section that links the run back to the
 living roadmap in `docs/research_agenda.md`. Each milestone entry supports
@@ -44,8 +64,9 @@ reports with the roadmap slice they unlock.
 
 `python scripts/train.py ...` now emits lightweight profitability summaries for
 every supervised training run. Once validation completes, the Lightning module
-aggregates ROI, Sharpe, and maximum drawdown across the epoch and writes two
-artefacts next to the configured checkpoint directory:
+aggregates ROI, Sharpe, maximum drawdown, scenario highlights, and confidence
+intervals across the epoch and writes two artefacts next to the configured
+checkpoint directory:
 
 * `profitability_summary.json` — machine-friendly metrics for automation.
 * `profitability_summary.md` — a Markdown table ready for experiment notebooks
