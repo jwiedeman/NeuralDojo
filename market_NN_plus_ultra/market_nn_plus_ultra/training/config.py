@@ -213,6 +213,8 @@ class ReinforcementConfig:
     costs: Optional[TradingCosts] = None
     risk_objective: RiskObjectiveConfig = field(default_factory=RiskObjectiveConfig)
     replay_buffer: ReplayBufferConfig = field(default_factory=ReplayBufferConfig)
+    rollout_workers: int = 1
+    worker_device: str = "cpu"
 
 
 @dataclass(slots=True)
