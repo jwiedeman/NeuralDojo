@@ -187,5 +187,17 @@ class MarketNNPlusUltraAgent:
             metrics = self.evaluate_predictions(predictions, return_column=return_column)
         return AgentRunResult(predictions=predictions, metrics=metrics)
 
+    @property
+    def feature_columns(self) -> list[str]:
+        """Return the feature column names used during inference."""
+
+        return list(self._feature_columns)
+
+    @property
+    def dataset(self) -> Optional[SlidingWindowDataset]:
+        """Expose the cached dataset when it has been prepared."""
+
+        return self._dataset
+
 
 __all__ = ["MarketNNPlusUltraAgent", "AgentRunResult"]

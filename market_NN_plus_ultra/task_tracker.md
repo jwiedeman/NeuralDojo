@@ -125,10 +125,11 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-10-26): Drafted base-image requirements bundling diagnostics tooling and simulator dependencies to minimise integration friction once implementation begins.
   - Notes (2025-10-28): Selected candidate CUDA runtime baselines aligned with profiler expectations and listed smoke tests (dataset build, diagnostics callback, PPO rollout) containers must execute before publishing.
   - Notes (2025-10-29): Documented container layer caching strategy for telemetry artefacts, outlined GPU runtime validation scripts, and coordinated dependency pinning with upcoming service scaffolding.
-- [ ] Expose REST/gRPC service that mirrors the existing market agent API but uses the new brain. — Notes: Capturing parity requirements while Phase 3 service scaffold is planned.
+- [x] Expose REST/gRPC service that mirrors the existing market agent API but uses the new brain. — Notes: Capturing parity requirements while Phase 3 service scaffold is planned.
   - Notes (2025-10-26): Outlined telemetry payload schema aligning calibration heads, PPO warm starts, and simulator metrics for service contract readiness.
   - Notes (2025-10-28): Sketched streaming inference mode for multi-horizon forecasts, defined pagination contract for telemetry attachments, and logged authentication hooks required for deployment parity.
   - Notes (2025-10-29): Scheduled API review with monitoring/reporting leads, mapped response schema versioning to deployment automation, and prepared stub tests covering backward-compatible payloads.
+  - Notes (2025-11-18): FastAPI service shipped via `market_nn_plus_ultra.service` with prediction/configuration/curriculum/reload endpoints, regression coverage in `tests/test_service.py`, and CLI launcher `scripts/service.py` for local uvicorn runs.
 - [ ] Schedule continuous retraining jobs triggered by new data arrival. — Notes: Will reuse orchestration DAG from Phase 3 Milestone 4 once prototyped.
   - Notes (2025-10-26): Scheduled spike for diagnostics ingestion operator and defined retry semantics for warm-start stages.
   - Notes (2025-10-28): Added change-data-capture polling requirements, calibration-drift alert thresholds, and storage budgets for rolling checkpoint windows.
@@ -196,6 +197,12 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 * Ran deterministic simulator kernel smoke tests, capturing latency bucket histograms and validating telemetry payload schemas ahead of PPO integration.
 * Locked profitability reporting payload contracts and propagated schema identifiers to service/orchestration planning to keep monitoring dashboards in sync.
 * Sketched orchestration DAG skeletons for simulator smoke tests and profitability report generation with retry/idempotency notes and planned fixture-backed regression coverage.
+
+### Active Work Log — 2025-11-18
+
+* Released the FastAPI-based inference service with prediction/configuration/curriculum/reload endpoints and telemetry snapshots.
+* Added regression coverage via `tests/test_service.py` validating health, curriculum, prediction, and reload flows against a synthetic SQLite fixture.
+* Documented the `scripts/service.py` launcher for uvicorn deployments and recorded service completion against the implementation log.
 
 ### Active Work Log — 2025-11-09
 

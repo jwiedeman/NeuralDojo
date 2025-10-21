@@ -188,6 +188,14 @@ The commands below take you from a fresh clone to running both training and infe
 
    The command above validates the SQLite dataset, optionally regenerates regime labels, runs pretraining, launches supervised training, and finishes with PPO fine-tuning. Artifacts land under `automation_runs/<timestamp>/`, including checkpoints, profitability summaries, and policy state dicts. Add flags such as `--regenerate-regimes`, `--skip-pretraining`, or `--skip-training` to tailor individual stages.
 
+9. **Serve the inference API**
+
+   ```bash
+   python scripts/service.py --config configs/default.yaml --host 0.0.0.0 --port 8000
+   ```
+
+   The FastAPI service loads the same experiment configuration as the CLI agent and exposes `/health`, `/config`, `/curriculum`, `/predict`, and `/reload` endpoints. Override defaults with flags such as `--checkpoint`, `--device`, or `--max-prediction-rows` when deploying. Responses include telemetry snapshots (feature columns, horizon, window size) so monitoring dashboards can ingest predictions without extra glue code.
+
 ## Windows vs. WSL
 
 You can run the project either directly in Windows or inside Windows Subsystem for Linux (WSL):
