@@ -88,6 +88,48 @@ def test_live_monitor_cli_runs(tmp_path: Path, suffix: str):
     assert set(payload["risk"]).issuperset({"sharpe", "max_drawdown"})
 
 
+def test_live_monitor_cli_with_operations_summary(tmp_path: Path):
+    reference = pd.DataFrame({"realised_return": np.linspace(-0.01, 0.02, 16)})
+    predictions = pd.DataFrame({"realised_return": np.linspace(-0.01, 0.02, 16)})
+
+    reference_path = tmp_path / "reference.parquet"
+    predictions_path = tmp_path / "predictions.parquet"
+    reference.to_parquet(reference_path)
+    predictions.to_parquet(predictions_path)
+
+    operations_payload = {
+        "risk": {"roi": 0.0125, "sharpe": 1.2, "max_drawdown": -0.04},
+        "guardrails": {"gross_exposure_peak": 1.1},
+        "triggered": ["Gross exposure peak 1.100 exceeded limit 1.000"],
+    }
+    operations_path = tmp_path / "operations.json"
+    operations_path.write_text(json.dumps(operations_payload), encoding="utf-8")
+
+    output = tmp_path / "snapshot.json"
+
+    from market_NN_plus_ultra.scripts.monitoring.live_monitor import main
+
+    code = main(
+        [
+            str(reference_path),
+            "--predictions",
+            str(predictions_path),
+            "--operations-summary",
+            str(operations_path),
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert code == 0
+    payload = json.loads(output.read_text())
+    assert pytest.approx(payload["risk"]["roi"]) == operations_payload["risk"]["roi"]
+    assert payload["alerts"] == operations_payload["triggered"]
+    assert pytest.approx(payload["guardrails"]["gross_exposure_peak"]) == operations_payload["guardrails"][
+        "gross_exposure_peak"
+    ]
+
+
 def test_prometheus_exporter_updates_metrics():
     prometheus_client = pytest.importorskip("prometheus_client")
     registry = prometheus_client.CollectorRegistry()
