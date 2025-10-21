@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
 import pandas as pd
 import torch
 
@@ -168,23 +169,57 @@ class MarketNNPlusUltraAgent:
             frame = frame.sort_values(["symbol", "window_end"]).reset_index(drop=True)
         return frame
 
-    def evaluate_predictions(self, predictions: pd.DataFrame, return_column: str = "realised_return") -> dict[str, float]:
-        """Compute risk metrics on a column of realised returns."""
+    def evaluate_predictions(
+        self,
+        predictions: pd.DataFrame,
+        return_column: str = "realised_return",
+        benchmark_column: str | None = None,
+    ) -> dict[str, float]:
+        """Compute risk metrics on realised returns (optionally vs. a benchmark)."""
 
         if return_column not in predictions:
             raise ValueError(f"Column '{return_column}' not found in predictions DataFrame")
-        returns = predictions[return_column].to_numpy()
-        metrics = risk_metrics(returns)
+        returns_series = pd.to_numeric(predictions[return_column], errors="coerce")
+
+        benchmark_array: np.ndarray | None = None
+        if benchmark_column is not None:
+            if benchmark_column not in predictions:
+                raise ValueError(
+                    f"Column '{benchmark_column}' not found in predictions DataFrame"
+                )
+            benchmark_series = pd.to_numeric(predictions[benchmark_column], errors="coerce")
+            aligned = pd.concat(
+                [
+                    returns_series.rename("__returns"),
+                    benchmark_series.rename("__benchmark"),
+                ],
+                axis=1,
+            ).dropna()
+            returns_array = aligned["__returns"].to_numpy(dtype=np.float64)
+            benchmark_array = aligned["__benchmark"].to_numpy(dtype=np.float64)
+        else:
+            returns_array = returns_series.dropna().to_numpy(dtype=np.float64)
+
+        metrics = risk_metrics(returns_array, benchmark_returns=benchmark_array)
         return sanitize_metrics(metrics)
 
-    def run(self, evaluate: bool = True, return_column: str = "realised_return") -> AgentRunResult:
+    def run(
+        self,
+        evaluate: bool = True,
+        return_column: str = "realised_return",
+        benchmark_column: str | None = None,
+    ) -> AgentRunResult:
         """Convenience wrapper that prepares data, generates signals, and evaluates."""
 
         dataset = self.prepare_dataset()
         predictions = self.generate_signals(dataset)
         metrics = None
         if evaluate and not predictions.empty and return_column in predictions.columns:
-            metrics = self.evaluate_predictions(predictions, return_column=return_column)
+            metrics = self.evaluate_predictions(
+                predictions,
+                return_column=return_column,
+                benchmark_column=benchmark_column,
+            )
         return AgentRunResult(predictions=predictions, metrics=metrics)
 
     @property

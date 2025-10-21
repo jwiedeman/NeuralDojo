@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from market_nn_plus_ultra.evaluation import (
     OperationsThresholds,
@@ -22,6 +23,24 @@ def test_compile_operations_summary_without_trades_returns_risk_only() -> None:
     assert "risk" in payload
     assert "guardrails" not in payload
     assert payload["risk"]["sharpe"] == summary.risk["sharpe"]
+
+
+def test_compile_operations_summary_with_benchmark_includes_excess_metrics() -> None:
+    predictions = pd.DataFrame(
+        {
+            "window_end": pd.date_range("2025-01-01", periods=4, freq="D"),
+            "realised_return": [0.01, -0.015, 0.02, 0.005],
+            "benchmark_return": [0.008, -0.01, 0.012, 0.003],
+        }
+    )
+
+    summary = compile_operations_summary(predictions, benchmark_col="benchmark_return")
+
+    assert "information_ratio" in summary.risk
+    assert "tracking_error" in summary.risk
+    assert "beta" in summary.risk
+    assert "alpha" in summary.risk
+    assert summary.risk["average_excess_return"] == pytest.approx(0.00175)
 
 
 def test_compile_operations_summary_triggers_thresholds() -> None:

@@ -34,6 +34,7 @@ class ServiceSettings:
     device: str = "cpu"
     evaluate_by_default: bool = True
     return_column: str = "realised_return"
+    benchmark_column: str | None = None
     max_prediction_rows: Optional[int] = 1024
 
     def __post_init__(self) -> None:
@@ -52,6 +53,10 @@ class PredictionRequest(BaseModel):
     return_column: str | None = Field(
         default=None,
         description="Optional realised-return column name for evaluation metrics.",
+    )
+    benchmark_column: str | None = Field(
+        default=None,
+        description="Optional benchmark return column for excess metrics.",
     )
     limit: int | None = Field(
         default=None,
@@ -176,13 +181,23 @@ class ServiceState:
             )
             set_guardrail_enabled(self._guardrail_policy is not None)
 
-    def run_agent(self, *, evaluate: bool, return_column: str) -> tuple[AgentRunResult, dict[str, Any]]:
+    def run_agent(
+        self,
+        *,
+        evaluate: bool,
+        return_column: str,
+        benchmark_column: str | None,
+    ) -> tuple[AgentRunResult, dict[str, Any]]:
         """Execute the agent and capture telemetry for responses."""
 
         with self._lock:
             if self._agent is None:
                 raise RuntimeError("Agent not initialised")
-            result = self._agent.run(evaluate=evaluate, return_column=return_column)
+            result = self._agent.run(
+                evaluate=evaluate,
+                return_column=return_column,
+                benchmark_column=benchmark_column,
+            )
             telemetry = self._build_telemetry(result)
             return result, telemetry
 
@@ -308,12 +323,14 @@ def create_app(settings: ServiceSettings) -> FastAPI:
         with RequestTimer("predict", "POST") as timer:
             evaluate = request.evaluate if request.evaluate is not None else settings.evaluate_by_default
             return_column = request.return_column or settings.return_column
+            benchmark_column = request.benchmark_column or settings.benchmark_column
 
             try:
                 result, telemetry = await run_in_threadpool(
                     service_state.run_agent,
                     evaluate=evaluate,
                     return_column=return_column,
+                    benchmark_column=benchmark_column,
                 )
             except ValueError as exc:
                 timer.set_status(400)

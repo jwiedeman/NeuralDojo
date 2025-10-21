@@ -28,6 +28,7 @@ Key flags:
 | `--metrics` | Optional JSON file containing extra metrics (e.g. benchmark stats) to merge into the report. |
 | `--milestones` | JSON file referencing research agenda milestones to surface in the generated narrative. |
 | `--return-column` | Which column represents realised returns; defaults to `realised_return`. |
+| `--benchmark-column` | Optional benchmark return column to compute excess return, tracking error, beta, and information ratio metrics. |
 | `--no-equity` / `--no-distribution` | Disable chart generation to speed up quick summaries. |
 | `--charts-dir-name` | Custom name for the folder that stores generated charts (defaults to `<output>_assets`). |
 
@@ -41,7 +42,9 @@ Every generated report contains the following sections:
 
 * **Overview** — dataset size, symbols covered, and backtest window.
 * **Risk Metrics** — Sharpe, Sortino, drawdown, volatility, and other ROI
-  diagnostics.
+  diagnostics. When a benchmark column is supplied the report also includes
+  excess return, tracking error, information ratio, beta, and benchmark
+  correlation statistics.
 * **Profitability Summary** — total and annualised returns, volatility,
   hit rate, best/worst periods, and trade counts.
 * **Attribution by Symbol** — per-ticker sample weights, average returns,
@@ -130,8 +133,8 @@ recomputing statistics downstream.
 
 `compile_operations_summary` brings risk metrics and guardrail diagnostics into
 one payload that operations teams can consume before approving a rollout. Feed
-it the evaluation returns plus an optional trade log and, when desired, a set of
-thresholds that codify your guardrails:
+it the evaluation returns, optionally pass a benchmark column and trade log, and
+when desired supply a set of thresholds that codify your guardrails:
 
 ```python
 from market_nn_plus_ultra.evaluation import (
@@ -142,6 +145,7 @@ from market_nn_plus_ultra.evaluation import (
 summary = compile_operations_summary(
     predictions_df,
     trades_df,
+    benchmark_col="benchmark_return",
     capital_base=5_000_000,
     thresholds=OperationsThresholds(
         min_sharpe=1.0,
@@ -155,9 +159,14 @@ summary = compile_operations_summary(
 
 if summary.triggered:
     print("Run blocked:")
-    for alert in summary.triggered:
-        print(" -", alert)
+for alert in summary.triggered:
+    print(" -", alert)
 ```
+
+The same helper powers the `scripts/operations_summary.py` CLI for quick JSON
+summaries. Pass `--benchmark-column` when invoking the CLI to add excess return,
+tracking error, information ratio, and beta diagnostics alongside the standard
+Sharpe and drawdown outputs.
 
 ## Analyst Feedback Workflow
 
