@@ -44,6 +44,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-10-29): Prioritised telemetry ingestion automation, lined up profiler trace storage budgets, and scheduled dry-run sweeps using reduced fixtures to validate harness changes before full GPU allocation.
   - Notes (2025-11-05): Captured benchmark configs under `configs/benchmarks/`, logged profiler placeholders in `docs/benchmarks/architecture_sweep.md`, and added regression coverage in `tests/benchmarks/test_architecture_sweep.py`; telemetry remains pending dedicated GPU allocation.
   - Notes (2025-11-14): Added aggregation utilities (`evaluation.benchmarking`, `scripts/benchmarks/summarise_architecture_sweep.py`) and regression tests so GPU outputs can be collapsed into Omni vs. hybrid comparisons immediately after runs complete.
+  - Notes (2025-11-19): Extended the summarisation CLI with grouped leaderboard exports and documented the workflow so omni vs. hybrid prioritisation can happen before 4090 hardware comes online.
 - [x] Pretrain on masked time-series reconstruction before supervised fine-tuning (`scripts/pretrain.py`).
 - [ ] Benchmark pretraining checkpoints vs. scratch initialisation across asset classes. — Notes: Will run after schema enforcement lands to guarantee clean fixtures.
    - Notes (2025-10-26): Defined evaluation splits aligned with diagnostics outputs so calibration drift and gradient-noise comparisons remain reproducible.

@@ -7,6 +7,8 @@ import pandas as pd
 import pytest
 
 from market_nn_plus_ultra.evaluation.benchmarking import (
+    architecture_leaderboard,
+    dataframe_to_markdown,
     format_markdown_table,
     load_benchmark_frames,
     summarise_architecture_performance,
@@ -19,6 +21,7 @@ def _sample_frame() -> pd.DataFrame:
         {
             "architecture": ["omni", "omni", "hybrid"],
             "label": ["omni-small", "omni-large", "hybrid"],
+            "dataset_universe": ["equities", "crypto", "equities"],
             "metric_val_loss": [0.12, 0.10, 0.15],
             "duration_seconds": [12.0, 20.0, 8.0],
             "profitability_roi": [0.05, 0.08, 0.04],
@@ -91,6 +94,33 @@ def test_summary_cli_writes_markdown(tmp_path: Path, capsys: pytest.CaptureFixtu
     assert "hybrid" in text
 
 
+def test_summary_cli_leaderboard_support(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    module = _load_summary_cli()
+    frame = _sample_frame()
+    input_path = tmp_path / "benchmark.csv"
+    frame.to_csv(input_path, index=False)
+
+    leaderboard_path = tmp_path / "leaderboard.md"
+    exit_code = module.main(
+        [
+            str(input_path),
+            "--leaderboard-group-by",
+            "dataset_universe",
+            "--leaderboard-top-k",
+            "1",
+            "--leaderboard-output",
+            str(leaderboard_path),
+        ]
+    )
+
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert "Leaderboard" in captured.out
+    assert leaderboard_path.exists()
+    leaderboard_text = leaderboard_path.read_text(encoding="utf-8")
+    assert "dataset_universe" in leaderboard_text
+
+
 def test_summaries_to_frame_round_trips() -> None:
     frame = _sample_frame()
     summaries = summarise_architecture_performance(frame)
@@ -102,3 +132,45 @@ def test_summaries_to_frame_round_trips() -> None:
         "median_metric",
     }
     assert summary_frame.shape[0] == 2
+
+
+def test_architecture_leaderboard_groups_and_ranks() -> None:
+    frame = pd.DataFrame(
+        {
+            "architecture": ["omni", "hybrid", "omni", "state"],
+            "label": ["omni-eq", "hybrid-eq", "omni-crypto", "state-crypto"],
+            "dataset_universe": ["equities", "equities", "crypto", "crypto"],
+            "metric_val_loss": [0.1, 0.12, 0.2, 0.18],
+            "duration_seconds": [12.0, 8.0, 16.0, 10.0],
+        }
+    )
+
+    leaderboard = architecture_leaderboard(
+        frame,
+        metric="metric_val_loss",
+        higher_is_better=False,
+        group_by=("dataset_universe",),
+        top_k=2,
+    )
+
+    assert set(leaderboard["dataset_universe"]) == {"equities", "crypto"}
+    equities = leaderboard[leaderboard["dataset_universe"] == "equities"].sort_values("rank")
+    assert equities.iloc[0]["architecture"] == "omni"
+    assert equities.iloc[0]["rank"] == 1
+    assert equities.iloc[0]["metric_val_loss"] == pytest.approx(0.1)
+    assert equities.iloc[1]["architecture"] == "hybrid"
+    assert equities.iloc[1]["rank"] == 2
+
+
+def test_dataframe_to_markdown_renders_expected_headers() -> None:
+    frame = pd.DataFrame(
+        {
+            "group": ["equities"],
+            "rank": [1],
+            "architecture": ["omni"],
+            "metric_val_loss": [0.123456],
+        }
+    )
+    markdown = dataframe_to_markdown(frame)
+    assert "| group |" in markdown
+    assert "omni" in markdown
