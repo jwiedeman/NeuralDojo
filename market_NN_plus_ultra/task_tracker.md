@@ -32,6 +32,8 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-10-27): Added pairing matrix, regime-aware workflow checklist, and CLI toggle coverage so research teams can enable fused bundles without bespoke notebooks.
 - [x] Surface dependency errors with structured logging for experiment reproducibility. (PR TBD)
 - [x] Seed registry with higher-moment statistics and spectral energy factors.
+- Notes (2025-11-21): Shipped `scripts/operations_summary.py` so operations teams can export the readiness summary JSON without
+  writing bespoke notebooks.
 
 ## 1. Deep Temporal Modelling
 - [x] Implement TemporalFusionTransformer-style encoder with multi-horizon support.
