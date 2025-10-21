@@ -217,10 +217,138 @@ def format_markdown_table(
     return "\n".join(rows)
 
 
+def _normalise_group_by(group_by: Sequence[str] | None) -> list[str]:
+    if group_by is None:
+        return []
+    return [column for column in group_by if column]
+
+
+def _format_float(value: float | None, precision: int = 6) -> str:
+    if value is None:
+        return "—"
+    formatted = f"{value:.{precision}f}"
+    return formatted.rstrip("0").rstrip(".") if "." in formatted else formatted
+
+
+def architecture_leaderboard(
+    frame: pd.DataFrame,
+    *,
+    metric: str = "metric_val_loss",
+    higher_is_better: bool = False,
+    group_by: Sequence[str] | None = None,
+    top_k: int = 3,
+) -> pd.DataFrame:
+    """Return the top-performing scenarios per group for rapid comparisons.
+
+    This helper collapses raw benchmark rows into a leaderboard that highlights
+    the strongest performing architectures per asset universe or fixture group.
+    It is especially useful when triaging GPU runs for the omni-scale backbone
+    and hybrid baselines: instead of manually inspecting large parquet files,
+    the leaderboard surfaces the best-performing runs per configuration bucket
+    using the requested metric.
+
+    Parameters
+    ----------
+    frame:
+        Benchmark rows emitted by :mod:`scripts/benchmarks/architecture_sweep.py`.
+    metric:
+        Column name used to rank rows (defaults to ``metric_val_loss``).
+    higher_is_better:
+        Whether larger metric values indicate better performance.
+    group_by:
+        Optional sequence of column names used to build independent leaderboards.
+        When omitted the entire frame is considered one group.
+    top_k:
+        Number of rows to include per group. Must be positive.
+    """
+
+    if frame.empty:
+        raise ValueError("Benchmark frame is empty; nothing to rank")
+    if top_k <= 0:
+        raise ValueError("top_k must be positive")
+
+    _ensure_column(frame, metric)
+    group_columns = _normalise_group_by(group_by)
+    for column in group_columns:
+        _ensure_column(frame, column)
+
+    ascending = not higher_is_better
+    groups: Iterable[tuple[tuple[object, ...], pd.DataFrame]]
+    if group_columns:
+        groups = (
+            (key if isinstance(key, tuple) else (key,), group.copy())
+            for key, group in frame.groupby(group_columns, sort=False, dropna=False)
+        )
+    else:
+        groups = [(("all",), frame.copy())]
+
+    rows: list[dict[str, object]] = []
+    for key, group in groups:
+        group = group.copy()
+        group[metric] = pd.to_numeric(group[metric], errors="coerce")
+        group = group.dropna(subset=[metric])
+        if group.empty:
+            continue
+
+        sorted_group = group.sort_values(metric, ascending=ascending)
+        limited = sorted_group.head(top_k)
+        for rank, (_, row) in enumerate(limited.iterrows(), start=1):
+            record: dict[str, object] = {
+                "rank": rank,
+                "architecture": row.get("architecture"),
+                "label": row.get("label") or row.get("scenario"),
+                metric: float(row[metric]),
+                "duration_seconds": _coerce_float(row.get("duration_seconds")),
+                "best_model_path": row.get("best_model_path"),
+            }
+            for column, value in zip(group_columns or ["group"], key):
+                record[column] = value
+            rows.append(record)
+
+    if not rows:
+        raise ValueError("No benchmark rows contained finite metric values")
+
+    leaderboard_frame = pd.DataFrame(rows)
+    column_order = list(group_columns or ["group"]) + [
+        "rank",
+        "architecture",
+        "label",
+        metric,
+        "duration_seconds",
+        "best_model_path",
+    ]
+    existing_columns = [column for column in column_order if column in leaderboard_frame.columns]
+    leaderboard_frame = leaderboard_frame[existing_columns]
+    return leaderboard_frame
+
+
+def dataframe_to_markdown(frame: pd.DataFrame) -> str:
+    """Render a :class:`~pandas.DataFrame` as a Markdown table."""
+
+    columns = list(frame.columns)
+    header = "| " + " | ".join(columns) + " |"
+    separator = "| " + " | ".join("---" for _ in columns) + " |"
+    rows = [header, separator]
+    for _, row in frame.iterrows():
+        cells = []
+        for column in columns:
+            value = row[column]
+            if isinstance(value, float) and not math.isnan(value):
+                cells.append(_format_float(value))
+            elif pd.isna(value):
+                cells.append("—")
+            else:
+                cells.append(str(value))
+        rows.append("| " + " | ".join(cells) + " |")
+    return "\n".join(rows)
+
+
 __all__ = [
     "ArchitectureSummary",
+    "architecture_leaderboard",
     "summarise_architecture_performance",
     "load_benchmark_frames",
     "summaries_to_frame",
     "format_markdown_table",
+    "dataframe_to_markdown",
 ]

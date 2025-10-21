@@ -76,3 +76,23 @@ Use `--higher-is-better` to pivot the ranking around ROI-style metrics and
 `--format csv` (or `json`, `parquet`) when a structured export is required for
 dashboards. The CLI collapses each parquet file into per-architecture summaries
 so a high-level comparison is available even before GPU runs finish.
+
+To accelerate the omni-versus-hybrid comparisons required for the 4090 sweep,
+the CLI can now emit grouped leaderboards that surface the top runs per asset
+universe or fixture slice:
+
+```bash
+python scripts/benchmarks/summarise_architecture_sweep.py \
+  docs/benchmarks/omni_gpu.parquet \
+  docs/benchmarks/hybrid_gpu.parquet \
+  docs/benchmarks/baseline_cpu.parquet \
+  --metric metric_val_loss \
+  --leaderboard-group-by dataset_universe \
+  --leaderboard-top-k 2 \
+  --leaderboard-output docs/benchmarks/architecture_leaderboard.md
+```
+
+This command generates both the global summary and a Markdown leaderboard that
+lists the top performers per `dataset_universe`. Swap the `--leaderboard-format`
+argument to `csv`, `json`, or `parquet` when downstream dashboards need a
+structured export.
