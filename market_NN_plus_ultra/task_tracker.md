@@ -208,6 +208,12 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 * Exposed the `/guardrails` FastAPI endpoint so automation clients can validate trade logs and retrieve scaled results alongside violation summaries.
 * Extended service telemetry with guardrail configuration snapshots, aligning inference output with new enforcement capabilities.
 
+### Active Work Log — 2025-11-26
+
+* Released the walk-forward evaluation CLI (`scripts/walkforward_eval.py`) that turns predictions into per-split Sharpe/drawdown catalogues and JSON summaries for reporting automation.
+* Added regression coverage via `tests/test_walkforward_eval_script.py`, exercising Parquet inputs, JSON summaries, and extreme-split descriptors.
+* Updated the README quickstart and implementation plan to document the new evaluation workflow and hook the CLI into the optimisation log.
+
 ### Active Work Log — 2025-11-20
 
 * Extended the reporting pipeline with regime-aware attribution tables, wiring volatility/liquidity breakdowns into Markdown/HTML exports and expanding regression coverage so evaluation runs surface market-state context alongside profitability metrics.
