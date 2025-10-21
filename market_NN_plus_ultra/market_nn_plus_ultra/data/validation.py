@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from ..utils.logging import StructuredLogger, get_structured_logger
+from ..reporting.annotations import DECISION_CHOICES
 
 try:  # pragma: no cover - optional dependency fallback
     import pandera.errors as pa_errors  # type: ignore
@@ -189,6 +190,30 @@ def _fallback_cross_asset_validation(
     return validated
 
 
+def _fallback_annotation_validation(
+    df: pd.DataFrame,
+    context: str,
+    *,
+    logger: StructuredLogger | None = None,
+) -> pd.DataFrame:
+    validated = df.copy()
+    if "annotation_id" in validated.columns:
+        validated["annotation_id"] = pd.to_numeric(validated["annotation_id"], errors="coerce").astype("Int64")
+    if "trade_id" in validated.columns:
+        validated["trade_id"] = pd.to_numeric(validated["trade_id"], errors="coerce").astype("Int64")
+    for column in ("trade_timestamp", "created_at", "context_window_start", "context_window_end"):
+        if column in validated.columns:
+            validated[column] = _coerce_datetime(validated[column], context, logger=logger)
+    for column in ("symbol", "decision", "rationale", "author", "tags"):
+        if column in validated.columns:
+            validated[column] = validated[column].astype(str)
+    if "confidence" in validated.columns:
+        validated["confidence"] = _fallback_numeric(validated["confidence"])
+    if "metadata" in validated.columns:
+        validated["metadata"] = validated["metadata"].astype(str)
+    return validated
+
+
 if pa is not None:  # pragma: no branch - only executed when dependency available
     ASSET_SCHEMA = pa.DataFrameSchema(
         {
@@ -274,6 +299,30 @@ if pa is not None:  # pragma: no branch - only executed when dependency availabl
         },
         coerce=True,
     )
+
+    TRADE_ANNOTATION_SCHEMA = pa.DataFrameSchema(
+        {
+            "annotation_id": pa.Column(pa.Int, nullable=True, required=False, coerce=True),
+            "trade_id": pa.Column(pa.Int, nullable=False, coerce=True),
+            "symbol": pa.Column(pa.String, nullable=True, required=False, coerce=True),
+            "trade_timestamp": pa.Column(pa.DateTime, nullable=True, required=False, coerce=True),
+            "decision": pa.Column(
+                pa.String,
+                nullable=False,
+                coerce=True,
+                checks=pa.Check.isin(list(DECISION_CHOICES)),
+            ),
+            "rationale": pa.Column(pa.String, nullable=False, coerce=True),
+            "confidence": pa.Column(pa.Float, nullable=True, required=False, coerce=True),
+            "tags": pa.Column(pa.String, nullable=True, required=False, coerce=True),
+            "author": pa.Column(pa.String, nullable=False, coerce=True),
+            "created_at": pa.Column(pa.DateTime, nullable=False, coerce=True),
+            "metadata": pa.Column(pa.String, nullable=True, required=False, coerce=True),
+            "context_window_start": pa.Column(pa.DateTime, nullable=True, required=False, coerce=True),
+            "context_window_end": pa.Column(pa.DateTime, nullable=True, required=False, coerce=True),
+        },
+        coerce=True,
+    )
 else:  # pragma: no cover - fallback definitions
     ASSET_SCHEMA = None
     PRICE_SCHEMA = None
@@ -282,6 +331,7 @@ else:  # pragma: no cover - fallback definitions
     TRADE_SCHEMA = None
     BENCHMARK_SCHEMA = None
     CROSS_ASSET_VIEW_SCHEMA = None
+    TRADE_ANNOTATION_SCHEMA = None
 
 
 def _enforce_foreign_key(df: pd.DataFrame, column: str, valid_values: set[str], context: str, *, logger: StructuredLogger | None = None) -> None:
@@ -404,6 +454,40 @@ def validate_trades_frame(
     return validated.sort_values([col for col in ("symbol", "timestamp") if col in validated.columns])
 
 
+def validate_trade_annotation_frame(
+    df: pd.DataFrame,
+    *,
+    trades: pd.DataFrame | None = None,
+    logger: StructuredLogger | None = None,
+) -> pd.DataFrame:
+    """Validate analyst feedback annotations."""
+
+    if df.empty:
+        return df
+    context = "trade_annotations_table"
+    if TRADE_ANNOTATION_SCHEMA is not None:
+        validated = _run_pandera_validation(TRADE_ANNOTATION_SCHEMA, df, context, logger=logger)
+    else:
+        validated = _fallback_annotation_validation(df, context, logger=logger)
+    subset = ["trade_id", "created_at"]
+    if "annotation_id" in validated.columns:
+        subset.append("annotation_id")
+    _ensure_unique(validated, subset, context, logger=logger)
+    if trades is not None and not trades.empty and "trade_id" in trades.columns:
+        valid_ids = set(trades["trade_id"].dropna().astype(int))
+        supplied = set(validated["trade_id"].dropna().astype(int))
+        missing = sorted(supplied - valid_ids)
+        if missing:
+            _log_failure(
+                logger,
+                context,
+                errors={"unknown_trade_ids": missing[:5]},
+                reason="foreign_key_violation",
+            )
+            raise DataValidationError(context, "contains references to trades not present in the dataset")
+    return validated.sort_values("created_at", ascending=False)
+
+
 def validate_benchmark_frame(df: pd.DataFrame, *, logger: StructuredLogger | None = None) -> pd.DataFrame:
     """Validate benchmark return series."""
 
@@ -449,6 +533,7 @@ class ValidationBundle:
     trades: pd.DataFrame | None = None
     benchmarks: pd.DataFrame | None = None
     cross_asset_views: pd.DataFrame | None = None
+    trade_annotations: pd.DataFrame | None = None
 
 
 def validate_sqlite_frames(frames: Mapping[str, pd.DataFrame], *, logger: StructuredLogger | None = None) -> ValidationBundle:
@@ -479,6 +564,13 @@ def validate_sqlite_frames(frames: Mapping[str, pd.DataFrame], *, logger: Struct
         validate_trades_frame(trades, assets=validated_assets, logger=logger) if trades is not None else None
     )
 
+    annotations = frames.get("trade_annotations")
+    validated_annotations = (
+        validate_trade_annotation_frame(annotations, trades=validated_trades, logger=logger)
+        if annotations is not None
+        else None
+    )
+
     benchmarks = frames.get("benchmarks")
     validated_benchmarks = (
         validate_benchmark_frame(benchmarks, logger=logger) if benchmarks is not None else None
@@ -499,6 +591,7 @@ def validate_sqlite_frames(frames: Mapping[str, pd.DataFrame], *, logger: Struct
         trades=validated_trades,
         benchmarks=validated_benchmarks,
         cross_asset_views=validated_cross_asset,
+        trade_annotations=validated_annotations,
     )
 
 
@@ -519,6 +612,7 @@ __all__ = [
     "PRICE_SCHEMA",
     "REGIME_SCHEMA",
     "TRADE_SCHEMA",
+    "TRADE_ANNOTATION_SCHEMA",
     "ValidationBundle",
     "validate_assets_frame",
     "validate_benchmark_frame",
@@ -527,6 +621,7 @@ __all__ = [
     "validate_price_frame",
     "validate_regime_frame",
     "validate_sqlite_frames",
+    "validate_trade_annotation_frame",
     "validate_trades_frame",
     "safe_float_array",
 ]

@@ -84,6 +84,28 @@ alpha sources.
 
 *Suggested indices:* (`symbol`, `timestamp`), (`timestamp` DESC).
 
+### `trade_annotations`
+
+| Column                  | Type     | Notes                                                                                     |
+|-------------------------|----------|-------------------------------------------------------------------------------------------|
+| `annotation_id`         | INTEGER  | Primary key for the annotation entry.                                                     |
+| `trade_id`              | INTEGER  | Foreign key referencing `trades.trade_id`.                                                |
+| `symbol`                | TEXT     | Optional symbol override when annotating external trades.                                 |
+| `trade_timestamp`       | DATETIME | Timestamp of the underlying trade (mirrors `trades.timestamp`).                           |
+| `decision`              | TEXT     | Analyst verdict (`approve`, `reject`, `flag`, `hold`, `escalate`).                         |
+| `rationale`             | TEXT     | Free-form explanation describing the decision.                                            |
+| `confidence`            | REAL     | Optional analyst confidence score in the range [0, 1].                                    |
+| `tags`                  | TEXT     | Comma-separated tags used for downstream filtering.                                      |
+| `author`                | TEXT     | Analyst or reviewer responsible for the annotation.                                       |
+| `created_at`            | DATETIME | Timestamp (UTC) when the annotation was recorded.                                         |
+| `metadata`              | JSON     | Optional structured payload (ticket IDs, escalation references, replay-buffer hints).     |
+| `context_window_start`  | DATETIME | Optional UTC timestamp marking the beginning of the reviewed market window.               |
+| `context_window_end`    | DATETIME | Optional UTC timestamp marking the end of the reviewed market window.                     |
+
+*Primary key:* (`annotation_id`)
+
+*Suggested indices:* (`trade_id`, `created_at` DESC), (`decision`, `created_at` DESC).
+
 ### `benchmarks`
 
 | Column      | Type     | Notes                                                                   |

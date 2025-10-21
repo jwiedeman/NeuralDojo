@@ -159,6 +159,37 @@ if summary.triggered:
         print(" -", alert)
 ```
 
+## Analyst Feedback Workflow
+
+Operations leads can now capture structured analyst decisions directly from the
+command line. The `scripts/annotate_trades.py` utility writes annotations into
+the SQLite dataset so replay buffers, reporting automation, and operations
+dashboards inherit the context without bespoke notebooks:
+
+```bash
+python scripts/annotate_trades.py \
+  --database data/plus_ultra.db \
+  record \
+  --trade-id 42 \
+  --decision reject \
+  --rationale "Escalated: liquidity dried up" \
+  --author "risk_desk" \
+  --tags liquidity,manual
+```
+
+Switch to the `list` sub-command to export annotations as JSON or a Markdown
+table for review meetings:
+
+```bash
+python scripts/annotate_trades.py --database data/plus_ultra.db list --format table
+```
+
+Every annotation stores the decision, rationale, confidence score, optional
+context windows, tags, and metadata payloads. Validation is enforced via the
+new `trade_annotations` schema, and annotations are exposed through
+`market_nn_plus_ultra.reporting.annotations` for programmatic access inside
+simulators, PPO replay buffers, and reporting pipelines.
+
 `OperationsSummary.as_dict()` returns a serialisable payload that downstream
 automation (reports, dashboards, approval workflows) can persist alongside other
 telemetry.
