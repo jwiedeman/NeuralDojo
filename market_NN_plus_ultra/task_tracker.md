@@ -204,6 +204,11 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 * Published `notebooks/mvp_retraining_walkthrough.ipynb` to execute the retraining→evaluation→monitoring loop with artefact capture.
 * Updated `docs/quickstart_mvp.md` with lightweight run guidance so the MVP can be validated without GPU hardware.
 
+### Active Work Log — 2025-12-05
+
+* Built the `automation.mvp_pipeline` helpers to orchestrate the MVP fixture→training→inference→monitoring flow with guardrail summaries.
+* Authored `notebooks/mvp_profitability_walkthrough.ipynb` that executes the new helpers end-to-end, captures artefacts, and surfaces profitability/monitoring diagnostics for review.
+
 ### Active Work Log — 2025-11-03
 
 * Ran Sprint 4 integration sync to coordinate calibration-head export wiring, PPO warm-start smoke tests, simulator profiling harness tasks, and reporting/monitoring dependencies.
