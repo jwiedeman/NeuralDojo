@@ -47,6 +47,7 @@ from .config import (
     TrainerConfig,
     MarketStateConfig,
 )
+from .checkpoints import load_backbone_from_checkpoint
 from .curriculum import (
     CurriculumCallback,
     CurriculumParameters,
@@ -868,8 +869,27 @@ def _normalise_logged_metrics(metrics: Mapping[str, Any]) -> dict[str, float]:
     return normalised
 
 
-def run_training(config: ExperimentConfig) -> TrainingRunResult:
+def run_training(
+    config: ExperimentConfig,
+    *,
+    pretrain_checkpoint_path: str | Path | None = None,
+) -> TrainingRunResult:
     module, data_module = instantiate_modules(config)
+    if pretrain_checkpoint_path is not None:
+        try:
+            first_param = next(module.backbone.parameters())
+            device = first_param.device
+        except StopIteration:  # pragma: no cover - defensive guard
+            device = torch.device("cpu")
+        load_backbone_from_checkpoint(
+            module.backbone,
+            pretrain_checkpoint_path,
+            device=device,
+        )
+        logger.info(
+            "Loaded backbone weights from pretraining checkpoint %s",
+            pretrain_checkpoint_path,
+        )
     if data_module.train_dataset is None or data_module.val_dataset is None:
         data_module.setup(stage="fit")
     summary = data_module.dataset_summary()

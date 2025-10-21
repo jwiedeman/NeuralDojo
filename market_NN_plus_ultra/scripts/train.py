@@ -187,6 +187,11 @@ def parse_args() -> argparse.Namespace:
         type=float,
         help="Trigger a warning when validation absolute error exceeds this value",
     )
+    parser.add_argument(
+        "--pretrain-checkpoint",
+        type=Path,
+        help="Warm start the supervised run from a pretraining checkpoint",
+    )
     return parser.parse_args()
 
 
@@ -195,7 +200,7 @@ def main() -> None:
     config = load_experiment_from_file(args.config)
     _apply_overrides(config, args)
     _ensure_wandb_defaults(config, config_path=args.config, disabled=args.no_wandb)
-    run_training(config)
+    run_training(config, pretrain_checkpoint_path=args.pretrain_checkpoint)
 
 
 if __name__ == "__main__":
