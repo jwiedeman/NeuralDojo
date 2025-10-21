@@ -2,10 +2,166 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from importlib.util import find_spec
 from time import perf_counter, time
 from typing import Iterable, Optional
 
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
+if find_spec("prometheus_client") is not None:  # pragma: no cover - exercised via integration tests
+    from prometheus_client import (  # type: ignore[import-not-found]
+        CONTENT_TYPE_LATEST,
+        Counter,
+        Gauge,
+        Histogram,
+        generate_latest,
+    )
+else:  # pragma: no cover - covered by unit tests when dependency is absent
+    CONTENT_TYPE_LATEST = "text/plain; version=0.0.4; charset=utf-8"
+
+    class _MetricRegistry:
+        """Minimal in-memory registry for metrics when Prometheus is unavailable."""
+
+        def __init__(self) -> None:
+            self._metrics: list[_SimpleMetricBase] = []
+
+        def register(self, metric: "_SimpleMetricBase") -> None:
+            self._metrics.append(metric)
+
+        def render(self) -> bytes:
+            lines: list[str] = []
+            for metric in self._metrics:
+                lines.extend(metric.render())
+            return ("\n".join(lines) + "\n").encode("utf-8")
+
+    @dataclass
+    class _Sample:
+        value: float = 0.0
+
+    class _MetricHandle:
+        def __init__(self, metric: "_SimpleMetricBase", key: tuple[str, ...]) -> None:
+            self._metric = metric
+            self._key = key
+
+        def inc(self, amount: float = 1.0) -> "_MetricHandle":
+            self._metric._inc(self._key, amount)
+            return self
+
+        def observe(self, value: float) -> "_MetricHandle":
+            self._metric._observe(self._key, value)
+            return self
+
+        def set(self, value: float) -> "_MetricHandle":
+            self._metric._set(self._key, value)
+            return self
+
+    class _SimpleMetricBase:
+        metric_type: str = "gauge"
+
+        def __init__(
+            self,
+            name: str,
+            documentation: str,
+            *,
+            labelnames: tuple[str, ...] = (),
+            **_kwargs: object,
+        ) -> None:
+            self._name = name
+            self._documentation = documentation
+            self._labelnames = labelnames
+            self._samples: dict[tuple[str, ...], _Sample] = {}
+            _REGISTRY.register(self)
+
+        def labels(self, **labels: str) -> _MetricHandle:
+            key = tuple(labels.get(label, "") for label in self._labelnames)
+            if key not in self._samples:
+                self._samples[key] = _Sample()
+            return _MetricHandle(self, key)
+
+        # Direct operations for unlabeled metrics
+        def inc(self, amount: float = 1.0) -> None:
+            self._inc((), amount)
+
+        def set(self, value: float) -> None:
+            self._set((), value)
+
+        def observe(self, value: float) -> None:
+            self._observe((), value)
+
+        def _inc(self, key: tuple[str, ...], amount: float) -> None:
+            sample = self._samples.setdefault(key, _Sample())
+            sample.value += float(amount)
+
+        def _observe(self, key: tuple[str, ...], value: float) -> None:
+            # Default behaviour matches increment semantics.
+            self._inc(key, value)
+
+        def _set(self, key: tuple[str, ...], value: float) -> None:
+            sample = self._samples.setdefault(key, _Sample())
+            sample.value = float(value)
+
+        def render(self) -> list[str]:
+            lines = [
+                f"# HELP {self._name} {self._documentation}",
+                f"# TYPE {self._name} {self.metric_type}",
+            ]
+            if not self._samples:
+                value = 0.0
+                sample_line = f"{self._name} {value}"
+                lines.append(sample_line)
+                return lines
+
+            for key, sample in self._samples.items():
+                if self._labelnames:
+                    label_parts = [f'{label}="{val}"' for label, val in zip(self._labelnames, key)]
+                    label_str = "{" + ",".join(label_parts) + "}"
+                else:
+                    label_str = ""
+                lines.append(f"{self._name}{label_str} {sample.value}")
+            return lines
+
+    class Counter(_SimpleMetricBase):
+        metric_type = "counter"
+
+        def _observe(self, key: tuple[str, ...], value: float) -> None:
+            # Histograms call observe, but counters should increase by the observed amount
+            self._inc(key, value)
+
+    class Gauge(_SimpleMetricBase):
+        metric_type = "gauge"
+
+    class Histogram(_SimpleMetricBase):
+        metric_type = "histogram"
+
+        def _observe(self, key: tuple[str, ...], value: float) -> None:
+            # Track count of observations, ignoring bucket semantics.
+            self._inc(key, 1.0)
+            # Store the latest value to aid debugging.
+            self._set(key + ("_last",), value)
+
+        def render(self) -> list[str]:
+            lines = [
+                f"# HELP {self._name} {self._documentation}",
+                f"# TYPE {self._name} {self.metric_type}",
+            ]
+            observed = False
+            for key, sample in self._samples.items():
+                if key and key[-1] == "_last":
+                    labelnames = self._labelnames + ("stat",)
+                    base_key = key[:-1]
+                    label_parts = [f'{label}="{val}"' for label, val in zip(labelnames, base_key + ("last",))]
+                    lines.append(f"{self._name}_bucket{{{','.join(label_parts)}}} {sample.value}")
+                else:
+                    label_parts = [f'{label}="{val}"' for label, val in zip(self._labelnames, key)]
+                    lines.append(f"{self._name}_count{{{','.join(label_parts)}}} {sample.value}")
+                    observed = True
+            if not observed:
+                lines.append(f"{self._name}_count 0")
+            return lines
+
+    _REGISTRY = _MetricRegistry()
+
+    def generate_latest() -> bytes:
+        return _REGISTRY.render()
 
 REQUEST_COUNTER = Counter(
     "plus_ultra_service_requests_total",
