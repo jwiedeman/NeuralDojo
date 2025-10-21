@@ -49,6 +49,7 @@ def compile_operations_summary(
     trades: pd.DataFrame | None = None,
     *,
     return_col: str = "realised_return",
+    benchmark_col: str | None = None,
     trade_timestamp_col: str = "timestamp",
     trade_symbol_col: str = "symbol",
     trade_notional_col: str = "notional",
@@ -80,13 +81,36 @@ def compile_operations_summary(
     thresholds:
         Optional threshold configuration. When supplied, metrics breaching a
         threshold produce human-readable alerts in ``OperationsSummary.triggered``.
+    benchmark_col:
+        Optional realised-return column containing benchmark performance. When
+        provided, the summary includes excess-return, tracking-error, beta, and
+        information-ratio diagnostics relative to the benchmark.
     """
 
     if return_col not in predictions:
         raise ValueError(f"return column '{return_col}' is missing from predictions")
 
-    returns = predictions[return_col].to_numpy(dtype=np.float64)
-    risk = risk_metrics(returns)
+    returns_series = pd.to_numeric(predictions[return_col], errors="coerce")
+    benchmark_array: np.ndarray | None = None
+    if benchmark_col is not None:
+        if benchmark_col not in predictions:
+            raise ValueError(
+                f"benchmark column '{benchmark_col}' is missing from predictions"
+            )
+        benchmark_series = pd.to_numeric(predictions[benchmark_col], errors="coerce")
+        aligned = pd.concat(
+            [
+                returns_series.rename("__returns"),
+                benchmark_series.rename("__benchmark"),
+            ],
+            axis=1,
+        ).dropna()
+        returns_array = aligned["__returns"].to_numpy(dtype=np.float64)
+        benchmark_array = aligned["__benchmark"].to_numpy(dtype=np.float64)
+    else:
+        returns_array = returns_series.dropna().to_numpy(dtype=np.float64)
+
+    risk = risk_metrics(returns_array, benchmark_returns=benchmark_array)
 
     guardrails: Dict[str, float] | None = None
     if trades is not None:

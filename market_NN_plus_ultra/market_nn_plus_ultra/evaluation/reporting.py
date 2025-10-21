@@ -259,6 +259,18 @@ def _extract_return_series(predictions: pd.DataFrame, return_column: str) -> pd.
     return numeric
 
 
+def _extract_optional_series(
+    predictions: pd.DataFrame, column: str | None, *, label: str
+) -> pd.Series | None:
+    if column is None:
+        return None
+    if column not in predictions.columns:
+        raise ValueError(f"Column '{column}' not present in predictions frame for {label}")
+    numeric = pd.to_numeric(predictions[column], errors="coerce")
+    numeric.name = column
+    return numeric
+
+
 def _summarise(predictions: pd.DataFrame) -> ReportSummary:
     num_rows = int(len(predictions))
     start = None
@@ -520,14 +532,37 @@ def _prepare_report(
     predictions: pd.DataFrame,
     *,
     return_column: str,
+    benchmark_column: str | None,
     metrics: Optional[Mapping[str, float]],
     periods_per_year: int,
 ) -> PreparedReport:
     returns_series = _extract_return_series(predictions, return_column)
+    benchmark_series = _extract_optional_series(
+        predictions, benchmark_column, label="benchmark"
+    )
     returns_array = returns_series.to_numpy(dtype=np.float64)
     summary = _summarise(predictions)
+
+    if benchmark_series is not None:
+        aligned = pd.concat(
+            [
+                returns_series.rename("__returns"),
+                benchmark_series.rename("__benchmark"),
+            ],
+            axis=1,
+        ).dropna()
+        returns_for_metrics = aligned["__returns"].to_numpy(dtype=np.float64)
+        benchmark_array = aligned["__benchmark"].to_numpy(dtype=np.float64)
+    else:
+        returns_for_metrics = returns_series.dropna().to_numpy(dtype=np.float64)
+        benchmark_array = None
+
     computed = sanitize_metrics(
-        risk_metrics(returns_array, periods_per_year=periods_per_year)
+        risk_metrics(
+            returns_for_metrics,
+            periods_per_year=periods_per_year,
+            benchmark_returns=benchmark_array,
+        )
     )
     if metrics is not None:
         merged = dict(computed)
@@ -922,6 +957,7 @@ def generate_markdown_report(
     *,
     metrics: Optional[Mapping[str, float]] = None,
     return_column: str = "realised_return",
+    benchmark_column: str | None = None,
     title: str = "Market NN Plus Ultra Performance Report",
     description: str | None = None,
     include_equity_chart: bool = True,
@@ -940,6 +976,7 @@ def generate_markdown_report(
     prepared = _prepare_report(
         predictions,
         return_column=return_column,
+        benchmark_column=benchmark_column,
         metrics=metrics,
         periods_per_year=periods_per_year,
     )
@@ -979,6 +1016,7 @@ def generate_html_report(
     *,
     metrics: Optional[Mapping[str, float]] = None,
     return_column: str = "realised_return",
+    benchmark_column: str | None = None,
     title: str = "Market NN Plus Ultra Performance Report",
     description: str | None = None,
     include_equity_chart: bool = True,
@@ -997,6 +1035,7 @@ def generate_html_report(
     prepared = _prepare_report(
         predictions,
         return_column=return_column,
+        benchmark_column=benchmark_column,
         metrics=metrics,
         periods_per_year=periods_per_year,
     )
@@ -1036,6 +1075,7 @@ def generate_report(
     *,
     metrics: Optional[Mapping[str, float]] = None,
     return_column: str = "realised_return",
+    benchmark_column: str | None = None,
     title: str = "Market NN Plus Ultra Performance Report",
     description: str | None = None,
     include_equity_chart: bool = True,
@@ -1054,6 +1094,7 @@ def generate_report(
             output,
             metrics=metrics,
             return_column=return_column,
+            benchmark_column=benchmark_column,
             title=title,
             description=description,
             include_equity_chart=include_equity_chart,
@@ -1067,6 +1108,7 @@ def generate_report(
         output if suffix else output.with_suffix(".md"),
         metrics=metrics,
         return_column=return_column,
+        benchmark_column=benchmark_column,
         title=title,
         description=description,
         include_equity_chart=include_equity_chart,

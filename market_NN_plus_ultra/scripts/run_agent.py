@@ -35,6 +35,11 @@ def parse_args() -> argparse.Namespace:
         help="Column to treat as realised return when computing metrics",
     )
     parser.add_argument(
+        "--benchmark-column",
+        type=str,
+        help="Optional benchmark return column for excess-return diagnostics",
+    )
+    parser.add_argument(
         "--metrics-output",
         type=Path,
         help="Optional path to write evaluation metrics (json/csv/tsv/txt/md)",
@@ -63,7 +68,11 @@ def main() -> None:
         checkpoint_path=args.checkpoint,
         device=args.device,
     )
-    result = agent.run(evaluate=not args.no_eval, return_column=args.return_column)
+    result = agent.run(
+        evaluate=not args.no_eval,
+        return_column=args.return_column,
+        benchmark_column=args.benchmark_column,
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     save_predictions(result.predictions, args.output)
     if result.metrics:

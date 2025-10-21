@@ -39,6 +39,33 @@ def test_operations_summary_cli_without_trades(tmp_path: Path, capsys) -> None:
     assert payload.get("triggered") == []
 
 
+def test_operations_summary_cli_with_benchmark(tmp_path: Path, capsys) -> None:
+    predictions = pd.DataFrame(
+        {
+            "window_end": pd.date_range("2025-01-01", periods=4, freq="D"),
+            "realised_return": [0.01, -0.015, 0.02, 0.005],
+            "benchmark_return": [0.008, -0.01, 0.012, 0.003],
+        }
+    )
+    predictions_path = _write_frame(predictions, tmp_path / "predictions.csv")
+
+    exit_code = operations_summary.main(
+        [
+            "--predictions",
+            str(predictions_path),
+            "--benchmark-column",
+            "benchmark_return",
+            "--indent",
+            "0",
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert "information_ratio" in payload["risk"]
+    assert "tracking_error" in payload["risk"]
+
+
 def test_operations_summary_cli_with_trades_and_thresholds(tmp_path: Path) -> None:
     predictions = pd.DataFrame(
         {

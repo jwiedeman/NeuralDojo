@@ -61,6 +61,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--trades", type=Path, help="Optional path to the trade log for guardrail metrics")
     parser.add_argument("--output", type=Path, help="Optional JSON destination; prints to stdout when omitted")
     parser.add_argument("--return-column", type=str, default="realised_return", help="Realised return column in predictions")
+    parser.add_argument(
+        "--benchmark-column",
+        type=str,
+        help="Optional benchmark return column for excess and tracking metrics",
+    )
     parser.add_argument("--trade-timestamp-col", type=str, default="timestamp", help="Timestamp column in the trade log")
     parser.add_argument("--trade-symbol-col", type=str, default="symbol", help="Symbol column in the trade log")
     parser.add_argument("--trade-notional-col", type=str, default="notional", help="Notional exposure column in the trade log")
@@ -132,6 +137,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         trade_return_col=args.trade_return_col,
         capital_base=args.capital_base,
         tail_percentile=args.tail_percentile,
+        benchmark_col=args.benchmark_column,
         thresholds=_parse_thresholds(args),
     )
     payload = summary.as_dict()

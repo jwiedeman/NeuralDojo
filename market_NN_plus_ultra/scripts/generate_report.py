@@ -69,6 +69,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path, required=True, help="Destination report path (.md or .html)")
     parser.add_argument("--metrics", type=Path, help="Optional JSON file of additional metrics to include")
     parser.add_argument("--return-column", type=str, default="realised_return", help="Return column to evaluate")
+    parser.add_argument(
+        "--benchmark-column",
+        type=str,
+        help="Optional benchmark return column to compute excess metrics",
+    )
     parser.add_argument("--title", type=str, default="Market NN Plus Ultra Performance Report", help="Report title")
     parser.add_argument("--description", type=str, help="Optional Markdown description to prefix the report")
     parser.add_argument("--periods-per-year", type=int, default=252, help="Return periods per year for annualisation")
@@ -105,6 +110,7 @@ def main() -> None:
         output,
         metrics=metrics,
         return_column=args.return_column,
+        benchmark_column=args.benchmark_column,
         title=args.title,
         description=args.description,
         include_equity_chart=not args.no_equity,

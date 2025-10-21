@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Tuple
 
 import numpy as np
 import pandas as pd
@@ -15,6 +15,87 @@ def _coerce_returns(array: np.ndarray | pd.Series) -> np.ndarray:
     if returns.size == 0:
         return returns
     return returns[~np.isnan(returns)]
+
+
+def _align_with_benchmark(
+    returns: np.ndarray | pd.Series, benchmark: np.ndarray | pd.Series
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Return aligned return/benchmark arrays with identical length."""
+
+    cleaned_returns = _coerce_returns(returns)
+    cleaned_benchmark = _coerce_returns(benchmark)
+    if cleaned_returns.size == 0 or cleaned_benchmark.size == 0:
+        empty = np.asarray([], dtype=np.float64)
+        return empty, empty
+
+    length = min(cleaned_returns.size, cleaned_benchmark.size)
+    if cleaned_returns.size != length:
+        cleaned_returns = cleaned_returns[-length:]
+    if cleaned_benchmark.size != length:
+        cleaned_benchmark = cleaned_benchmark[-length:]
+    return cleaned_returns, cleaned_benchmark
+
+
+def _tracking_error(
+    returns: np.ndarray, benchmark: np.ndarray, *, periods_per_year: int, eps: float = 1e-12
+) -> float:
+    if returns.size == 0:
+        return 0.0
+    diff = returns - benchmark
+    std = diff.std(ddof=0)
+    if std <= eps:
+        return 0.0
+    return float(std * np.sqrt(periods_per_year))
+
+
+def _information_ratio(
+    returns: np.ndarray,
+    benchmark: np.ndarray,
+    *,
+    periods_per_year: int,
+    eps: float = 1e-12,
+) -> float:
+    tracking = _tracking_error(returns, benchmark, periods_per_year=periods_per_year, eps=eps)
+    if tracking <= eps:
+        return 0.0
+    excess = (returns - benchmark).mean()
+    return float((excess * periods_per_year) / tracking)
+
+
+def _beta(
+    returns: np.ndarray, benchmark: np.ndarray, *, eps: float = 1e-12
+) -> float:
+    if returns.size == 0:
+        return 0.0
+    variance = benchmark.var(ddof=0)
+    if variance <= eps:
+        return 0.0
+    covariance = float(np.cov(returns, benchmark, ddof=0)[0, 1])
+    return float(covariance / (variance + eps))
+
+
+def _alpha(
+    returns: np.ndarray,
+    benchmark: np.ndarray,
+    *,
+    periods_per_year: int,
+    beta_value: float,
+) -> float:
+    if returns.size == 0:
+        return 0.0
+    mean_returns = returns.mean()
+    mean_benchmark = benchmark.mean()
+    return float((mean_returns * periods_per_year) - (beta_value * mean_benchmark * periods_per_year))
+
+
+def _benchmark_correlation(returns: np.ndarray, benchmark: np.ndarray, eps: float = 1e-12) -> float:
+    if returns.size == 0:
+        return 0.0
+    std_returns = returns.std(ddof=0)
+    std_benchmark = benchmark.std(ddof=0)
+    if std_returns <= eps or std_benchmark <= eps:
+        return 0.0
+    return float(np.corrcoef(returns, benchmark)[0, 1])
 
 
 def compute_equity_curve(returns: np.ndarray, initial_capital: float = 1.0) -> np.ndarray:
@@ -157,7 +238,12 @@ def profit_factor(returns: np.ndarray, eps: float = 1e-6) -> float:
     return float(positive / (negative + eps))
 
 
-def risk_metrics(returns: np.ndarray, periods_per_year: int = 252) -> Dict[str, float]:
+def risk_metrics(
+    returns: np.ndarray | pd.Series,
+    periods_per_year: int = 252,
+    *,
+    benchmark_returns: np.ndarray | pd.Series | None = None,
+) -> Dict[str, float]:
     """Return a suite of risk metrics for a stream of returns."""
 
     cleaned = _coerce_returns(returns)
@@ -188,7 +274,7 @@ def risk_metrics(returns: np.ndarray, periods_per_year: int = 252) -> Dict[str, 
         return_multiple = 1.0
     average_return = float(cleaned.mean()) if cleaned.size else 0.0
     annualised_return = float(average_return * periods_per_year)
-    return {
+    metrics: Dict[str, float] = {
         "sharpe": sharpe,
         "sortino": sortino,
         "max_drawdown": drawdown,
@@ -207,6 +293,43 @@ def risk_metrics(returns: np.ndarray, periods_per_year: int = 252) -> Dict[str, 
         "average_return": average_return,
         "annualised_return": annualised_return,
     }
+
+    if benchmark_returns is not None:
+        aligned_returns, aligned_benchmark = _align_with_benchmark(cleaned, benchmark_returns)
+        if aligned_returns.size and aligned_benchmark.size:
+            benchmark_average = float(aligned_benchmark.mean())
+            benchmark_annualised = float(benchmark_average * periods_per_year)
+            excess_mean = float((aligned_returns - aligned_benchmark).mean())
+            excess_annualised = float(excess_mean * periods_per_year)
+            tracking = _tracking_error(
+                aligned_returns, aligned_benchmark, periods_per_year=periods_per_year
+            )
+            info_ratio = _information_ratio(
+                aligned_returns, aligned_benchmark, periods_per_year=periods_per_year
+            )
+            beta_value = _beta(aligned_returns, aligned_benchmark)
+            alpha_value = _alpha(
+                aligned_returns,
+                aligned_benchmark,
+                periods_per_year=periods_per_year,
+                beta_value=beta_value,
+            )
+            correlation = _benchmark_correlation(aligned_returns, aligned_benchmark)
+            metrics.update(
+                {
+                    "benchmark_average_return": benchmark_average,
+                    "benchmark_annualised_return": benchmark_annualised,
+                    "average_excess_return": excess_mean,
+                    "annualised_excess_return": excess_annualised,
+                    "tracking_error": tracking,
+                    "information_ratio": info_ratio,
+                    "beta": beta_value,
+                    "alpha": alpha_value,
+                    "benchmark_correlation": correlation,
+                }
+            )
+
+    return metrics
 
 
 def evaluate_trade_log(trades: pd.DataFrame) -> Dict[str, float]:
