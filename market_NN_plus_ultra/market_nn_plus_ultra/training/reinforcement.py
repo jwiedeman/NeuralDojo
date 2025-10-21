@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import contextlib
 from dataclasses import dataclass, replace
+import math
+import time
 from pathlib import Path
-from typing import Dict, Iterable, Iterator, List, Optional, Sequence
+from typing import Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -145,8 +147,8 @@ class RolloutBatch:
             values=self.values[start:end],
             advantages=self.advantages[start:end],
             returns=self.returns[start:end],
-            rewards=self.rewards[start:end],
-        )
+        rewards=self.rewards[start:end],
+    )
 
 
 def _concat_rollout_batches(batches: Sequence[RolloutBatch]) -> RolloutBatch:
@@ -162,6 +164,56 @@ def _concat_rollout_batches(batches: Sequence[RolloutBatch]) -> RolloutBatch:
         returns=torch.cat([batch.returns for batch in valid], dim=0),
         rewards=torch.cat([batch.rewards for batch in valid], dim=0),
     )
+
+
+@dataclass(slots=True)
+class RolloutTelemetry:
+    """Lightweight telemetry captured alongside PPO rollouts."""
+
+    batches: int = 0
+    sequences: int = 0
+    steps: int = 0
+    reward_sum: float = 0.0
+    reward_sq_sum: float = 0.0
+    duration: float = 0.0
+
+    def merge(self, other: "RolloutTelemetry") -> "RolloutTelemetry":
+        self.batches += other.batches
+        self.sequences += other.sequences
+        self.steps += other.steps
+        self.reward_sum += other.reward_sum
+        self.reward_sq_sum += other.reward_sq_sum
+        self.duration += other.duration
+        return self
+
+    def mean_reward(self) -> float:
+        if self.steps == 0:
+            return 0.0
+        return self.reward_sum / self.steps
+
+    def reward_std(self) -> float:
+        if self.steps == 0:
+            return 0.0
+        mean = self.mean_reward()
+        variance = max((self.reward_sq_sum / self.steps) - mean**2, 0.0)
+        return math.sqrt(variance)
+
+    def sequences_per_second(self) -> float:
+        if self.duration <= 0.0:
+            return 0.0
+        return self.sequences / self.duration
+
+    def steps_per_second(self) -> float:
+        if self.duration <= 0.0:
+            return 0.0
+        return self.steps / self.duration
+
+
+def _merge_rollout_telemetry(telemetries: Sequence[RolloutTelemetry]) -> RolloutTelemetry:
+    telemetry = RolloutTelemetry()
+    for item in telemetries:
+        telemetry.merge(item)
+    return telemetry
 
 
 class RolloutReplayBuffer:
@@ -250,8 +302,18 @@ def _rollout_worker_loop(
 
             state_dict = payload
             policy.load_state_dict({key: tensor.to(worker_device) for key, tensor in state_dict.items()})
-            rollout = _collect_rollout(policy, iterator, reinforcement, worker_device)
-            response_queue.put(("result", rollout.detach().to(torch.device("cpu"))))
+            rollout, telemetry = _collect_rollout(
+                policy, iterator, reinforcement, worker_device
+            )
+            response_queue.put(
+                (
+                    "result",
+                    (
+                        rollout.detach().to(torch.device("cpu")),
+                        telemetry,
+                    ),
+                )
+            )
     except Exception as exc:  # pragma: no cover - surfaced via response queue
         response_queue.put(("error", repr(exc)))
 
@@ -307,7 +369,7 @@ class ParallelRolloutManager:
             self._requests.append(request)
             self._responses.append(response)
 
-    def collect(self, policy: MarketPolicyNetwork) -> RolloutBatch:
+    def collect(self, policy: MarketPolicyNetwork) -> Tuple[RolloutBatch, RolloutTelemetry]:
         state_dict = {
             key: tensor.detach().cpu()
             for key, tensor in policy.state_dict().items()
@@ -317,10 +379,13 @@ class ParallelRolloutManager:
             queue.put(("collect", state_dict))
 
         batches: list[RolloutBatch] = []
+        telemetries: list[RolloutTelemetry] = []
         for response in self._responses:
             kind, payload = response.get()
             if kind == "result":
-                batches.append(payload)
+                batch, telemetry = payload
+                batches.append(batch)
+                telemetries.append(telemetry)
             elif kind == "error":
                 self.close()
                 raise RuntimeError(f"Rollout worker error: {payload}")
@@ -328,7 +393,9 @@ class ParallelRolloutManager:
                 self.close()
                 raise RuntimeError(f"Unexpected worker message: {kind}")
 
-        return _concat_rollout_batches(batches)
+        combined_batch = _concat_rollout_batches(batches)
+        combined_telemetry = _merge_rollout_telemetry(telemetries)
+        return combined_batch, combined_telemetry
 
     def close(self) -> None:
         if self._closed:
@@ -356,10 +423,14 @@ class ReinforcementUpdate:
 
     update: int
     mean_reward: float
+    reward_std: float
     policy_loss: float
     value_loss: float
     entropy: float
     samples: int
+    collection_time: float
+    samples_per_second: float
+    steps_per_second: float
 
 
 @dataclass(slots=True)
@@ -419,7 +490,7 @@ def _collect_rollout(
     data_iterator: Iterable[dict[str, torch.Tensor]],
     reinforcement: ReinforcementConfig,
     device: torch.device,
-) -> RolloutBatch:
+) -> Tuple[RolloutBatch, RolloutTelemetry]:
     policy.eval()
     features_buf: List[torch.Tensor] = []
     actions_buf: List[torch.Tensor] = []
@@ -429,6 +500,8 @@ def _collect_rollout(
 
     total_samples = 0
     costs = reinforcement.costs or TradingCosts()
+    batches = 0
+    start_time = time.perf_counter()
 
     with torch.no_grad():
         while total_samples < reinforcement.steps_per_rollout:
@@ -440,6 +513,8 @@ def _collect_rollout(
                 reference = reference.to(device)
 
             actions, log_prob, entropy, values = policy.act(features)
+
+            batches += 1
 
             if reinforcement.targets_are_returns:
                 future_returns = targets
@@ -477,14 +552,26 @@ def _collect_rollout(
     adv_std = advantages.std(unbiased=False).clamp(min=1e-6)
     advantages = (advantages - adv_mean) / adv_std
 
-    return RolloutBatch(
-        features=features_tensor,
-        actions=actions_tensor,
-        log_probs=log_probs_tensor,
-        values=values_tensor,
-        advantages=advantages,
-        returns=returns,
-        rewards=rewards_tensor,
+    telemetry = RolloutTelemetry(
+        batches=batches,
+        sequences=int(features_tensor.size(0)),
+        steps=int(rewards_tensor.numel()),
+        reward_sum=float(rewards_tensor.sum().item()),
+        reward_sq_sum=float(rewards_tensor.square().sum().item()),
+        duration=time.perf_counter() - start_time,
+    )
+
+    return (
+        RolloutBatch(
+            features=features_tensor,
+            actions=actions_tensor,
+            log_probs=log_probs_tensor,
+            values=values_tensor,
+            advantages=advantages,
+            returns=returns,
+            rewards=rewards_tensor,
+        ),
+        telemetry,
     )
 
 
@@ -544,6 +631,8 @@ def _ppo_update(
     optimizer: torch.optim.Optimizer,
     rollout: RolloutBatch,
     reinforcement: ReinforcementConfig,
+    *,
+    telemetry: RolloutTelemetry | None = None,
 ) -> ReinforcementUpdate:
     policy.train()
 
@@ -587,14 +676,22 @@ def _ppo_update(
             updates += 1
 
     mean_reward = rollout.rewards.mean().item()
+    reward_std = rollout.rewards.std(unbiased=False).item()
+    collection_time = telemetry.duration if telemetry is not None else 0.0
+    samples_per_second = telemetry.sequences_per_second() if telemetry is not None else 0.0
+    steps_per_second = telemetry.steps_per_second() if telemetry is not None else 0.0
     denom = max(1, updates)
     return ReinforcementUpdate(
         update=0,
         mean_reward=mean_reward,
+        reward_std=reward_std,
         policy_loss=policy_loss_total / denom,
         value_loss=value_loss_total / denom,
         entropy=entropy_total / denom,
         samples=num_samples,
+        collection_time=collection_time,
+        samples_per_second=samples_per_second,
+        steps_per_second=steps_per_second,
     )
 
 
@@ -667,12 +764,13 @@ def run_reinforcement_finetuning(
 
         for step in range(reinforcement.total_updates):
             if manager is not None:
-                rollout = manager.collect(policy)
+                rollout, telemetry = manager.collect(policy)
             else:
-                rollout = _collect_rollout(policy, iterator, reinforcement, device)
+                rollout, telemetry = _collect_rollout(policy, iterator, reinforcement, device)
 
             rollout = rollout.to(device)
             combined = rollout
+            combined_telemetry = telemetry
             if buffer is not None:
                 ratio = min(sample_ratio, 1.0)
                 replay_batch: RolloutBatch | None = None
@@ -682,16 +780,27 @@ def run_reinforcement_finetuning(
                 buffer.add(rollout)
                 if replay_batch is not None:
                     combined = _concat_rollout_batches([rollout, replay_batch.to(device)])
+                    combined_telemetry = telemetry
 
-            update_stats = _ppo_update(policy, optimizer, combined, reinforcement)
+            update_stats = _ppo_update(
+                policy,
+                optimizer,
+                combined,
+                reinforcement,
+                telemetry=combined_telemetry,
+            )
             updates.append(
                 ReinforcementUpdate(
                     update=step,
                     mean_reward=update_stats.mean_reward,
+                    reward_std=update_stats.reward_std,
                     policy_loss=update_stats.policy_loss,
                     value_loss=update_stats.value_loss,
                     entropy=update_stats.entropy,
                     samples=update_stats.samples,
+                    collection_time=update_stats.collection_time,
+                    samples_per_second=update_stats.samples_per_second,
+                    steps_per_second=update_stats.steps_per_second,
                 )
             )
     finally:

@@ -98,6 +98,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
    - Notes (2025-11-11): CPU-backed replay buffer merged with configurable sampling ratios, CLI summaries now surface per-update sample counts, and regression coverage guards hybrid batches while distributed rollout plumbing remains queued.
    - Notes (2025-11-14): Parallel rollout manager shipped with spawn-based workers, CLI overrides, and regression coverage confirming sample scaling; curriculum plumbing + telemetry batching remain next in line before distributed profiling.
    - Notes (2025-11-14): Landed deterministic ROI evaluation for PPO runs, wiring differentiable PnL metrics into run summaries and CLI output to close the optimisation loop post-supervised training.
+   - Notes (2025-11-16): Added `RolloutTelemetry` aggregation, throughput stats, and CLI/reporting surfacing so distributed PPO profiling captures collection latency, reward dispersion, and sample-rate telemetry for downstream automation.
 
 ## 3. Evaluation & Monitoring
 - [x] Build evaluation harness for daily/weekly backtests with walk-forward splits.
