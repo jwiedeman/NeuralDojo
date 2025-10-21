@@ -86,7 +86,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-10-29): Scheduled smoke-test executions against reduced fixtures, aligned checkpoint catalogue updates with reporting automation, and captured alerting requirements for failed warm starts in the monitoring milestone draft.
   - Notes (2025-11-04): Implemented warm-start CLI gating with resume semantics, executed the first diagnostics-enabled smoke run, and staged distributed rollout harness benchmarks for the next Sprint 4 review.
   - Notes (2025-11-05): Finalised backbone weight loading from masked/contrastive checkpoints via the PPO runner, added `--pretrain-checkpoint` validation to the CLI, and extended regression coverage to assert weights transfer before PPO updates.
-- [ ] Extend PPO-style upgrades to optimise ROI directly using the differentiable PnL simulator after supervised convergence.
+- [x] Extend PPO-style upgrades to optimise ROI directly using the differentiable PnL simulator after supervised convergence.
    - Notes (2024-02-25): PPO upgrades will reuse optimisation telemetry (latency, gradient noise) once Phase 2 diagnostics are instrumented, keeping action-confidence work grounded in measurable improvements.
    - Notes (2025-10-26): Sequenced simulator integration milestones (slippage hooks, latency buckets) with PPO reward-shaping toggles to align ROI optimisation with execution realism.
    - Notes (2025-10-28): Defined convergence gates (calibration drift threshold, drawdown guardrails) for enabling ROI-centric updates and queued benchmarking harness updates for ROI vs. risk comparisons.
@@ -95,6 +95,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
    - Notes (2025-11-09): Simulator telemetry bundle (slippage, fees, funding, latency penalties) now exposed via `market_nn_plus_ultra.simulation.simulate_execution`; next steps wire traces into PPO rollouts and CLI toggles once profiling windows resume.
    - Notes (2025-11-11): CPU-backed replay buffer merged with configurable sampling ratios, CLI summaries now surface per-update sample counts, and regression coverage guards hybrid batches while distributed rollout plumbing remains queued.
    - Notes (2025-11-14): Parallel rollout manager shipped with spawn-based workers, CLI overrides, and regression coverage confirming sample scaling; curriculum plumbing + telemetry batching remain next in line before distributed profiling.
+   - Notes (2025-11-14): Landed deterministic ROI evaluation for PPO runs, wiring differentiable PnL metrics into run summaries and CLI output to close the optimisation loop post-supervised training.
 
 ## 3. Evaluation & Monitoring
 - [x] Build evaluation harness for daily/weekly backtests with walk-forward splits.

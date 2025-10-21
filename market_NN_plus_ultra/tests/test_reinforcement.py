@@ -115,6 +115,8 @@ def test_reinforcement_finetuning_smoke(tmp_path: Path) -> None:
     assert np.isfinite(update.entropy)
     assert update.samples == reinforcement_config.steps_per_rollout
     assert result.policy_state_dict
+    assert "roi_mean" in result.evaluation_metrics
+    assert all(np.isfinite(value) for value in result.evaluation_metrics.values())
 
 
 def test_reinforcement_with_replay_buffer(tmp_path: Path) -> None:
@@ -173,6 +175,7 @@ def test_reinforcement_with_replay_buffer(tmp_path: Path) -> None:
     # First update uses only fresh rollout data; second should include replay samples.
     assert result.updates[0].samples == reinforcement_config.steps_per_rollout
     assert result.updates[1].samples > reinforcement_config.steps_per_rollout
+    assert "roi_mean" in result.evaluation_metrics
 
 
 def test_reinforcement_parallel_rollout_workers(tmp_path: Path) -> None:
@@ -232,6 +235,7 @@ def test_reinforcement_parallel_rollout_workers(tmp_path: Path) -> None:
     update = result.updates[0]
     assert update.samples == reinforcement_config.steps_per_rollout * reinforcement_config.rollout_workers
     assert np.isfinite(update.mean_reward)
+    assert "roi_mean" in result.evaluation_metrics
 
 
 def test_reinforcement_warm_start_from_pretraining_checkpoint(tmp_path: Path) -> None:
@@ -296,6 +300,7 @@ def test_reinforcement_warm_start_from_pretraining_checkpoint(tmp_path: Path) ->
     )
 
     assert result.updates == []
+    assert "roi_mean" in result.evaluation_metrics
     policy_backbone = {
         key: tensor
         for key, tensor in result.policy_state_dict.items()
