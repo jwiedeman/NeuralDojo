@@ -215,6 +215,11 @@ The commands below take you from a fresh clone to running both training and infe
 
    The command above validates the SQLite dataset, optionally regenerates regime labels, runs pretraining, launches supervised training, and finishes with PPO fine-tuning. Artifacts land under `automation_runs/<timestamp>/`, including checkpoints, profitability summaries, and policy state dicts. Add flags such as `--regenerate-regimes`, `--skip-pretraining`, or `--skip-training` to tailor individual stages.
 
+   Looking for a complete walkthrough that chains fixture creation, pretraining,
+   training, evaluation, and monitoring? Follow the
+   [end-to-end MVP quickstart](./docs/quickstart_mvp.md) to run the full loop
+   and capture Prometheus-ready telemetry after each pass.
+
 10. **Serve the inference API**
 
    ```bash

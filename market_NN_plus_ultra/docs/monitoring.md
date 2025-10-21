@@ -40,6 +40,29 @@ snapshot JSON. Prometheus exporters can call
 `market_nn_plus_ultra.monitoring.default_prometheus_exporter()` and feed it
 the resulting snapshot to keep dashboards up to date.
 
+### Using evaluation artefacts from `run_retraining_plan`
+
+When the automation pipeline finishes with the evaluation stage enabled, the
+`evaluation/` directory contains both the predictions parquet and the
+operations summary JSON. The monitoring CLI now understands these artefacts
+directly, so you can produce a Prometheus-ready snapshot in one command:
+
+```bash
+python scripts/monitoring/live_monitor.py \
+  automation_runs/20251203-120000/evaluation/reference_returns.parquet \
+  --evaluation-dir automation_runs/20251203-120000/evaluation \
+  --output automation_runs/20251203-120000/evaluation/monitoring_snapshot.json
+```
+
+In this example the reference file holds a baseline return history (e.g. a
+validation backtest) stored alongside the evaluation artefacts. `--evaluation-dir`
+resolves the predictions (`predictions.parquet` by default) and operations
+summary (`operations_summary.json`). The CLI merges the profitability metrics
+and guardrail alerts captured during evaluation with live drift checks so the
+resulting snapshot includes everything the Prometheus exporter needs. Provide
+custom filenames with `--evaluation-predictions-name` or
+`--evaluation-operations-name` when the defaults are not used.
+
 ## Alert Semantics
 
 * **Risk thresholds** reuse the `OperationsThresholds` dataclass so the

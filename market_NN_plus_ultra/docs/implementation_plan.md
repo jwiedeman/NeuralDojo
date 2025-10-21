@@ -65,12 +65,16 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * **2025-11-18 — Inference service MVP:** Shipped the FastAPI service scaffold under `market_nn_plus_ultra.service` with prediction, configuration, curriculum, and reload endpoints, added regression coverage, and published the `scripts/service.py` launcher so the Plus Ultra agent can be served with telemetry-rich responses without bespoke notebooks.
 * **2025-11-19 — Benchmark leaderboard automation:** Added grouped leaderboard utilities in `market_nn_plus_ultra.evaluation.benchmarking`, extended the summarisation CLI with `--leaderboard-*` flags, and documented the workflow so omni vs. hybrid comparisons can be prioritised for the pending 4090 sweeps without combing through raw parquet outputs.
 * **2025-11-20 — GPU container baseline:** Published the CUDA-enabled Docker image + entrypoint (`docker/Dockerfile.gpu`) with documentation covering training, pretraining, agent, and service invocations so orchestration backlogs can target a reproducible runtime while reinforcement, reporting, and monitoring milestones iterate.
+* **2025-12-04 — Evaluation-aware monitoring CLI:** Wired the monitoring snapshot CLI to consume evaluation predictions and operations summaries directly, merged guardrail alerts into the Prometheus-ready payload, and added regression coverage plus documentation so automation runs surface profitability telemetry immediately.
+* **2025-12-04 — MVP pipeline quickstart:** Authored `docs/quickstart_mvp.md`, linked it from the README, and documented the retraining → evaluation → monitoring workflow so teams can stand up profitability tracking without bespoke notebooks.
 
 ### MVP Execution Focus — 2025-12-02
 
 * [x] Normalise Prometheus risk gauges to emit non-negative drawdown/tail metrics for dashboards without losing sign information in offline summaries.
-* [ ] Feed `run_retraining_plan` evaluation artefacts (predictions, profitability summaries, operations alerts) directly into the monitoring snapshot CLI so MVP deployments emit Prometheus-ready snapshots after each run.
-* [ ] Publish an end-to-end quickstart (fixture + config bundle) that exercises pretraining → training → evaluation → monitoring to validate profitability tracking before scaling reinforcement loops.
+* [x] Feed `run_retraining_plan` evaluation artefacts (predictions, profitability summaries, operations alerts) directly into the monitoring snapshot CLI so MVP deployments emit Prometheus-ready snapshots after each run.
+  - Notes (2025-12-04): CLI now accepts `--evaluation-dir`/`--operations-summary`, merges operations alerts with drift diagnostics, and prints guardrail tables alongside the Prometheus snapshot JSON.
+* [x] Publish an end-to-end quickstart (fixture + config bundle) that exercises pretraining → training → evaluation → monitoring to validate profitability tracking before scaling reinforcement loops.
+  - Notes (2025-12-04): Introduced `docs/quickstart_mvp.md` plus README pointers covering fixture generation, retraining automation, reference capture, monitoring snapshot export, and optional Prometheus pushes.
 
 ## Phase 1 — Data & Feature Depth (Weeks 1-2)
 

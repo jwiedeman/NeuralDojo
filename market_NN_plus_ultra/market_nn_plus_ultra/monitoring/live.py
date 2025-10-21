@@ -30,6 +30,7 @@ class MonitoringSnapshot:
     drift: DriftMetrics
     alerts: list[str]
     window_count: int
+    guardrails: dict[str, float] | None = None
 
     def as_dict(self) -> dict[str, object]:
         """Return a serialisable representation of the snapshot."""
@@ -40,6 +41,8 @@ class MonitoringSnapshot:
             "alerts": list(self.alerts),
             "window_count": int(self.window_count),
         }
+        if self.guardrails is not None:
+            payload["guardrails"] = dict(self.guardrails)
         return payload
 
 
@@ -154,6 +157,7 @@ class LiveMonitor:
             drift=drift,
             alerts=alerts,
             window_count=window_array.size,
+            guardrails=None,
         )
         return snapshot
 
