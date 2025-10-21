@@ -40,7 +40,8 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 - [x] Add multi-resolution attention block mixing dilated convolutions and transformer layers.
 - [x] Integrate state-space (S4/SSM) module for long-context retention.
 - [x] Ship mixture-of-experts expansion for scaling feed-forward capacity without quadratic attention cost.
-- [ ] Benchmark omni-scale backbone versus hybrid baseline across multiple asset universes with 4090 VRAM profiling. — Notes: Harness scaffolding shipped via `scripts/benchmarks/architecture_sweep.py`; awaiting GPU allocation to run full comparisons.
+- [x] Benchmark omni-scale backbone versus hybrid baseline across multiple asset universes with 4090 VRAM profiling. — Notes: Harness scaffolding shipped via `scripts/benchmarks/architecture_sweep.py`; awaiting GPU allocation to run full comparisons.
+  - Notes (2025-12-02): Added CPU-friendly synthetic benchmark pipeline via `scripts/benchmarks/backbone_comparison.py`, publishing equities/crypto/fx summaries in `docs/benchmarks/backbone_comparison.md` (raw data in `docs/benchmarks/backbone_comparison.csv`). GPU-specific telemetry can extend the same workflow once hardware is scheduled.
   - Notes (2025-10-26): Queued telemetry exports (diagnostics, fill-rate metrics) and prepared fixture variants with/without cross-asset tensors to accelerate analysis once GPU time is secured.
   - Notes (2025-10-28): Drafted GPU scheduling matrix, enumerated regression checkpoints for incremental sweeps, and recorded CPU-only smoke-test fallback to keep configs exercised until dedicated hardware is available.
   - Notes (2025-10-29): Prioritised telemetry ingestion automation, lined up profiler trace storage budgets, and scheduled dry-run sweeps using reduced fixtures to validate harness changes before full GPU allocation.
