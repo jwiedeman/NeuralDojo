@@ -9,6 +9,9 @@ import torch
 from types import SimpleNamespace
 
 from market_nn_plus_ultra.training import (
+    CurriculumConfig,
+    CurriculumParameters,
+    CurriculumStage,
     DataConfig,
     ExperimentConfig,
     MaskedTimeSeriesLightningModule,
@@ -121,6 +124,7 @@ def test_reinforcement_finetuning_smoke(tmp_path: Path) -> None:
     assert update.collection_time >= 0.0
     assert update.samples_per_second >= 0.0
     assert update.steps_per_second >= 0.0
+    assert isinstance(update.curriculum, CurriculumParameters)
     assert result.policy_state_dict
     assert "roi_mean" in result.evaluation_metrics
     assert all(np.isfinite(value) for value in result.evaluation_metrics.values())
@@ -247,7 +251,73 @@ def test_reinforcement_parallel_rollout_workers(tmp_path: Path) -> None:
     assert np.isfinite(update.reward_std)
     assert update.samples_per_second > 0.0
     assert update.steps_per_second > 0.0
+    assert isinstance(update.curriculum, CurriculumParameters)
     assert "roi_mean" in result.evaluation_metrics
+
+
+def test_reinforcement_curriculum_schedule_updates(tmp_path: Path) -> None:
+    db_path = tmp_path / "ppo_fixture.db"
+    _build_sqlite_fixture(db_path, rows=200)
+
+    curriculum = CurriculumConfig(
+        stages=[
+            CurriculumStage(start_epoch=0, window_size=12, horizon=2, stride=4, normalise=False),
+            CurriculumStage(start_epoch=1, window_size=24, horizon=4, stride=2, normalise=True),
+        ],
+        repeat_final=True,
+    )
+    data_config = DataConfig(
+        sqlite_path=db_path,
+        symbol_universe=["TEST"],
+        feature_set=[],
+        window_size=16,
+        horizon=4,
+        stride=4,
+        normalise=True,
+        val_fraction=0.0,
+        curriculum=curriculum,
+    )
+    model_config = ModelConfig(
+        feature_dim=5,
+        model_dim=64,
+        depth=2,
+        heads=4,
+        dropout=0.1,
+        conv_kernel_size=3,
+        conv_dilations=(1, 2),
+        horizon=4,
+        output_dim=1,
+        architecture="temporal_transformer",
+    )
+    trainer_config = TrainerConfig(
+        batch_size=4,
+        num_workers=0,
+        accelerator="cpu",
+        precision="32-true",
+        checkpoint_dir=tmp_path / "checkpoints",
+    )
+    reinforcement_config = ReinforcementConfig(
+        total_updates=2,
+        steps_per_rollout=8,
+        policy_epochs=1,
+        minibatch_size=4,
+        learning_rate=1e-3,
+    )
+    experiment = ExperimentConfig(
+        seed=31,
+        data=data_config,
+        model=model_config,
+        optimizer=OptimizerConfig(lr=1e-3),
+        trainer=trainer_config,
+        reinforcement=reinforcement_config,
+    )
+
+    result = run_reinforcement_finetuning(experiment, device="cpu")
+
+    assert len(result.updates) == 2
+    first, second = result.updates
+    assert first.curriculum == CurriculumParameters(window_size=12, horizon=2, stride=4, normalise=False)
+    assert second.curriculum == CurriculumParameters(window_size=24, horizon=4, stride=2, normalise=True)
 
 
 def test_reinforcement_warm_start_from_pretraining_checkpoint(tmp_path: Path) -> None:
@@ -346,6 +416,7 @@ def _cli_namespace(**overrides: object) -> SimpleNamespace:
         "worker_device": None,
         "activation": None,
         "targets_are_returns": False,
+        "curriculum_profile": False,
         "cost_transaction": None,
         "cost_slippage": None,
         "cost_holding": None,

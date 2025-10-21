@@ -28,6 +28,7 @@ from .config import (
     TrainerConfig,
 )
 from .checkpoints import load_backbone_from_checkpoint
+from .curriculum import CurriculumParameters
 from .train_loop import MarketDataModule, MarketLightningModule
 
 
@@ -45,32 +46,44 @@ class MarketPolicyNetwork(nn.Module):
         super().__init__()
         self.model_config = model_config
         self.backbone = _build_backbone(model_config)
+        self.max_horizon = model_config.horizon
         self.horizon = model_config.horizon
         self.action_dim = model_config.output_dim
         self.policy_head = nn.Sequential(
             nn.LayerNorm(model_config.model_dim),
             nn.Linear(model_config.model_dim, model_config.model_dim),
             nn.GELU(),
-            nn.Linear(model_config.model_dim, self.horizon * self.action_dim),
+            nn.Linear(model_config.model_dim, self.max_horizon * self.action_dim),
         )
         self.value_head = nn.Sequential(
             nn.LayerNorm(model_config.model_dim),
             nn.Linear(model_config.model_dim, model_config.model_dim),
             nn.GELU(),
-            nn.Linear(model_config.model_dim, self.horizon),
+            nn.Linear(model_config.model_dim, self.max_horizon),
         )
-        self.log_std = nn.Parameter(torch.zeros(self.horizon, self.action_dim))
+        self.log_std = nn.Parameter(torch.zeros(self.max_horizon, self.action_dim))
+
+    def set_horizon(self, horizon: int) -> None:
+        if horizon < 1:
+            raise ValueError("Horizon must be positive")
+        if horizon > self.max_horizon:
+            raise ValueError(
+                f"Horizon {horizon} exceeds maximum configured horizon {self.max_horizon}"
+            )
+        self.horizon = horizon
 
     def forward(self, features: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         hidden = self.backbone(features)
         last_state = hidden[:, -1, :]
         mean = self.policy_head(last_state)
-        mean = mean.view(features.size(0), self.horizon, self.action_dim)
+        mean = mean.view(features.size(0), self.max_horizon, self.action_dim)
+        mean = mean[:, : self.horizon, :]
         value = self.value_head(last_state)
+        value = value[:, : self.horizon]
         return mean, value
 
     def _distribution(self, mean: torch.Tensor) -> Normal:
-        std = torch.exp(self.log_std).clamp(min=1e-4)
+        std = torch.exp(self.log_std[: self.horizon]).clamp(min=1e-4)
         std = std.unsqueeze(0).expand_as(mean)
         return Normal(mean, std)
 
@@ -84,6 +97,11 @@ class MarketPolicyNetwork(nn.Module):
 
     def evaluate_actions(self, features: torch.Tensor, actions: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         mean, value = self.forward(features)
+        if actions.size(1) != self.horizon:
+            raise ValueError(
+                "Action horizon does not match policy horizon: "
+                f"expected {self.horizon}, got {actions.size(1)}"
+            )
         dist = self._distribution(mean)
         log_prob = dist.log_prob(actions).sum(dim=-1)
         entropy = dist.entropy().sum(dim=-1)
@@ -290,6 +308,11 @@ def _rollout_worker_loop(
             )
         iterator = _infinite_iterator(train_loader)
         policy = MarketPolicyNetwork(model_config).to(worker_device)
+        initial_curriculum: CurriculumParameters | None = getattr(
+            data_module, "current_curriculum", None
+        )
+        if initial_curriculum is not None:
+            policy.set_horizon(initial_curriculum.horizon)
 
         response_queue.put(("ready", None))
 
@@ -300,7 +323,19 @@ def _rollout_worker_loop(
             if command != "collect":
                 continue
 
-            state_dict = payload
+            state_dict, step = payload
+            if data_module.has_curriculum:
+                changed = data_module.step_curriculum(step)
+                if changed is not None:
+                    train_loader = data_module.train_dataloader()
+                    if len(train_loader) == 0:
+                        raise RuntimeError(
+                            "Training dataloader is empty after curriculum step; adjust schedule or dataset length."
+                        )
+                    iterator = _infinite_iterator(train_loader)
+                current = getattr(data_module, "current_curriculum", None)
+                if current is not None:
+                    policy.set_horizon(current.horizon)
             policy.load_state_dict({key: tensor.to(worker_device) for key, tensor in state_dict.items()})
             rollout, telemetry = _collect_rollout(
                 policy, iterator, reinforcement, worker_device
@@ -369,14 +404,14 @@ class ParallelRolloutManager:
             self._requests.append(request)
             self._responses.append(response)
 
-    def collect(self, policy: MarketPolicyNetwork) -> Tuple[RolloutBatch, RolloutTelemetry]:
+    def collect(self, policy: MarketPolicyNetwork, step: int) -> Tuple[RolloutBatch, RolloutTelemetry]:
         state_dict = {
             key: tensor.detach().cpu()
             for key, tensor in policy.state_dict().items()
         }
 
         for queue in self._requests:
-            queue.put(("collect", state_dict))
+            queue.put(("collect", (state_dict, step)))
 
         batches: list[RolloutBatch] = []
         telemetries: list[RolloutTelemetry] = []
@@ -431,6 +466,7 @@ class ReinforcementUpdate:
     collection_time: float
     samples_per_second: float
     steps_per_second: float
+    curriculum: CurriculumParameters | None = None
 
 
 @dataclass(slots=True)
@@ -736,6 +772,10 @@ def run_reinforcement_finetuning(
     if len(train_loader) == 0:
         raise RuntimeError("Training dataloader is empty; ensure the dataset yields at least one batch")
 
+    initial_curriculum: CurriculumParameters | None = getattr(data_module, "current_curriculum", None)
+    if initial_curriculum is not None:
+        policy.set_horizon(initial_curriculum.horizon)
+
     iterator = _infinite_iterator(train_loader)
     updates: List[ReinforcementUpdate] = []
 
@@ -763,8 +803,33 @@ def run_reinforcement_finetuning(
             manager = ParallelRolloutManager(experiment_config, reinforcement)
 
         for step in range(reinforcement.total_updates):
+            if data_module.has_curriculum:
+                changed = data_module.step_curriculum(step)
+                if changed is not None:
+                    train_dataset = getattr(data_module, "train_dataset", None)
+                    if train_dataset is None or len(train_dataset) == 0:  # type: ignore[arg-type]
+                        raise RuntimeError(
+                            "Curriculum stage produced an empty training dataset; adjust schedule or dataset length."
+                        )
+                    if manager is None:
+                        train_loader = data_module.train_dataloader()
+                        if len(train_loader) == 0:
+                            raise RuntimeError(
+                                "Training dataloader is empty after curriculum step; adjust schedule or dataset length."
+                            )
+                        iterator = _infinite_iterator(train_loader)
+
+            current_curriculum: CurriculumParameters | None = getattr(
+                data_module, "current_curriculum", None
+            )
+            if (
+                current_curriculum is not None
+                and policy.horizon != current_curriculum.horizon
+            ):
+                policy.set_horizon(current_curriculum.horizon)
+
             if manager is not None:
-                rollout, telemetry = manager.collect(policy)
+                rollout, telemetry = manager.collect(policy, step)
             else:
                 rollout, telemetry = _collect_rollout(policy, iterator, reinforcement, device)
 
@@ -801,6 +866,7 @@ def run_reinforcement_finetuning(
                     collection_time=update_stats.collection_time,
                     samples_per_second=update_stats.samples_per_second,
                     steps_per_second=update_stats.steps_per_second,
+                    curriculum=current_curriculum,
                 )
             )
     finally:

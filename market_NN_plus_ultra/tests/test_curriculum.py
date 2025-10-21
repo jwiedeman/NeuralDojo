@@ -8,6 +8,7 @@ from market_nn_plus_ultra.training import (
     CurriculumScheduler,
     CurriculumStage,
     DataConfig,
+    summarise_curriculum_profile,
 )
 
 
@@ -107,3 +108,35 @@ class DummyTrainer:
 
     def reset_val_dataloader(self) -> None:
         self.reset_val_calls += 1
+
+
+def test_summarise_curriculum_profile_handles_missing_schedule():
+    cfg = make_data_config()
+
+    schedule = summarise_curriculum_profile(cfg, total_epochs=3)
+
+    assert len(schedule) == 3
+    expected = CurriculumParameters(
+        window_size=cfg.window_size,
+        horizon=cfg.horizon,
+        stride=cfg.stride,
+        normalise=cfg.normalise,
+    )
+    assert all(params == expected for params in schedule)
+
+
+def test_summarise_curriculum_profile_resolves_stages():
+    cfg = make_data_config(
+        curriculum=CurriculumConfig(
+            stages=[
+                CurriculumStage(start_epoch=0, window_size=64, horizon=4, stride=2, normalise=False),
+                CurriculumStage(start_epoch=2, window_size=128, horizon=6, stride=3, normalise=True),
+            ],
+            repeat_final=True,
+        )
+    )
+
+    schedule = summarise_curriculum_profile(cfg, total_epochs=5)
+
+    assert [params.window_size for params in schedule] == [64, 64, 128, 128, 128]
+    assert [params.normalise for params in schedule] == [False, False, True, True, True]
