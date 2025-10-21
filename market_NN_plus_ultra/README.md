@@ -292,7 +292,7 @@ Each module comes with docstrings explaining expected behaviour so future contri
 * **Risk-aware optimisation** — Custom loss functions marry standard regression objectives with differentiable Sharpe and drawdown penalties, rewarding policies that maximise return while respecting risk budgets.
 * **Differentiable PnL simulator** — Training losses can now backpropagate through a cost-aware PnL stream that includes transaction, slippage, and holding penalties for realistic signal shaping.
 * **Reinforcement fine-tuning** — PPO-style policy optimisation on top of supervised checkpoints lets the agent learn directly from differentiable PnL trajectories with configurable trading costs.
-* **Automated evaluation** — The evaluation module exposes risk-adjusted metrics (Sharpe, Sortino, Calmar, drawdown) and trade-level analytics that plug directly into backtesting or live monitoring loops.
+* **Automated evaluation** — The evaluation module exposes risk-adjusted metrics (Sharpe, Sortino, Calmar, drawdown), regime-aware attribution tables, and trade-level analytics that plug directly into backtesting or live monitoring loops.
 * **Walk-forward harness** — `WalkForwardBacktester` enables regimented daily/weekly/monthly evaluation splits, automatically summarising ROI-focused metrics per regime.
 * **Research ergonomics** — YAML-driven experiment configs, dataclass-backed runtime configs, and a high-level trainer streamline iteration while keeping experiments reproducible.
 

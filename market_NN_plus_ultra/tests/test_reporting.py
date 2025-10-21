@@ -22,10 +22,14 @@ def _sample_predictions() -> pd.DataFrame:
     timestamps = pd.date_range("2024-01-01", periods=64, freq="h")
     returns = rng.normal(0.001, 0.01, size=64)
     symbols = ["BTC", "ETH"] * 32
+    vol_cycle = ["low_vol", "mid_vol", "high_vol", "mid_vol"]
+    liq_cycle = ["dry", "balanced", "flood", "balanced"]
     data = {
         "symbol": symbols,
         "window_end": timestamps,
         "realised_return": returns,
+        "regime__volatility_regime": [vol_cycle[i % len(vol_cycle)] for i in range(len(returns))],
+        "regime__liquidity_regime": [liq_cycle[i % len(liq_cycle)] for i in range(len(returns))],
     }
     return pd.DataFrame(data)
 
@@ -41,6 +45,8 @@ def test_generate_markdown_report(tmp_path: Path) -> None:
     assert "Sharpe" in contents
     assert "## Profitability Summary" in contents
     assert "## Attribution by Symbol" in contents
+    assert "## Regime Attribution" in contents
+    assert "### Volatility Regime" in contents
     assert "## Scenario Analysis" in contents
     assert "## Bootstrapped Confidence Intervals" in contents
 
@@ -83,6 +89,8 @@ def test_generate_html_report(tmp_path: Path) -> None:
     assert "table" in html
     assert "<h2>Profitability Summary</h2>" in html
     assert "<h2>Attribution by Symbol</h2>" in html
+    assert "<h2>Regime Attribution</h2>" in html
+    assert "<h3>Volatility Regime</h3>" in html
     assert "<h2>Scenario Analysis</h2>" in html
     assert "<h2>Bootstrapped Confidence Intervals</h2>" in html
 

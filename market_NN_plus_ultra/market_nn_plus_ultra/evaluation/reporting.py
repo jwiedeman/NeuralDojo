@@ -107,6 +107,47 @@ class AttributionRow:
 
 
 @dataclass(slots=True)
+class RegimeAttributionRow:
+    """Attribution record describing performance for a regime bucket."""
+
+    label: str
+    samples: int
+    sample_weight: float
+    average_return: float
+    cumulative_return: float
+    sharpe: float
+    hit_rate: float
+
+    def markdown_row(self) -> str:
+        return (
+            f"| {self.label} | {self.samples} | {_format_percent(self.sample_weight)} | "
+            f"{_format_percent(self.average_return)} | {_format_percent(self.cumulative_return)} | "
+            f"{self.sharpe:.3f} | {_format_percent(self.hit_rate)} |"
+        )
+
+    def html_row(self) -> str:
+        return (
+            "<tr>"
+            f"<td>{self.label}</td>"
+            f"<td>{self.samples}</td>"
+            f"<td>{_format_percent(self.sample_weight)}</td>"
+            f"<td>{_format_percent(self.average_return)}</td>"
+            f"<td>{_format_percent(self.cumulative_return)}</td>"
+            f"<td>{self.sharpe:.3f}</td>"
+            f"<td>{_format_percent(self.hit_rate)}</td>"
+            "</tr>"
+        )
+
+
+@dataclass(slots=True)
+class RegimeAttributionGroup:
+    """Collection of regime attribution rows for a single regime signal."""
+
+    name: str
+    rows: Sequence[RegimeAttributionRow]
+
+
+@dataclass(slots=True)
 class ScenarioEvent:
     """A notable scenario (best/worst period)."""
 
@@ -197,6 +238,7 @@ class PreparedReport:
     metrics: Dict[str, float]
     profitability: ProfitabilitySummary
     attribution: Sequence[AttributionRow]
+    regime_attribution: Sequence[RegimeAttributionGroup]
     scenarios: ScenarioAnalysis
     confidence_intervals: Mapping[str, ConfidenceInterval]
 
@@ -298,6 +340,60 @@ def _compute_attribution(
             )
         )
     return rows
+
+
+def _compute_regime_attribution(
+    predictions: pd.DataFrame,
+    returns_series: pd.Series,
+    *,
+    periods_per_year: int,
+) -> list[RegimeAttributionGroup]:
+    regime_columns = [col for col in predictions.columns if col.startswith("regime__")]
+    if not regime_columns:
+        return []
+
+    cleaned_returns = returns_series.dropna()
+    total_samples = int(cleaned_returns.size)
+    if total_samples == 0:
+        return []
+
+    groups: list[RegimeAttributionGroup] = []
+    base_frame = predictions.reindex(cleaned_returns.index).copy()
+    base_frame["__returns"] = cleaned_returns
+
+    for column in sorted(regime_columns):
+        regime_values = base_frame[column].dropna()
+        if regime_values.empty:
+            continue
+
+        joined = base_frame.loc[regime_values.index, ["__returns", column]].dropna()
+        if joined.empty:
+            continue
+
+        rows: list[RegimeAttributionRow] = []
+        for label, group in joined.groupby(column, observed=True):
+            returns = group["__returns"].to_numpy(dtype=np.float64)
+            if returns.size == 0:
+                continue
+            metrics = risk_metrics(returns, periods_per_year=periods_per_year)
+            rows.append(
+                RegimeAttributionRow(
+                    label=str(label),
+                    samples=int(returns.size),
+                    sample_weight=(returns.size / total_samples) if total_samples else 0.0,
+                    average_return=float(metrics.get("average_return", float("nan"))),
+                    cumulative_return=float(metrics.get("cumulative_return", float("nan"))),
+                    sharpe=float(metrics.get("sharpe", float("nan"))),
+                    hit_rate=float(metrics.get("hit_rate", float("nan"))),
+                )
+            )
+
+        if rows:
+            rows.sort(key=lambda row: row.sample_weight, reverse=True)
+            base_name = column.split("regime__", 1)[1] or column
+            groups.append(RegimeAttributionGroup(name=base_name, rows=rows))
+
+    return groups
 
 
 def _resolve_timestamp(row: pd.Series) -> str | None:
@@ -442,6 +538,11 @@ def _prepare_report(
 
     profitability = _compute_profitability(returns_series, final_metrics)
     attribution = _compute_attribution(predictions, returns_series)
+    regime_attribution = _compute_regime_attribution(
+        predictions,
+        returns_series,
+        periods_per_year=periods_per_year,
+    )
     scenarios = _compute_scenarios(predictions, returns_series)
     confidence = _bootstrap_confidence_intervals(
         returns_series, periods_per_year=periods_per_year
@@ -453,6 +554,7 @@ def _prepare_report(
         metrics=final_metrics,
         profitability=profitability,
         attribution=attribution,
+        regime_attribution=regime_attribution,
         scenarios=scenarios,
         confidence_intervals=confidence,
     )
@@ -541,6 +643,7 @@ def _build_markdown(
     milestones: Sequence[MilestoneReference] = (),
     profitability: ProfitabilitySummary | None = None,
     attribution: Sequence[AttributionRow] = (),
+    regime_attribution: Sequence[RegimeAttributionGroup] = (),
     scenarios: ScenarioAnalysis | None = None,
     confidence_intervals: Mapping[str, ConfidenceInterval] = (),
 ) -> str:
@@ -586,6 +689,21 @@ def _build_markdown(
         for row in attribution:
             lines.append(row.markdown_row())
         lines.append("")
+
+    if regime_attribution:
+        lines.append("## Regime Attribution")
+        lines.append("")
+        for group in regime_attribution:
+            display = group.name.replace("_", " ").title()
+            lines.append(f"### {display}")
+            lines.append("")
+            lines.append(
+                "| Label | Samples | Sample Weight | Average Return | Cumulative Return | Sharpe | Hit Rate |"
+            )
+            lines.append("| --- | --- | --- | --- | --- | --- | --- |")
+            for row in group.rows:
+                lines.append(row.markdown_row())
+            lines.append("")
 
     if scenarios is not None and (
         scenarios.best_periods or scenarios.worst_periods or scenarios.drawdown
@@ -647,6 +765,7 @@ def _build_html(
     milestones: Sequence[MilestoneReference] = (),
     profitability: ProfitabilitySummary | None = None,
     attribution: Sequence[AttributionRow] = (),
+    regime_attribution: Sequence[RegimeAttributionGroup] = (),
     scenarios: ScenarioAnalysis | None = None,
     confidence_intervals: Mapping[str, ConfidenceInterval] = (),
 ) -> str:
@@ -700,6 +819,21 @@ def _build_html(
             f"{attr_rows}</tbody></table>"
         )
 
+    regime_html = ""
+    if regime_attribution:
+        sections: list[str] = ["<h2>Regime Attribution</h2>"]
+        for group in regime_attribution:
+            rows = "".join(row.html_row() for row in group.rows)
+            display = group.name.replace("_", " ").title()
+            sections.append(f"<h3>{display}</h3>")
+            sections.append(
+                "<table><thead><tr><th>Label</th><th>Samples</th><th>Sample Weight</th>"
+                "<th>Average Return</th><th>Cumulative Return</th><th>Sharpe</th><th>Hit Rate</th>"
+                "</tr></thead><tbody>"
+                f"{rows}</tbody></table>"
+            )
+        regime_html = "".join(sections)
+
     scenario_html = ""
     if scenarios is not None and (
         scenarios.best_periods or scenarios.worst_periods or scenarios.drawdown
@@ -747,6 +881,7 @@ def _build_html(
             profitability_html,
             milestone_list,
             attribution_html,
+            regime_html,
             scenario_html,
             confidence_html,
             "<h2>Visualisations</h2>" if charts else "",
@@ -830,6 +965,7 @@ def generate_markdown_report(
         milestones=_normalise_milestones(milestones),
         profitability=prepared.profitability,
         attribution=prepared.attribution,
+        regime_attribution=prepared.regime_attribution,
         scenarios=prepared.scenarios,
         confidence_intervals=prepared.confidence_intervals,
     )
@@ -886,6 +1022,7 @@ def generate_html_report(
         milestones=_normalise_milestones(milestones),
         profitability=prepared.profitability,
         attribution=prepared.attribution,
+        regime_attribution=prepared.regime_attribution,
         scenarios=prepared.scenarios,
         confidence_intervals=prepared.confidence_intervals,
     )
