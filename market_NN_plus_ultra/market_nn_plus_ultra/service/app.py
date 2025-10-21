@@ -9,13 +9,20 @@ from threading import Lock
 from typing import Any, Optional
 
 import pandas as pd
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
 
 from ..trading import AgentRunResult, GuardrailPolicy, GuardrailResult, MarketNNPlusUltraAgent
 from ..training import ExperimentConfig, load_experiment_from_file, summarise_curriculum_profile
+from .metrics import (
+    RequestTimer,
+    observe_prediction_rows,
+    record_guardrail_violations,
+    render_prometheus_metrics,
+    set_guardrail_enabled,
+)
 
 
 @dataclass(slots=True)
@@ -167,6 +174,7 @@ class ServiceState:
                 if config.guardrails.enabled
                 else None
             )
+            set_guardrail_enabled(self._guardrail_policy is not None)
 
     def run_agent(self, *, evaluate: bool, return_column: str) -> tuple[AgentRunResult, dict[str, Any]]:
         """Execute the agent and capture telemetry for responses."""
@@ -261,16 +269,20 @@ def create_app(settings: ServiceSettings) -> FastAPI:
 
     @app.get("/health")
     async def health() -> dict[str, Any]:
-        return {
-            "status": "ok",
-            "config_path": str(settings.config_path),
-            "checkpoint_path": str(settings.checkpoint_path) if settings.checkpoint_path else None,
-        }
+        with RequestTimer("health", "GET"):
+            return {
+                "status": "ok",
+                "config_path": str(settings.config_path),
+                "checkpoint_path": str(settings.checkpoint_path)
+                if settings.checkpoint_path
+                else None,
+            }
 
     @app.get("/config", response_model=ConfigResponse)
     async def read_config(service_state: ServiceState = Depends(get_state)) -> ConfigResponse:
-        config_dict = _dataclass_to_dict(service_state.config)
-        return ConfigResponse(config=config_dict)
+        with RequestTimer("config", "GET"):
+            config_dict = _dataclass_to_dict(service_state.config)
+            return ConfigResponse(config=config_dict)
 
     @app.get("/curriculum", response_model=CurriculumResponse)
     async def curriculum(
@@ -281,98 +293,130 @@ def create_app(settings: ServiceSettings) -> FastAPI:
         ),
         service_state: ServiceState = Depends(get_state),
     ) -> CurriculumResponse:
-        config = service_state.config
-        total_epochs = epochs or config.trainer.max_epochs
-        stages = summarise_curriculum_profile(config.data, total_epochs)
-        payload = [asdict(stage) for stage in stages]
-        return CurriculumResponse(epochs=total_epochs, stages=jsonable_encoder(payload))
+        with RequestTimer("curriculum", "GET"):
+            config = service_state.config
+            total_epochs = epochs or config.trainer.max_epochs
+            stages = summarise_curriculum_profile(config.data, total_epochs)
+            payload = [asdict(stage) for stage in stages]
+            return CurriculumResponse(epochs=total_epochs, stages=jsonable_encoder(payload))
 
     @app.post("/predict", response_model=PredictionResponse)
     async def predict(
         request: PredictionRequest,
         service_state: ServiceState = Depends(get_state),
     ) -> PredictionResponse:
-        evaluate = request.evaluate if request.evaluate is not None else settings.evaluate_by_default
-        return_column = request.return_column or settings.return_column
+        with RequestTimer("predict", "POST") as timer:
+            evaluate = request.evaluate if request.evaluate is not None else settings.evaluate_by_default
+            return_column = request.return_column or settings.return_column
 
-        try:
-            result, telemetry = await run_in_threadpool(
-                service_state.run_agent,
-                evaluate=evaluate,
-                return_column=return_column,
+            try:
+                result, telemetry = await run_in_threadpool(
+                    service_state.run_agent,
+                    evaluate=evaluate,
+                    return_column=return_column,
+                )
+            except ValueError as exc:
+                timer.set_status(400)
+                timer.set_exception(exc)
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            except RuntimeError as exc:
+                timer.set_status(500)
+                timer.set_exception(exc)
+                raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+            predictions, rows = _serialise_predictions(
+                result,
+                limit=request.limit,
+                max_rows=settings.max_prediction_rows,
             )
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        except RuntimeError as exc:
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-        predictions, rows = _serialise_predictions(
-            result,
-            limit=request.limit,
-            max_rows=settings.max_prediction_rows,
-        )
-        metrics = _serialise_metrics(result.metrics if evaluate else None)
-        return PredictionResponse(rows=rows, predictions=predictions, metrics=metrics, telemetry=telemetry)
+            observe_prediction_rows(rows)
+            metrics = _serialise_metrics(result.metrics if evaluate else None)
+            return PredictionResponse(
+                rows=rows,
+                predictions=predictions,
+                metrics=metrics,
+                telemetry=telemetry,
+            )
 
     @app.post("/reload", response_model=ReloadResponse)
     async def reload(
         request: ReloadRequest,
         service_state: ServiceState = Depends(get_state),
     ) -> ReloadResponse:
-        checkpoint = request.checkpoint_path
-        try:
-            await run_in_threadpool(service_state.reload, checkpoint_path=checkpoint)
-        except FileNotFoundError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-        return ReloadResponse(checkpoint_path=str(checkpoint) if checkpoint else str(settings.checkpoint_path) if settings.checkpoint_path else None)
+        with RequestTimer("reload", "POST") as timer:
+            checkpoint = request.checkpoint_path
+            try:
+                await run_in_threadpool(service_state.reload, checkpoint_path=checkpoint)
+            except FileNotFoundError as exc:
+                timer.set_status(404)
+                timer.set_exception(exc)
+                raise HTTPException(status_code=404, detail=str(exc)) from exc
+            return ReloadResponse(
+                checkpoint_path=
+                str(checkpoint)
+                if checkpoint
+                else str(settings.checkpoint_path)
+                if settings.checkpoint_path
+                else None
+            )
 
     @app.post("/guardrails", response_model=GuardrailResponse)
     async def enforce_guardrails(
         request: GuardrailRequest,
         service_state: ServiceState = Depends(get_state),
     ) -> GuardrailResponse:
-        policy = service_state.guardrail_policy
-        if policy is None:
-            raise HTTPException(status_code=400, detail="Guardrails not enabled in configuration")
+        with RequestTimer("guardrails", "POST") as timer:
+            policy = service_state.guardrail_policy
+            if policy is None:
+                timer.set_status(400)
+                raise HTTPException(status_code=400, detail="Guardrails not enabled in configuration")
 
-        config = service_state.config.guardrails
-        trades_df = pd.DataFrame(request.trades)
-        if trades_df.empty:
-            trades_df = pd.DataFrame({config.timestamp_col: pd.Series(dtype="datetime64[ns]")})
-        for column, dtype in (
-            (config.symbol_col, object),
-            (config.notional_col, float),
-            (config.position_col, float),
-            (config.price_col, float),
-            (config.return_col, float),
-        ):
-            if column not in trades_df.columns:
-                trades_df[column] = pd.Series(dtype=dtype)
-        if config.sector_caps and config.sector_column not in trades_df.columns:
-            trades_df[config.sector_column] = pd.Series(dtype=object)
-        if config.factor_caps and config.factor_column not in trades_df.columns:
-            trades_df[config.factor_column] = pd.Series(dtype=object)
+            config = service_state.config.guardrails
+            trades_df = pd.DataFrame(request.trades)
+            if trades_df.empty:
+                trades_df = pd.DataFrame({config.timestamp_col: pd.Series(dtype="datetime64[ns]")})
+            for column, dtype in (
+                (config.symbol_col, object),
+                (config.notional_col, float),
+                (config.position_col, float),
+                (config.price_col, float),
+                (config.return_col, float),
+            ):
+                if column not in trades_df.columns:
+                    trades_df[column] = pd.Series(dtype=dtype)
+            if config.sector_caps and config.sector_column not in trades_df.columns:
+                trades_df[config.sector_column] = pd.Series(dtype=object)
+            if config.factor_caps and config.factor_column not in trades_df.columns:
+                trades_df[config.factor_column] = pd.Series(dtype=object)
 
-        try:
-            result = await run_in_threadpool(service_state.enforce_guardrails, trades_df)
-        except (ValueError, TypeError) as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            try:
+                result = await run_in_threadpool(service_state.enforce_guardrails, trades_df)
+            except (ValueError, TypeError) as exc:
+                timer.set_status(400)
+                timer.set_exception(exc)
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-        payload = result.as_payload()
-        metrics = {key: float(value) for key, value in payload["metrics"].items()}
-        exposures_payload = {
-            group: {name: float(value) for name, value in values.items()}
-            for group, values in payload.get("exposures", {}).items()
-        }
-        violations = [GuardrailViolationModel(**violation) for violation in payload["violations"]]
-        trades_payload = jsonable_encoder(payload["trades"])
-        return GuardrailResponse(
-            metrics=metrics,
-            violations=violations,
-            scaled=bool(payload["scaled"]),
-            trades=trades_payload,
-            exposures=exposures_payload,
-        )
+            payload = result.as_payload()
+            metrics = {key: float(value) for key, value in payload["metrics"].items()}
+            exposures_payload = {
+                group: {name: float(value) for name, value in values.items()}
+                for group, values in payload.get("exposures", {}).items()
+            }
+            violations = [GuardrailViolationModel(**violation) for violation in payload["violations"]]
+            record_guardrail_violations(violation.name for violation in violations)
+            trades_payload = jsonable_encoder(payload["trades"])
+            return GuardrailResponse(
+                metrics=metrics,
+                violations=violations,
+                scaled=bool(payload["scaled"]),
+                trades=trades_payload,
+                exposures=exposures_payload,
+            )
+
+    @app.get("/metrics")
+    async def metrics() -> Response:
+        payload, content_type = render_prometheus_metrics()
+        return Response(content=payload, media_type=content_type)
 
     return app
 
