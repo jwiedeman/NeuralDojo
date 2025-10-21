@@ -34,7 +34,7 @@ keeping the stack maintainable and research-friendly.
 ## Phase 3 — Evaluation & Monitoring
 
 * Stand up a walk-forward evaluation harness covering daily, weekly, and monthly cadences with rolling retraining windows.
-* Produce auto-generated Markdown/HTML reports that chart ROI, drawdowns, turnover, and regime attribution for every run.
+* ✅ Produce auto-generated Markdown/HTML reports that chart ROI, drawdowns, turnover, and regime attribution for every run — regime-specific attribution tables now surface volatility/liquidity buckets alongside risk metrics in both Markdown and HTML exports.
 * ✅ Stream experiment telemetry to Weights & Biases so every Plus Ultra experiment carries searchable configs, metrics, and
   artefacts. Offline logging is available for air-gapped studies.
 

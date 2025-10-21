@@ -29,6 +29,8 @@ from .operations import (
 )
 from .reporting import (
     MilestoneReference,
+    RegimeAttributionGroup,
+    RegimeAttributionRow,
     ReportSummary,
     generate_html_report,
     generate_markdown_report,
@@ -64,6 +66,8 @@ __all__ = [
     "ulcer_index",
     "value_at_risk",
     "MilestoneReference",
+    "RegimeAttributionGroup",
+    "RegimeAttributionRow",
     "ReportSummary",
     "generate_markdown_report",
     "generate_html_report",

@@ -47,6 +47,9 @@ Every generated report contains the following sections:
 * **Attribution by Symbol** — per-ticker sample weights, average returns,
   cumulative PnL, and contribution percentages so desk leads can spot the
   assets driving performance or losses.
+* **Regime Attribution** — volatility, liquidity, and other regime labels are
+  summarised with sample weights, return statistics, Sharpe ratios, and hit
+  rates to highlight which market states drive or drag performance.
 * **Scenario Analysis** — worst drawdown window plus best and worst periods
   with timestamps and symbols for quick drill-downs.
 * **Bootstrapped Confidence Intervals** — 95% intervals for total return,
