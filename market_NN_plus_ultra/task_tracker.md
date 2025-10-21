@@ -49,12 +49,13 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-11-14): Added aggregation utilities (`evaluation.benchmarking`, `scripts/benchmarks/summarise_architecture_sweep.py`) and regression tests so GPU outputs can be collapsed into Omni vs. hybrid comparisons immediately after runs complete.
   - Notes (2025-11-19): Extended the summarisation CLI with grouped leaderboard exports and documented the workflow so omni vs. hybrid prioritisation can happen before 4090 hardware comes online.
 - [x] Pretrain on masked time-series reconstruction before supervised fine-tuning (`scripts/pretrain.py`).
-- [ ] Benchmark pretraining checkpoints vs. scratch initialisation across asset classes. — Notes: Will run after schema enforcement lands to guarantee clean fixtures.
-   - Notes (2025-10-26): Defined evaluation splits aligned with diagnostics outputs so calibration drift and gradient-noise comparisons remain reproducible.
-   - Notes (2025-10-28): Synced checkpoint catalogue with latest fixtures, earmarked masked/contrastive pairs for comparative runs, and listed telemetry exports required for profitability dashboards.
-   - Notes (2025-10-29): Reserved benchmarking slots following warm-start smoke tests, documented metric rollups shared with profitability reporting, and queued automation scripts to publish comparison summaries alongside diagnostics logs.
-   - Notes (2025-11-07): Sequenced GPU allocation requests alongside upcoming PPO rollout profiling, recorded dependency on profitability reporting schema updates, and outlined fallback CPU smoke tests to keep configs exercised while waiting for hardware.
-   - Notes (2025-11-13): Added supervised warm-start support via `run_training(..., pretrain_checkpoint_path=...)`, exposed the flag on `scripts/train.py`, and shipped `scripts/benchmarks/pretraining_comparison.py` to automate scratch vs. pretrained comparisons.
+- [x] Benchmark pretraining checkpoints vs. scratch initialisation across asset classes. — Notes: Will run after schema enforcement lands to guarantee clean fixtures.
+  - Notes (2025-10-26): Defined evaluation splits aligned with diagnostics outputs so calibration drift and gradient-noise comparisons remain reproducible.
+  - Notes (2025-10-28): Synced checkpoint catalogue with latest fixtures, earmarked masked/contrastive pairs for comparative runs, and listed telemetry exports required for profitability dashboards.
+  - Notes (2025-10-29): Reserved benchmarking slots following warm-start smoke tests, documented metric rollups shared with profitability reporting, and queued automation scripts to publish comparison summaries alongside diagnostics logs.
+  - Notes (2025-11-07): Sequenced GPU allocation requests alongside upcoming PPO rollout profiling, recorded dependency on profitability reporting schema updates, and outlined fallback CPU smoke tests to keep configs exercised while waiting for hardware.
+  - Notes (2025-11-13): Added supervised warm-start support via `run_training(..., pretrain_checkpoint_path=...)`, exposed the flag on `scripts/train.py`, and shipped `scripts/benchmarks/pretraining_comparison.py` to automate scratch vs. pretrained comparisons.
+  - Notes (2025-11-27): Extended the CLI to emit warm-start deltas (validation loss, ROI, runtime), added regression coverage, and updated documentation so benchmark runs immediately surface warm-start lift without manual spreadsheets.
 - [x] Extend pretraining tasks with contrastive (TS2Vec-style) objectives for regime discrimination.
 - [x] Introduce curriculum over window sizes and horizons to stabilise very deep models. (See `CurriculumScheduler`)
 - [x] Automate architecture sweeps over depth, horizon, and dilation for omni-scale, MoE, transformer, and state-space backbones. — Notes: Planned to extend the benchmark harness CLI once baseline sweeps are in place.

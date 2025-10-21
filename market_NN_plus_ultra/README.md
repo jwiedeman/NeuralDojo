@@ -173,7 +173,7 @@ The commands below take you from a fresh clone to running both training and infe
        --output benchmarks/pretraining_comparison.parquet
    ```
 
-   The CLI runs two supervised jobs (one from scratch, one seeded by the pretraining checkpoint), aggregates metrics into a parquet catalogue, and writes checkpoints to `benchmarks/pretraining_runs/`. Use the output to quantify validation lift, ROI changes, or training-time savings before rolling the warm start into production recipes.
+   The CLI runs two supervised jobs (one from scratch, one seeded by the pretraining checkpoint), aggregates metrics into a parquet catalogue, and writes checkpoints to `benchmarks/pretraining_runs/`. A third row records warm-start minus scratch deltas for every numeric metric, and the command prints a concise summary of the most useful deltas (validation loss, ROI, Sharpe, runtime) so you can gauge warm-start lift at a glance. Use the output to quantify validation lift, ROI changes, or training-time savings before rolling the warm start into production recipes.
 
 8. **Evaluate stability with walk-forward splits**
 
