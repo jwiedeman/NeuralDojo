@@ -1,0 +1,50 @@
+# syntax=docker/dockerfile:1
+#
+# Container image for running Market NN Plus Ultra training, inference,
+# and service workloads on GPU-enabled hosts. The image builds on the
+# official PyTorch CUDA runtime so Torch + Lightning are preinstalled
+# with the correct CUDA toolkit.
+
+FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-runtime as base
+
+LABEL maintainer="NeuralDojo" \
+      org.opencontainers.image.title="market-nn-plus-ultra" \
+      org.opencontainers.image.description="GPU-enabled container for Market NN Plus Ultra training and inference" \
+      org.opencontainers.image.source="https://github.com/NeuralDojo"
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PLUS_ULTRA_HOME=/workspace
+
+WORKDIR /workspace
+
+# Install build dependencies for pandas, pandera, and other scientific packages.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends build-essential git && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy the project metadata and sources required to install the package.
+COPY pyproject.toml README.md ./
+COPY market_nn_plus_ultra ./market_nn_plus_ultra
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir .
+
+# Copy runtime assets that are not packaged automatically.
+COPY configs ./configs
+COPY scripts ./scripts
+
+# Ensure well-known directories exist for volume mounts.
+RUN mkdir -p /workspace/data /workspace/checkpoints /workspace/outputs
+
+# Copy the multi-command entrypoint and make it executable.
+COPY docker/entrypoint.sh /opt/plus-ultra/entrypoint.sh
+RUN chmod +x /opt/plus-ultra/entrypoint.sh
+
+ENV PATH="/workspace/.local/bin:${PATH}" \
+    DATA_DIR=/workspace/data \
+    CHECKPOINT_DIR=/workspace/checkpoints \
+    OUTPUT_DIR=/workspace/outputs
+
+ENTRYPOINT ["/opt/plus-ultra/entrypoint.sh"]
+CMD ["bash"]

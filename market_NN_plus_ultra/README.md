@@ -196,6 +196,35 @@ The commands below take you from a fresh clone to running both training and infe
 
    The FastAPI service loads the same experiment configuration as the CLI agent and exposes `/health`, `/config`, `/curriculum`, `/predict`, and `/reload` endpoints. Override defaults with flags such as `--checkpoint`, `--device`, or `--max-prediction-rows` when deploying. Responses include telemetry snapshots (feature columns, horizon, window size) so monitoring dashboards can ingest predictions without extra glue code.
 
+## Containerised workflow
+
+Prefer a reproducible runtime with CUDA already configured? Build the GPU-ready
+image under [`docker/Dockerfile.gpu`](./docker/Dockerfile.gpu) and run training,
+pretraining, the offline agent, or the FastAPI service with a single command.
+The entrypoint accepts the same sub-commands as the native scripts:
+
+```bash
+docker buildx build -f docker/Dockerfile.gpu -t plus-ultra:latest .
+
+# Launch supervised training on the GPU
+docker run --gpus all --rm \
+  -v "$PWD/data:/workspace/data" \
+  -v "$PWD/checkpoints:/workspace/checkpoints" \
+  plus-ultra:latest \
+  train --config configs/default.yaml --accelerator gpu --devices 1
+
+# Serve the FastAPI inference API
+docker run --gpus all --rm -p 8000:8000 \
+  -v "$PWD/data:/workspace/data" \
+  -v "$PWD/checkpoints:/workspace/checkpoints" \
+  plus-ultra:latest \
+  service --config configs/default.yaml --checkpoint checkpoints/default/last.ckpt
+```
+
+See [`docs/containerization.md`](./docs/containerization.md) for detailed
+volume recommendations, troubleshooting tips, and additional entrypoint
+examples.
+
 ## Windows vs. WSL
 
 You can run the project either directly in Windows or inside Windows Subsystem for Linux (WSL):

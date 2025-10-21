@@ -1,0 +1,25 @@
+# Exclude local development artefacts from Docker build context
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+build/
+dist/
+.eggs/
+.venv/
+.ipynb_checkpoints/
+.git/
+.gitignore
+*.db
+*.parquet
+*.csv
+outputs/
+checkpoints/
+data/
+logs/
+reports/
+# Tests and docs are unnecessary for runtime images
+.tests/
+tests/
+docs/
+notebooks/

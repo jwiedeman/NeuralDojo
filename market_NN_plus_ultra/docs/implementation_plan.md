@@ -47,6 +47,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * **2025-11-18 — Reporting enrichment:** Completed the automated run-report upgrades with profitability summaries, attribution tables, scenario analysis, and bootstrapped confidence intervals, refreshing the CLI, documentation, and regression coverage so evaluation artefacts are investor-ready out of the box.
 * **2025-11-18 — Inference service MVP:** Shipped the FastAPI service scaffold under `market_nn_plus_ultra.service` with prediction, configuration, curriculum, and reload endpoints, added regression coverage, and published the `scripts/service.py` launcher so the Plus Ultra agent can be served with telemetry-rich responses without bespoke notebooks.
 * **2025-11-19 — Benchmark leaderboard automation:** Added grouped leaderboard utilities in `market_nn_plus_ultra.evaluation.benchmarking`, extended the summarisation CLI with `--leaderboard-*` flags, and documented the workflow so omni vs. hybrid comparisons can be prioritised for the pending 4090 sweeps without combing through raw parquet outputs.
+* **2025-11-20 — GPU container baseline:** Published the CUDA-enabled Docker image + entrypoint (`docker/Dockerfile.gpu`) with documentation covering training, pretraining, agent, and service invocations so orchestration backlogs can target a reproducible runtime while reinforcement, reporting, and monitoring milestones iterate.
 
 ## Phase 1 — Data & Feature Depth (Weeks 1-2)
 

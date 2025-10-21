@@ -122,7 +122,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
    - Notes (2025-11-07): Coordinated telemetry schema updates with simulator and PPO teams, outlined Markdown/HTML template deltas for risk-aware metrics, and scheduled Sprint 5 doc automation spikes to keep reporting aligned with new objectives.
 
 ## 4. Automation & Deployment
-- [ ] Containerise training + inference pipelines with GPU support. — Notes: Blocked until simulator + service interface prototypes settle.
+- [x] Containerise training + inference pipelines with GPU support. — Notes: Docker image (`docker/Dockerfile.gpu`) + multi-command entrypoint ship CUDA-ready runtime; docs in `docs/containerization.md` cover volumes + usage (2025-11-20).
   - Notes (2025-10-26): Drafted base-image requirements bundling diagnostics tooling and simulator dependencies to minimise integration friction once implementation begins.
   - Notes (2025-10-28): Selected candidate CUDA runtime baselines aligned with profiler expectations and listed smoke tests (dataset build, diagnostics callback, PPO rollout) containers must execute before publishing.
   - Notes (2025-10-29): Documented container layer caching strategy for telemetry artefacts, outlined GPU runtime validation scripts, and coordinated dependency pinning with upcoming service scaffolding.
