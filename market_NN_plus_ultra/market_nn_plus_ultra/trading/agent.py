@@ -10,11 +10,12 @@ import numpy as np
 import pandas as pd
 import torch
 
-from ..data import FeatureRegistry, SQLiteMarketDataset, SlidingWindowDataset
-from ..data.sqlite_loader import SQLiteMarketSource
+from ..data import SlidingWindowDataset
 from ..evaluation.metrics import risk_metrics
 from ..utils.reporting import sanitize_metrics
 from ..training import ExperimentConfig, MarketLightningModule
+from ..training.train_loop import MarketDataModule, ensure_feature_dim_alignment
+from ..training.curriculum import CurriculumParameters
 
 
 @dataclass(slots=True)
@@ -40,6 +41,14 @@ class MarketNNPlusUltraAgent:
         self.batch_size = batch_size or experiment_config.trainer.batch_size
         self.checkpoint_path = checkpoint_path
 
+        self._data_module = MarketDataModule(
+            experiment_config.data,
+            experiment_config.trainer,
+            seed=experiment_config.seed,
+        )
+        ensure_feature_dim_alignment(self.config, self._data_module)
+        self._data_module.setup(stage="fit")
+
         if checkpoint_path is not None:
             module = MarketLightningModule.from_checkpoint(
                 checkpoint_path=checkpoint_path,
@@ -52,7 +61,6 @@ class MarketNNPlusUltraAgent:
         self.model = module.to(self.device)
         self.model.eval()
 
-        self.registry = FeatureRegistry()
         self._dataset: Optional[SlidingWindowDataset] = None
         self._feature_columns: list[str] = []
 
@@ -60,30 +68,14 @@ class MarketNNPlusUltraAgent:
         """Load SQLite data, enrich features, and create a sliding-window dataset."""
 
         data_cfg = self.config.data
-        source = SQLiteMarketSource(path=str(data_cfg.sqlite_path))
-        dataset = SQLiteMarketDataset(
-            source=source,
-            symbol_universe=data_cfg.symbol_universe,
-            indicators=data_cfg.indicators,
-            resample_rule=data_cfg.resample_rule,
-            tz_convert=data_cfg.tz_convert,
-        )
-        panel = dataset.as_panel()
-        pipeline = self.registry.build_pipeline(data_cfg.feature_set)
-        enriched = pipeline.transform_panel(panel)
-        if data_cfg.feature_set:
-            feature_columns = [f for f in data_cfg.feature_set if f in enriched.columns]
-        else:
-            feature_columns = [c for c in enriched.columns if c not in ("symbol",)]
-        sliding = SlidingWindowDataset(
-            panel=enriched,
-            feature_columns=feature_columns,
-            target_columns=data_cfg.target_columns,
+        params = CurriculumParameters(
             window_size=data_cfg.window_size,
             horizon=data_cfg.horizon,
             stride=data_cfg.stride,
             normalise=data_cfg.normalise,
         )
+        sliding = self._data_module._build_dataset(params)
+        feature_columns = self._data_module.feature_columns
         if len(feature_columns) != self.config.model.feature_dim:
             raise ValueError(
                 "Configured feature_dim does not match engineered features. "
