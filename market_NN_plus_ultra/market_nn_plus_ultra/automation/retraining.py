@@ -16,6 +16,7 @@ import torch
 from ..data.labelling import MarketRegimeLabellingConfig, generate_regime_labels
 from ..data.sqlite_loader import SQLiteMarketDataset, SQLiteMarketSource
 from ..data.validation import ValidationBundle, validate_sqlite_frames
+from ..evaluation import OperationsThresholds, compile_operations_summary
 from ..training import (
     ExperimentConfig,
     TrainingRunResult,
@@ -25,6 +26,8 @@ from ..training import (
     run_training,
 )
 from ..training.train_loop import _normalise_logged_metrics
+from ..trading import MarketNNPlusUltraAgent
+from ..utils.reporting import write_metrics_report
 
 
 LOGGER = logging.getLogger(__name__)
@@ -83,6 +86,33 @@ class RetrainingPlan:
     reinforcement_config: Path | None = None
     run_reinforcement: bool = False
     warm_start: WarmStartStrategy = WarmStartStrategy.TRAINING
+    evaluation_config: Path | None = None
+    run_evaluation: bool = False
+    evaluation_checkpoint: Path | None = None
+    evaluation_stage: "EvaluationStageConfig" = field(default_factory=lambda: EvaluationStageConfig())
+
+
+@dataclass(slots=True)
+class EvaluationStageConfig:
+    """Configuration describing post-training evaluation and monitoring."""
+
+    output_dir: Path | None = None
+    predictions_path: Path | None = None
+    metrics_path: Path | None = None
+    operations_path: Path | None = None
+    trades_path: Path | None = None
+    return_column: str = "realised_return"
+    benchmark_column: str | None = None
+    device: str = "cpu"
+    trade_timestamp_col: str = "timestamp"
+    trade_symbol_col: str = "symbol"
+    trade_notional_col: str = "notional"
+    trade_position_col: str = "position"
+    trade_price_col: str = "price"
+    trade_return_col: str = "pnl"
+    capital_base: float = 1.0
+    tail_percentile: float = 5.0
+    operations_thresholds: OperationsThresholds = field(default_factory=OperationsThresholds)
 
 
 @dataclass(slots=True)
@@ -266,6 +296,161 @@ def _run_training_stage(
     return stage_result, result
 
 
+def _prepare_evaluation_config(config_path: Path, dataset_path: Path) -> ExperimentConfig:
+    config = load_experiment_from_file(config_path)
+    config.data = replace(config.data, sqlite_path=dataset_path)
+    return config
+
+
+def _resolve_stage_path(base_dir: Path, candidate: Path | None, default_name: str) -> Path:
+    if candidate is None:
+        return base_dir / default_name
+    path = Path(candidate)
+    if path.is_absolute():
+        return path
+    return base_dir / path
+
+
+def _write_predictions(frame: pd.DataFrame, destination: Path) -> tuple[Path, list[str]]:
+    notes: list[str] = []
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    suffix = destination.suffix.lower()
+    if suffix == ".csv":
+        frame.to_csv(destination, index=False)
+        return destination, notes
+    if suffix in {".json", ".jsonl"}:
+        orient = "records"
+        lines = suffix == ".jsonl"
+        frame.to_json(destination, orient=orient, lines=lines)
+        return destination, notes
+    if suffix == "":
+        destination = destination.with_suffix(".parquet")
+        suffix = ".parquet"
+    try:
+        frame.to_parquet(destination, index=False)
+        return destination, notes
+    except (ImportError, ValueError):  # pragma: no cover - fallback when parquet engine missing
+        fallback = destination.with_suffix(".csv")
+        fallback.parent.mkdir(parents=True, exist_ok=True)
+        frame.to_csv(fallback, index=False)
+        notes.append(
+            f"parquet support unavailable; wrote CSV fallback to {fallback.name}"
+        )
+        return fallback, notes
+
+
+def _load_optional_frame(path: Path | None) -> pd.DataFrame | None:
+    if path is None:
+        return None
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"Could not locate trades file '{path}'")
+    suffix = path.suffix.lower()
+    if suffix in {".parquet", ".pq"}:
+        return pd.read_parquet(path)
+    if suffix in {".csv", ".tsv", ".txt"}:
+        sep = "\t" if suffix == ".tsv" else ","
+        return pd.read_csv(path, sep=sep)
+    if suffix in {".json", ".jsonl"}:
+        return pd.read_json(path, lines=suffix == ".jsonl")
+    raise ValueError(f"Unsupported trades file format for '{path}'")
+
+
+def _run_evaluation_stage(
+    plan: RetrainingPlan,
+    config_path: Path,
+    checkpoint_path: Path,
+) -> RetrainingStageResult:
+    start = datetime.now(timezone.utc)
+    cfg = plan.evaluation_stage
+    output_dir = cfg.output_dir or (plan.output_dir / "evaluation")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    experiment_config = _prepare_evaluation_config(config_path, plan.dataset_path)
+    agent = MarketNNPlusUltraAgent(
+        experiment_config,
+        checkpoint_path=checkpoint_path,
+        device=cfg.device,
+    )
+    run_result = agent.run(
+        evaluate=True,
+        return_column=cfg.return_column,
+        benchmark_column=cfg.benchmark_column,
+    )
+
+    predictions = run_result.predictions
+    predictions_path, notes = _write_predictions(
+        predictions,
+        _resolve_stage_path(output_dir, cfg.predictions_path, "predictions.parquet"),
+    )
+
+    metrics = run_result.metrics or {}
+    metrics_path: Path | None = None
+    if metrics:
+        metrics_path = write_metrics_report(
+            metrics,
+            _resolve_stage_path(output_dir, cfg.metrics_path, "metrics.json"),
+            format_hint="json",
+        )
+
+    trades = _load_optional_frame(cfg.trades_path)
+    operations_summary = compile_operations_summary(
+        predictions,
+        trades,
+        return_col=cfg.return_column,
+        benchmark_col=cfg.benchmark_column,
+        trade_timestamp_col=cfg.trade_timestamp_col,
+        trade_symbol_col=cfg.trade_symbol_col,
+        trade_notional_col=cfg.trade_notional_col,
+        trade_position_col=cfg.trade_position_col,
+        trade_price_col=cfg.trade_price_col,
+        trade_return_col=cfg.trade_return_col,
+        capital_base=cfg.capital_base,
+        tail_percentile=cfg.tail_percentile,
+        thresholds=cfg.operations_thresholds,
+    )
+    operations_payload = operations_summary.as_dict()
+    operations_payload["triggered"] = operations_summary.triggered
+    operations_path = _resolve_stage_path(
+        output_dir,
+        cfg.operations_path,
+        "operations_summary.json",
+    )
+    operations_path.parent.mkdir(parents=True, exist_ok=True)
+    operations_path.write_text(
+        json.dumps(operations_payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    if operations_summary.triggered:
+        notes.append(
+            "operations alerts triggered: " + ", ".join(operations_summary.triggered)
+        )
+
+    artifacts: dict[str, Any] = {
+        "predictions_path": str(predictions_path),
+        "operations_summary_path": str(operations_path),
+        "operations_summary": operations_payload,
+    }
+    if metrics:
+        artifacts["metrics"] = dict(metrics)
+    if metrics_path is not None:
+        artifacts["metrics_path"] = str(metrics_path)
+    if trades is not None:
+        artifacts["trades_rows"] = int(len(trades))
+
+    completed = datetime.now(timezone.utc)
+    return RetrainingStageResult(
+        name="evaluation",
+        success=True,
+        started_at=start,
+        completed_at=completed,
+        artifacts=artifacts,
+        notes=notes,
+    )
+
+
 def _determine_reinforcement_checkpoint(
     warm_start: WarmStartStrategy,
     training_result: TrainingRunResult | None,
@@ -393,6 +578,27 @@ def run_retraining_plan(plan: RetrainingPlan) -> RetrainingSummary:
         )
         stages.append(reinforcement_stage)
 
+    if plan.run_evaluation:
+        eval_config_path = plan.evaluation_config or plan.training_config
+        checkpoint_override = plan.evaluation_checkpoint
+        checkpoint_source: Path | None
+        if checkpoint_override is not None:
+            checkpoint_source = Path(checkpoint_override)
+        elif training_result is not None and training_result.best_model_path:
+            checkpoint_source = Path(training_result.best_model_path)
+        else:
+            checkpoint_source = None
+        if checkpoint_source is None:
+            raise ValueError(
+                "run_evaluation=True requires a checkpoint (either via training or evaluation_checkpoint)"
+            )
+        evaluation_stage = _run_evaluation_stage(
+            plan,
+            eval_config_path,
+            checkpoint_source,
+        )
+        stages.append(evaluation_stage)
+
     completed_at = datetime.now(timezone.utc)
     return RetrainingSummary(
         plan=plan,
@@ -406,6 +612,7 @@ __all__ = [
     "DatasetStageConfig",
     "WarmStartStrategy",
     "RetrainingPlan",
+    "EvaluationStageConfig",
     "RetrainingStageResult",
     "RetrainingSummary",
     "run_retraining_plan",

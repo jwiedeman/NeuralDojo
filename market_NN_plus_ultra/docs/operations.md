@@ -62,6 +62,12 @@ automation runs can branch or halt when SLOs breach.
    a new experiment run using the most recent stable checkpoint. The
    `plus_ultra_service_last_success_timestamp` gauge should jump once the new
    model is rolled out.
+5. **Post-run profitability snapshot:** Kick off
+   `scripts/automation/retrain.py --run-evaluation` after long training jobs to
+   emit predictions and an operations summary JSON. The evaluation stage writes
+   ROI, Sharpe, drawdown, and guardrail alerts to the orchestration run folder
+   so operations leads can review profitability alongside guardrail coverage
+   before deploying a new checkpoint.
 
 Document follow-up observations in the implementation log so future iterations
 inherit context on incident response and monitoring coverage.

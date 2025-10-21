@@ -2,6 +2,7 @@
 
 from .retraining import (
     DatasetStageConfig,
+    EvaluationStageConfig,
     RetrainingPlan,
     RetrainingStageResult,
     RetrainingSummary,
@@ -17,6 +18,7 @@ from .scheduler import (
 
 __all__ = [
     "DatasetStageConfig",
+    "EvaluationStageConfig",
     "RetrainingPlan",
     "RetrainingStageResult",
     "RetrainingSummary",
