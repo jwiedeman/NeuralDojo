@@ -133,12 +133,13 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-10-28): Sketched streaming inference mode for multi-horizon forecasts, defined pagination contract for telemetry attachments, and logged authentication hooks required for deployment parity.
   - Notes (2025-10-29): Scheduled API review with monitoring/reporting leads, mapped response schema versioning to deployment automation, and prepared stub tests covering backward-compatible payloads.
   - Notes (2025-11-18): FastAPI service shipped via `market_nn_plus_ultra.service` with prediction/configuration/curriculum/reload endpoints, regression coverage in `tests/test_service.py`, and CLI launcher `scripts/service.py` for local uvicorn runs.
-- [ ] Schedule continuous retraining jobs triggered by new data arrival. — Notes: Will reuse orchestration DAG from Phase 3 Milestone 4 once prototyped.
+- [x] Schedule continuous retraining jobs triggered by new data arrival. — Notes: Will reuse orchestration DAG from Phase 3 Milestone 4 once prototyped.
   - Notes (2025-10-26): Scheduled spike for diagnostics ingestion operator and defined retry semantics for warm-start stages.
   - Notes (2025-10-28): Added change-data-capture polling requirements, calibration-drift alert thresholds, and storage budgets for rolling checkpoint windows.
   - Notes (2025-10-29): Broke DAG implementation into schema-validation, warm-start, PPO, and reporting tasks; queued integration tests for checkpoint lineage tracking; and aligned orchestration alerts with monitoring escalation paths.
   - Notes (2025-11-04): Drafted DAG task skeletons for simulator smoke tests and profitability report generation, added retry/idempotency guidance, and planned fixture-backed regression coverage for the dataset refresh → diagnostics export path.
   - Notes (2025-11-13): Automation orchestrator landed via `market_nn_plus_ultra.automation.run_retraining_plan` and `scripts/automation/retrain.py`, providing the sequential dataset→pretrain→train→PPO workflow needed before wiring DAG scheduling triggers.
+  - Notes (2025-11-23): Introduced `RetrainingScheduler` with file-change detection and cooldown handling so dataset refreshes automatically trigger `run_retraining_plan`, complete with regression coverage in `tests/test_retraining_scheduler.py`.
 - [ ] Set up online monitoring for live performance and drift detection. — Notes: Pending telemetry surface defined in Phase 4 Milestone 2.
   - Notes (2025-10-26): Matched diagnostics sampling cadence with Prometheus scrape intervals and scoped simulator latency histograms for alerting.
   - Notes (2025-10-28): Specified dashboard panels (calibration confidence, ROI trend, drawdown guardrails), alert routing rules, and dependencies on the service telemetry payload contract.
