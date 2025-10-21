@@ -156,3 +156,9 @@ def test_service_endpoints(tmp_path: Path) -> None:
     assert guardrail_payload["scaled"] is True
     assert guardrail_payload["violations"] == []
     assert guardrail_payload["metrics"]["gross_exposure_peak"] <= 0.6 + 1e-6
+
+    metrics_resp = client.get("/metrics")
+    assert metrics_resp.status_code == 200
+    metrics_body = metrics_resp.text
+    assert "plus_ultra_service_requests_total" in metrics_body
+    assert "plus_ultra_guardrails_enabled" in metrics_body
