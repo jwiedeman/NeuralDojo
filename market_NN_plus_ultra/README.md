@@ -175,7 +175,34 @@ The commands below take you from a fresh clone to running both training and infe
 
    The CLI runs two supervised jobs (one from scratch, one seeded by the pretraining checkpoint), aggregates metrics into a parquet catalogue, and writes checkpoints to `benchmarks/pretraining_runs/`. Use the output to quantify validation lift, ROI changes, or training-time savings before rolling the warm start into production recipes.
 
-8. **Automate retraining with the orchestration CLI**
+8. **Evaluate stability with walk-forward splits**
+
+   Once you have predictions with realised returns, run the walk-forward
+   evaluation CLI to generate per-split metrics and an aggregated summary:
+
+   ```bash
+   python scripts/walkforward_eval.py \
+       --predictions outputs/predictions.parquet \
+       --train-window 252 \
+       --test-window 63 \
+       --metrics-output benchmarks/walkforward_metrics.parquet \
+       --summary-output benchmarks/walkforward_summary.json
+   ```
+
+   ```powershell
+   python scripts/walkforward_eval.py `
+       --predictions outputs\predictions.parquet `
+       --train-window 252 `
+       --test-window 63 `
+       --metrics-output benchmarks\walkforward_metrics.parquet `
+       --summary-output benchmarks\walkforward_summary.json
+   ```
+
+   The command emits a per-split metrics table and records aggregate Sharpe,
+   drawdown, and hit-rate statistics, helping you track deployment readiness as
+   you iterate on training runs.
+
+9. **Automate retraining with the orchestration CLI**
 
    ```bash
    python scripts/automation/retrain.py \
@@ -188,7 +215,7 @@ The commands below take you from a fresh clone to running both training and infe
 
    The command above validates the SQLite dataset, optionally regenerates regime labels, runs pretraining, launches supervised training, and finishes with PPO fine-tuning. Artifacts land under `automation_runs/<timestamp>/`, including checkpoints, profitability summaries, and policy state dicts. Add flags such as `--regenerate-regimes`, `--skip-pretraining`, or `--skip-training` to tailor individual stages.
 
-9. **Serve the inference API**
+10. **Serve the inference API**
 
    ```bash
    python scripts/service.py --config configs/default.yaml --host 0.0.0.0 --port 8000
