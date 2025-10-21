@@ -105,3 +105,28 @@ class CurriculumCallback(pl.Callback):
             pl_module.log("curriculum/window_size", float(params.window_size), prog_bar=True, logger=True)
             pl_module.log("curriculum/horizon", float(params.horizon), prog_bar=True, logger=True)
 
+
+def summarise_curriculum_profile(data_config: DataConfig, total_epochs: int) -> list[CurriculumParameters]:
+    """Resolve the curriculum parameters that will apply over ``total_epochs`` iterations.
+
+    When no curriculum configuration is supplied the base ``DataConfig`` parameters are
+    repeated for every epoch so callers always receive a schedule matching the requested
+    length.
+    """
+
+    if total_epochs <= 0:
+        return []
+
+    base = CurriculumParameters(
+        window_size=data_config.window_size,
+        horizon=data_config.horizon,
+        stride=data_config.stride,
+        normalise=data_config.normalise,
+    )
+
+    if data_config.curriculum is None:
+        return [base for _ in range(total_epochs)]
+
+    scheduler = CurriculumScheduler(data_config, data_config.curriculum)
+    return [scheduler.parameters_for_epoch(epoch) for epoch in range(total_epochs)]
+

@@ -11,9 +11,11 @@ from market_nn_plus_ultra.cli.reinforcement import (
     register_reinforcement_arguments,
 )
 from market_nn_plus_ultra.training import (
+    CurriculumParameters,
     ReinforcementConfig,
     load_experiment_from_file,
     run_reinforcement_finetuning,
+    summarise_curriculum_profile,
 )
 
 
@@ -51,8 +53,38 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-grad-norm", type=float, help="Gradient clipping norm")
     parser.add_argument("--rollout-workers", type=int, help="Number of parallel rollout workers")
     parser.add_argument("--worker-device", type=str, help="Device identifier for rollout workers")
+    parser.add_argument(
+        "--curriculum-profile",
+        action="store_true",
+        help="Print the resolved curriculum schedule before launching PPO",
+    )
     register_reinforcement_arguments(parser)
     return parser.parse_args()
+
+
+def _print_curriculum_profile(schedule: list[CurriculumParameters]) -> None:
+    if not schedule:
+        print("\n--- Curriculum Profile ---\n(no curriculum configured)\n")
+        return
+
+    print("\n--- Curriculum Profile ---")
+    start = 0
+    prev = schedule[0]
+    for idx in range(1, len(schedule) + 1):
+        if idx == len(schedule) or schedule[idx] != prev:
+            if start == idx - 1:
+                label = f"Update {start:03d}"
+            else:
+                label = f"Updates {start:03d}-{idx - 1:03d}"
+            normalise_flag = "true" if prev.normalise else "false"
+            print(
+                f"{label} | window={prev.window_size} | horizon={prev.horizon} | "
+                f"stride={prev.stride} | normalise={normalise_flag}"
+            )
+            if idx < len(schedule):
+                start = idx
+                prev = schedule[idx]
+    print()
 
 
 def apply_overrides(config: ReinforcementConfig, args: argparse.Namespace) -> ReinforcementConfig:
@@ -96,6 +128,11 @@ def main() -> None:
 
     if args.checkpoint and args.pretrain_checkpoint:
         raise SystemExit("Specify either --checkpoint or --pretrain-checkpoint, not both")
+
+    if args.curriculum_profile:
+        schedule_length = max(1, reinforcement.total_updates)
+        schedule = summarise_curriculum_profile(experiment.data, schedule_length)
+        _print_curriculum_profile(schedule)
 
     result = run_reinforcement_finetuning(
         experiment,

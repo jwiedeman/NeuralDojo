@@ -34,6 +34,7 @@ from .curriculum import (
     CurriculumCallback,
     CurriculumParameters,
     CurriculumScheduler,
+    summarise_curriculum_profile,
 )
 from .diagnostics import (
     DiagnosticsThresholds,
@@ -70,6 +71,7 @@ __all__ = [
     "CurriculumScheduler",
     "CurriculumParameters",
     "CurriculumCallback",
+    "summarise_curriculum_profile",
     "TrainingDiagnosticsCallback",
     "DiagnosticsThresholds",
     "RunningMoments",
