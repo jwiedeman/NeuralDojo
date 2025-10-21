@@ -56,3 +56,23 @@ python scripts/benchmarks/architecture_sweep.py \
 
 After collecting the parquet outputs, append throughput, VRAM, and latency
 statistics to the table so downstream reporting jobs can ingest the telemetry.
+
+## Summarising results
+
+Once the sweep parquet files have been generated, run the comparison helper to
+produce a Markdown table that highlights the best-performing architecture per
+metric:
+
+```bash
+python scripts/benchmarks/summarise_architecture_sweep.py \
+  docs/benchmarks/omni_gpu.parquet \
+  docs/benchmarks/hybrid_gpu.parquet \
+  docs/benchmarks/baseline_cpu.parquet \
+  --metric metric_val_loss \
+  --output docs/benchmarks/architecture_summary.md
+```
+
+Use `--higher-is-better` to pivot the ranking around ROI-style metrics and
+`--format csv` (or `json`, `parquet`) when a structured export is required for
+dashboards. The CLI collapses each parquet file into per-architecture summaries
+so a high-level comparison is available even before GPU runs finish.
