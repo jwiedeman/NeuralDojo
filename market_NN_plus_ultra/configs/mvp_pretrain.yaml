@@ -1,0 +1,83 @@
+seed: 42
+notes: "mvp cpu-friendly pretraining config"
+
+data:
+  sqlite_path: data/plus_ultra_fixture.db
+  symbol_universe: []
+  indicators: {}
+  alternative_data: []
+  resample_rule: null
+  tz_convert: null
+  feature_set: null
+  target_columns: [close]
+  window_size: 64
+  horizon: 1
+  stride: 8
+  normalise: true
+  val_fraction: 0.1
+
+model:
+  feature_dim: 27
+  model_dim: 128
+  depth: 2
+  heads: 4
+  dropout: 0.1
+  conv_kernel_size: 3
+  conv_dilations: [1, 2, 4]
+  horizon: 1
+  output_dim: 1
+  architecture: omni_mixture
+  ff_mult: 2
+  ssm_state_dim: 64
+  ssm_kernel_size: 8
+  coarse_factor: 2
+  cross_every: 1
+  max_seq_len: 512
+  gradient_checkpointing: false
+  market_state:
+    enabled: false
+    embedding_dim: 8
+    dropout: 0.0
+    include: []
+
+optimizer:
+  lr: 0.001
+  weight_decay: 0.0
+  betas: [0.9, 0.99]
+
+trainer:
+  batch_size: 16
+  num_workers: 0
+  max_epochs: 2
+  gradient_clip_val: 1.0
+  accumulate_grad_batches: 1
+  accelerator: cpu
+  devices: 1
+  precision: 32
+  log_every_n_steps: 10
+  checkpoint_dir: checkpoints/mvp_pretrain
+  monitor_metric: val/pretrain_loss
+  monitor_mode: min
+  save_top_k: 1
+  limit_train_batches: 0.25
+  limit_val_batches: 0.25
+
+pretraining:
+  mask_prob: 0.2
+  mask_value: 0.0
+  loss: mse
+  objective: masked
+  temperature: 0.1
+  projection_dim: 64
+  augmentations: [jitter]
+  jitter_std: 0.02
+  scaling_std: 0.05
+  time_mask_ratio: 0.1
+  time_mask_fill: mean
+  monitor_metric: val/pretrain_loss
+
+wandb_project: null
+wandb_entity: null
+wandb_run_name: null
+wandb_tags: []
+wandb_offline: true

@@ -43,6 +43,11 @@ python scripts/automation/retrain.py \
   --eval-max-turnover 1.5
 ```
 
+> **Tip:** For CPU-only smoke tests or notebook walkthroughs use the lightweight
+> configs added under `configs/mvp_pretrain.yaml` and `configs/mvp_quickstart.yaml`.
+> They trim model depth, epochs, and dataloader workers so the orchestration run
+> completes in minutes while still exercising evaluation + guardrail wiring.
+
 The command prints a summary of each stage. Evaluation artefacts land under the
 chosen output directory (default: `automation_runs/<timestamp>/evaluation/`).
 Expect to see at least:
@@ -129,3 +134,8 @@ registry directly inside a long-running service.
 Following these steps gives you a single command (`retrain.py`) that trains the
 agent, evaluates profitability, and leaves behind everything required to monitor
 Sharpe, drawdowns, and guardrail breaches after each run.
+
+For a guided, executable version of this loop, open
+`notebooks/mvp_retraining_walkthrough.ipynb`. The notebook keeps the quickstart
+checklist intact, runs the orchestration pipeline end-to-end, and saves the
+resulting artefacts under `automation_runs/mvp_notebook/` for review.

@@ -198,6 +198,12 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
 * Mapped CLI integration work for opt-in diagnostics, ensuring researchers can trigger telemetry without editing experiment YAML.
 * Scheduled telemetry schema reviews so the new diagnostics artefacts feed Phase 2 reporting and Phase 4 monitoring milestones without rework.
 
+### Active Work Log — 2025-12-04
+
+* Added CPU-friendly MVP configs (`configs/mvp_pretrain.yaml`, `configs/mvp_quickstart.yaml`) for rapid orchestration smoke tests.
+* Published `notebooks/mvp_retraining_walkthrough.ipynb` to execute the retraining→evaluation→monitoring loop with artefact capture.
+* Updated `docs/quickstart_mvp.md` with lightweight run guidance so the MVP can be validated without GPU hardware.
+
 ### Active Work Log — 2025-11-03
 
 * Ran Sprint 4 integration sync to coordinate calibration-head export wiring, PPO warm-start smoke tests, simulator profiling harness tasks, and reporting/monitoring dependencies.
