@@ -22,7 +22,9 @@ def _load_module() -> object:
     return module
 
 
-def test_pretraining_comparison_runs_both_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_pretraining_comparison_runs_both_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
     module = _load_module()
 
     trainer_stub = SimpleNamespace(checkpoint_dir=tmp_path / "base")
@@ -49,6 +51,7 @@ def test_pretraining_comparison_runs_both_paths(tmp_path: Path, monkeypatch: pyt
             best_model_path=str(Path(config.trainer.checkpoint_dir) / "model.ckpt"),
             logged_metrics={"val/loss": 0.1 if pretrain_checkpoint_path is None else 0.08},
             dataset_summary={"train_windows": 8, "val_windows": 4},
+            profitability_summary={"roi": 0.5 if pretrain_checkpoint_path is None else 0.65},
         )
 
     monkeypatch.setattr(module, "load_experiment_from_file", fake_load_experiment)
@@ -83,6 +86,16 @@ def test_pretraining_comparison_runs_both_paths(tmp_path: Path, monkeypatch: pyt
     assert warm_call[1].name == "pretrained"
 
     frame = pd.read_parquet(output_path)
-    assert sorted(frame["run"].tolist()) == ["pretrained", "scratch"]
+    assert sorted(frame["run"].tolist()) == [
+        "pretrained",
+        "pretrained_minus_scratch",
+        "scratch",
+    ]
     assert "metric_val_loss" in frame.columns
+    delta = frame.set_index("run").loc["pretrained_minus_scratch"]
+    assert pytest.approx(delta["metric_val_loss"], rel=1e-6) == -0.02
+    assert pytest.approx(delta["profitability_roi"], rel=1e-6) == 0.15
+
+    captured = capsys.readouterr().out
+    assert "Warm-start vs scratch deltas" in captured
 

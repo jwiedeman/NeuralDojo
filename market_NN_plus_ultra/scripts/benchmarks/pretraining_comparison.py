@@ -57,6 +57,59 @@ def _result_to_row(label: str, result, duration: float) -> dict[str, object]:
     return row
 
 
+def _compute_delta_row(
+    frame: pd.DataFrame, warm_label: str, scratch_label: str
+) -> dict[str, object]:
+    """Return a row capturing warm-start minus scratch deltas.
+
+    The function expects the input frame to contain exactly one row for each
+    label. Only numeric columns (metrics, profitability summaries, durations)
+    are differenced. Non-numeric columns are filled with ``pd.NA`` to maintain
+    schema compatibility for downstream concatenation.
+    """
+
+    if "run" not in frame.columns:
+        raise ValueError("Input frame must contain a 'run' column")
+
+    scratch_rows = frame[frame["run"] == scratch_label]
+    warm_rows = frame[frame["run"] == warm_label]
+    if scratch_rows.empty or warm_rows.empty:
+        raise ValueError("Both scratch and warm-start rows are required")
+    if len(scratch_rows) != 1 or len(warm_rows) != 1:
+        raise ValueError("Expected exactly one row per run label")
+
+    scratch = scratch_rows.iloc[0]
+    warm = warm_rows.iloc[0]
+    numeric_cols = frame.select_dtypes(include="number").columns
+
+    delta: dict[str, object] = {column: pd.NA for column in frame.columns}
+    delta["run"] = f"{warm_label}_minus_{scratch_label}"
+    for column in numeric_cols:
+        delta[column] = warm[column] - scratch[column]
+    return delta
+
+
+def _format_delta_summary(delta_row: dict[str, object]) -> str | None:
+    interesting_keys = (
+        "metric_val_loss",
+        "profitability_roi",
+        "profitability_sharpe",
+        "duration_seconds",
+    )
+    parts: list[str] = []
+    for key in interesting_keys:
+        value = delta_row.get(key)
+        if value is pd.NA or value is None:
+            continue
+        try:
+            parts.append(f"{key}: {value:+.4f}")
+        except TypeError:
+            continue
+    if not parts:
+        return None
+    return "Warm-start vs scratch deltas → " + ", ".join(parts)
+
+
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=Path("configs/default.yaml"), help="Experiment YAML path")
@@ -170,9 +223,16 @@ def main(argv: Iterable[str] | None = None) -> int:
     print(f"Warm-start run completed in {warm_duration:.2f}s")
 
     frame = pd.DataFrame(rows)
+    delta_row = _compute_delta_row(frame, args.label_pretrained, args.label_scratch)
+    frame = pd.concat([frame, pd.DataFrame([delta_row])], ignore_index=True)
+
     args.output.parent.mkdir(parents=True, exist_ok=True)
     frame.to_parquet(args.output)
     print(f"Wrote {len(frame)} benchmark rows to {args.output}")
+
+    summary = _format_delta_summary(delta_row)
+    if summary:
+        print(summary)
     return 0
 
 
