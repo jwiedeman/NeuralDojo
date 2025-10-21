@@ -72,7 +72,13 @@ class PrometheusExporter:
             ) from _PROMETHEUS_IMPORT_ERROR
 
         for name, value in snapshot.risk.items():
-            self.risk_gauge.labels(name=name).set(float(value))
+            numeric = float(value)
+            if numeric < 0.0:
+                # Prometheus gauges represent severities for dashboards, so
+                # negative-valued metrics (e.g. max drawdown) are stored as
+                # absolute magnitudes to keep panels non-negative.
+                numeric = abs(numeric)
+            self.risk_gauge.labels(name=name).set(numeric)
 
         for name, value in snapshot.drift.as_dict().items():
             self.drift_gauge.labels(name=name).set(float(value))

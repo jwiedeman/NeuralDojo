@@ -4,6 +4,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 
 ## Optimization Execution Log
 
+* **2025-12-02 — Monitoring severity gauges:** Normalised Prometheus exporter risk gauges to emit absolute magnitudes for negative metrics, keeping dashboards non-negative while preserving profitability alerting semantics for the MVP monitoring stack. Documented the behaviour in `docs/monitoring.md` to align operations playbooks with the live metrics surface.
 * **2025-12-01 — End-to-end evaluation automation:** Added an evaluation stage to `run_retraining_plan` that restores the latest checkpoint, runs the inference agent, persists predictions, and compiles an operations summary with profitability guardrails. The automation CLI now exposes `--run-evaluation` flags so orchestration runs can surface ROI/drawdown telemetry immediately after training.
 * **2025-11-28 — Benchmark-aware reporting:** Enabled optional benchmark inputs across the agent, reporting CLI, and operations summary. Risk metrics now surface excess return, tracking error, information ratio, beta, and benchmark correlation when a benchmark column is supplied, and the new metrics propagate through the FastAPI service and automation tooling.
 * **2024-02-25 — Plan resync:** Reconfirmed Phase 1 as the primary optimisation bottleneck. The focus is to finish schema enforcement and unlock richer market-regime labels before scaling benchmarking sweeps.
@@ -63,6 +64,12 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * **2025-11-18 — Inference service MVP:** Shipped the FastAPI service scaffold under `market_nn_plus_ultra.service` with prediction, configuration, curriculum, and reload endpoints, added regression coverage, and published the `scripts/service.py` launcher so the Plus Ultra agent can be served with telemetry-rich responses without bespoke notebooks.
 * **2025-11-19 — Benchmark leaderboard automation:** Added grouped leaderboard utilities in `market_nn_plus_ultra.evaluation.benchmarking`, extended the summarisation CLI with `--leaderboard-*` flags, and documented the workflow so omni vs. hybrid comparisons can be prioritised for the pending 4090 sweeps without combing through raw parquet outputs.
 * **2025-11-20 — GPU container baseline:** Published the CUDA-enabled Docker image + entrypoint (`docker/Dockerfile.gpu`) with documentation covering training, pretraining, agent, and service invocations so orchestration backlogs can target a reproducible runtime while reinforcement, reporting, and monitoring milestones iterate.
+
+### MVP Execution Focus — 2025-12-02
+
+* [x] Normalise Prometheus risk gauges to emit non-negative drawdown/tail metrics for dashboards without losing sign information in offline summaries.
+* [ ] Feed `run_retraining_plan` evaluation artefacts (predictions, profitability summaries, operations alerts) directly into the monitoring snapshot CLI so MVP deployments emit Prometheus-ready snapshots after each run.
+* [ ] Publish an end-to-end quickstart (fixture + config bundle) that exercises pretraining → training → evaluation → monitoring to validate profitability tracking before scaling reinforcement loops.
 
 ## Phase 1 — Data & Feature Depth (Weeks 1-2)
 
@@ -274,6 +281,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
    - *Kickoff prep (2025-10-29):* Coordinated with service interface planning to reserve metric namespaces, drafted alert escalation paths tied to the operations playbook, and pencilled load-test scenarios for validating monitoring throughput once the service scaffold lands.
    - *Integration sync (2025-11-03):* Scheduled telemetry contract review with service implementers, enumerated alert-simulation scripts leveraging diagnostics fixtures, and added backlog item for Grafana dashboard seeds ahead of MVP implementation.
    - *Alert prototype planning (2025-11-06):* Drafted synthetic drift + latency replay scripts to exercise Prometheus exporters, mapped alert routing into the operations playbook outline, and defined acceptance tests covering calibration-drift pages in the forthcoming Grafana dashboards.
+   - *Severity export (2025-12-02):* Normalised risk gauge exports to keep Prometheus dashboards non-negative and documented the behaviour so ROI/drawdown panels align with the MVP profitability monitoring goals without extra configuration.
 3. **Risk guardrails** — Build guardrail modules that enforce exposure, turnover, tail-risk thresholds, and sector/factor caps during inference, configurable via YAML, and aligned with reinforcement fine-tuning outputs. **Status:** ✅ Completed — guardrail enforcement now ships via `GuardrailPolicy`, YAML-driven configuration, and a FastAPI endpoint for trade-log validation.
    - *Design hooks (2025-10-18):* Enumerate guardrail evaluation order, map fallback actions when violations occur, and earmark simulation scenarios to regression-test guardrail logic before production rollout.
    - *Calibration alignment (2025-10-26):* Logged requirement for calibration-confidence-aware overrides and synced guardrail threshold drafts with planned reporting dashboards for consistent narratives.

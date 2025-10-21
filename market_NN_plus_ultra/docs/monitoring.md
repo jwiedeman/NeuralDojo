@@ -48,7 +48,10 @@ the resulting snapshot to keep dashboards up to date.
   warning dashboards. Override the PSI/JS/KS limits in the CLI or when
   constructing `LiveMonitor` for bespoke regimes.
 * **Prometheus gauges** expose the latest metric values, a window size gauge
-  for sanity checks, and counters/timestamps for alert auditing.
+  for sanity checks, and counters/timestamps for alert auditing. Negative
+  risk metrics (e.g. max drawdown, expected shortfall) are exported as
+  absolute magnitudes so dashboard panels remain non-negative while the
+  underlying snapshot preserves the sign for offline analysis.
 
 ## Next Steps
 
