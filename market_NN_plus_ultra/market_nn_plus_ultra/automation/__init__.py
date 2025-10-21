@@ -8,6 +8,12 @@ from .retraining import (
     WarmStartStrategy,
     run_retraining_plan,
 )
+from .scheduler import (
+    DatasetSnapshot,
+    PlanExecutor,
+    PlanFactory,
+    RetrainingScheduler,
+)
 
 __all__ = [
     "DatasetStageConfig",
@@ -16,5 +22,8 @@ __all__ = [
     "RetrainingSummary",
     "WarmStartStrategy",
     "run_retraining_plan",
+    "DatasetSnapshot",
+    "PlanFactory",
+    "PlanExecutor",
+    "RetrainingScheduler",
 ]
-
