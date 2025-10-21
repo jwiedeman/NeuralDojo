@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextlib
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Iterable, Iterator, List, Optional, Sequence
+from typing import Dict, Iterable, Iterator, List, Optional, Sequence
 
 import torch
 import torch.nn.functional as F
@@ -416,6 +416,7 @@ class ReinforcementRunResult:
 
     updates: List[ReinforcementUpdate]
     policy_state_dict: dict[str, torch.Tensor]
+    evaluation_metrics: Dict[str, float]
 
 
 def _apply_risk_objectives(pnl: torch.Tensor, config: RiskObjectiveConfig) -> torch.Tensor:
@@ -533,6 +534,57 @@ def _collect_rollout(
         returns=returns,
         rewards=rewards_tensor,
     )
+
+
+def _evaluate_policy(
+    policy: MarketPolicyNetwork,
+    dataloader: Iterable[dict[str, torch.Tensor]],
+    reinforcement: ReinforcementConfig,
+    device: torch.device,
+) -> Dict[str, float]:
+    """Run the policy in evaluation mode and aggregate ROI-style diagnostics."""
+
+    policy.eval()
+    costs = reinforcement.costs or TradingCosts()
+    pnl_series: list[torch.Tensor] = []
+
+    with torch.no_grad():
+        for batch in dataloader:
+            features = batch["features"].to(device)
+            targets = batch["targets"].to(device)
+            reference = batch.get("reference")
+            if reference is not None:
+                reference = reference.to(device)
+
+            mean, _ = policy.forward(features)
+            if reinforcement.targets_are_returns:
+                future_returns = targets
+            else:
+                future_returns = price_to_returns(targets, reference)
+
+            pnl = differentiable_pnl(
+                mean,
+                future_returns,
+                costs=costs,
+                activation=reinforcement.activation,
+            )
+            pnl_series.append(pnl)
+
+    if not pnl_series:
+        return {}
+
+    pnl_tensor = torch.cat(pnl_series, dim=0)
+    risk = compute_risk_metrics(pnl_tensor, dim=-1)
+    roi = pnl_tensor.sum(dim=-1)
+    summary: Dict[str, float] = {
+        "roi_mean": float(roi.mean().item()),
+        "roi_std": float(roi.std(unbiased=False).item()),
+        "sharpe": float(risk.sharpe.mean().item()),
+        "sortino": float(risk.sortino.mean().item()),
+        "max_drawdown": float(risk.drawdown.mean().item()),
+        "cvar": float(risk.cvar.mean().item()),
+    }
+    return summary
 
 
 def _ppo_update(
@@ -656,6 +708,7 @@ def run_reinforcement_finetuning(
     if reinforcement.rollout_workers < 1:
         raise ValueError("reinforcement.rollout_workers must be at least 1")
 
+    evaluation_metrics: Dict[str, float] = {}
     try:
         if reinforcement.rollout_workers > 1:
             manager = ParallelRolloutManager(experiment_config, reinforcement)
@@ -693,8 +746,20 @@ def run_reinforcement_finetuning(
         if manager is not None:
             manager.close()
 
+    with torch.no_grad():
+        try:
+            eval_loader = data_module.val_dataloader()
+        except Exception:  # pragma: no cover - defensive guard for unexpected datamodule issues
+            eval_loader = None
+        if eval_loader is not None:
+            evaluation_metrics = _evaluate_policy(policy, eval_loader, reinforcement, device)
+
     state_dict = {key: tensor.detach().cpu() for key, tensor in policy.state_dict().items()}
-    return ReinforcementRunResult(updates=updates, policy_state_dict=state_dict)
+    return ReinforcementRunResult(
+        updates=updates,
+        policy_state_dict=state_dict,
+        evaluation_metrics=evaluation_metrics,
+    )
 
 
 __all__ = [

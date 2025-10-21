@@ -114,6 +114,12 @@ def main() -> None:
             f"Entropy: {update.entropy:.6f} | Samples: {update.samples}"
         )
 
+    if result.evaluation_metrics:
+        print("\n--- Deterministic Evaluation Metrics ---")
+        for name in sorted(result.evaluation_metrics):
+            value = result.evaluation_metrics[name]
+            print(f"{name}: {value:.6f}")
+
 
 if __name__ == "__main__":
     main()

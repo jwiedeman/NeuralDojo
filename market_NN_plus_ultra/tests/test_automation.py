@@ -164,7 +164,11 @@ def test_run_retraining_plan_executes_all_stages(monkeypatch, tmp_path: Path) ->
 
     def fake_reinforcement(config, *, checkpoint_path=None, pretrain_checkpoint_path=None, device="cpu"):
         calls.append(("reinforce", checkpoint_path, pretrain_checkpoint_path, device))
-        return ReinforcementRunResult(updates=[], policy_state_dict={"weight": torch.tensor(1.0)})
+        return ReinforcementRunResult(
+            updates=[],
+            policy_state_dict={"weight": torch.tensor(1.0)},
+            evaluation_metrics={},
+        )
 
     monkeypatch.setattr(
         "market_nn_plus_ultra.automation.retraining.run_pretraining",
@@ -220,7 +224,7 @@ def test_pretraining_warm_start(monkeypatch, tmp_path: Path) -> None:
     def fake_reinforcement(config, *, checkpoint_path=None, pretrain_checkpoint_path=None, device="cpu"):
         assert checkpoint_path is None
         assert pretrain_checkpoint_path == str(tmp_path / "pre.ckpt")
-        return ReinforcementRunResult(updates=[], policy_state_dict={})
+        return ReinforcementRunResult(updates=[], policy_state_dict={}, evaluation_metrics={})
 
     monkeypatch.setattr(
         "market_nn_plus_ultra.automation.retraining.run_pretraining",
