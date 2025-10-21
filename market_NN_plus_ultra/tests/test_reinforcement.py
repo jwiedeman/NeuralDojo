@@ -113,10 +113,14 @@ def test_reinforcement_finetuning_smoke(tmp_path: Path) -> None:
     assert len(result.updates) == reinforcement_config.total_updates
     update = result.updates[0]
     assert np.isfinite(update.mean_reward)
+    assert np.isfinite(update.reward_std)
     assert np.isfinite(update.policy_loss)
     assert np.isfinite(update.value_loss)
     assert np.isfinite(update.entropy)
     assert update.samples == reinforcement_config.steps_per_rollout
+    assert update.collection_time >= 0.0
+    assert update.samples_per_second >= 0.0
+    assert update.steps_per_second >= 0.0
     assert result.policy_state_dict
     assert "roi_mean" in result.evaluation_metrics
     assert all(np.isfinite(value) for value in result.evaluation_metrics.values())
@@ -178,6 +182,8 @@ def test_reinforcement_with_replay_buffer(tmp_path: Path) -> None:
     # First update uses only fresh rollout data; second should include replay samples.
     assert result.updates[0].samples == reinforcement_config.steps_per_rollout
     assert result.updates[1].samples > reinforcement_config.steps_per_rollout
+    assert result.updates[0].samples_per_second >= 0.0
+    assert result.updates[1].samples_per_second >= 0.0
     assert "roi_mean" in result.evaluation_metrics
 
 
@@ -238,6 +244,9 @@ def test_reinforcement_parallel_rollout_workers(tmp_path: Path) -> None:
     update = result.updates[0]
     assert update.samples == reinforcement_config.steps_per_rollout * reinforcement_config.rollout_workers
     assert np.isfinite(update.mean_reward)
+    assert np.isfinite(update.reward_std)
+    assert update.samples_per_second > 0.0
+    assert update.steps_per_second > 0.0
     assert "roi_mean" in result.evaluation_metrics
 
 

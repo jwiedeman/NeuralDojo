@@ -50,6 +50,7 @@ from .reinforcement import (
     MarketPolicyNetwork,
     ReinforcementRunResult,
     ReinforcementUpdate,
+    RolloutTelemetry,
     run_reinforcement_finetuning,
 )
 
@@ -92,4 +93,5 @@ __all__ = [
     "run_reinforcement_finetuning",
     "ReinforcementRunResult",
     "ReinforcementUpdate",
+    "RolloutTelemetry",
 ]

@@ -108,8 +108,9 @@ def main() -> None:
     for update in result.updates:
         print(
             f"Update {update.update:03d} | Reward: {update.mean_reward:.6f} | "
-            f"Policy Loss: {update.policy_loss:.6f} | Value Loss: {update.value_loss:.6f} | "
-            f"Entropy: {update.entropy:.6f} | Samples: {update.samples}"
+            f"Std: {update.reward_std:.6f} | Policy Loss: {update.policy_loss:.6f} | "
+            f"Value Loss: {update.value_loss:.6f} | Entropy: {update.entropy:.6f} | "
+            f"Samples: {update.samples} | Throughput: {update.samples_per_second:.2f} seq/s"
         )
 
     if result.evaluation_metrics:
