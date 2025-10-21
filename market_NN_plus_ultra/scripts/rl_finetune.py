@@ -45,6 +45,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--entropy-coef", type=float, help="Coefficient for entropy bonus")
     parser.add_argument("--learning-rate", type=float, help="Override PPO learning rate")
     parser.add_argument("--max-grad-norm", type=float, help="Gradient clipping norm")
+    parser.add_argument("--rollout-workers", type=int, help="Number of parallel rollout workers")
+    parser.add_argument("--worker-device", type=str, help="Device identifier for rollout workers")
     parser.add_argument(
         "--targets-are-returns",
         action="store_true",
@@ -77,6 +79,10 @@ def apply_overrides(config: ReinforcementConfig, args: argparse.Namespace) -> Re
         updated.learning_rate = args.learning_rate
     if args.max_grad_norm is not None:
         updated.max_grad_norm = args.max_grad_norm
+    if args.rollout_workers is not None:
+        updated.rollout_workers = args.rollout_workers
+    if args.worker_device is not None:
+        updated.worker_device = args.worker_device
     if args.targets_are_returns:
         updated.targets_are_returns = True
     return updated

@@ -94,6 +94,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
    - Notes (2025-11-07): Locked Sprint 5 spike to map PPO reward-shaping hooks onto the upcoming simulator telemetry schema, drafted replay-buffer instrumentation requirements, and catalogued regression scenarios exercising risk-aware losses alongside ROI objectives.
    - Notes (2025-11-09): Simulator telemetry bundle (slippage, fees, funding, latency penalties) now exposed via `market_nn_plus_ultra.simulation.simulate_execution`; next steps wire traces into PPO rollouts and CLI toggles once profiling windows resume.
    - Notes (2025-11-11): CPU-backed replay buffer merged with configurable sampling ratios, CLI summaries now surface per-update sample counts, and regression coverage guards hybrid batches while distributed rollout plumbing remains queued.
+   - Notes (2025-11-14): Parallel rollout manager shipped with spawn-based workers, CLI overrides, and regression coverage confirming sample scaling; curriculum plumbing + telemetry batching remain next in line before distributed profiling.
 
 ## 3. Evaluation & Monitoring
 - [x] Build evaluation harness for daily/weekly backtests with walk-forward splits.

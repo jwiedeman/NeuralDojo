@@ -2,24 +2,28 @@
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Iterable, List, Optional, Sequence
+from typing import Iterable, Iterator, List, Optional, Sequence
 
 import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.distributions import Normal
+import torch.multiprocessing as mp
 
 from ..trading.pnl import TradingCosts, differentiable_pnl, price_to_returns
 from ..trading.risk import compute_risk_metrics
 from .config import (
+    DataConfig,
     ExperimentConfig,
     ModelConfig,
     OptimizerConfig,
     ReplayBufferConfig,
     ReinforcementConfig,
     RiskObjectiveConfig,
+    TrainerConfig,
 )
 from .train_loop import MarketDataModule, MarketLightningModule
 
@@ -238,6 +242,161 @@ class RolloutReplayBuffer:
         indices = torch.randperm(total)[:count]
         return self._buffer.select(indices)
 
+
+def _infinite_iterator(loader: Iterable[dict[str, torch.Tensor]]) -> Iterator[dict[str, torch.Tensor]]:
+    while True:
+        for batch in loader:
+            yield batch
+
+
+def _normalise_trainer_for_worker(config: TrainerConfig) -> TrainerConfig:
+    trainer = replace(config)
+    trainer.accelerator = "cpu"
+    trainer.devices = None
+    trainer.num_workers = 0
+    trainer.persistent_workers = False
+    return trainer
+
+
+def _rollout_worker_loop(
+    worker_id: int,
+    data_config: DataConfig,
+    trainer_config: TrainerConfig,
+    model_config: ModelConfig,
+    reinforcement_config: ReinforcementConfig,
+    base_seed: int,
+    device: str,
+    request_queue: mp.Queue,
+    response_queue: mp.Queue,
+) -> None:
+    torch.set_num_threads(1)
+    torch.manual_seed(base_seed + worker_id)
+
+    try:
+        worker_device = torch.device(device)
+        reinforcement = replace(reinforcement_config)
+        reinforcement.rollout_workers = 1
+        trainer = _normalise_trainer_for_worker(trainer_config)
+        data_module = MarketDataModule(data_config, trainer, seed=base_seed + worker_id)
+        data_module.setup("fit")
+        train_loader = data_module.train_dataloader()
+        if len(train_loader) == 0:
+            raise RuntimeError(
+                "Training dataloader is empty in rollout worker; check dataset configuration."
+            )
+        iterator = _infinite_iterator(train_loader)
+        policy = MarketPolicyNetwork(model_config).to(worker_device)
+
+        response_queue.put(("ready", None))
+
+        while True:
+            command, payload = request_queue.get()
+            if command == "stop":
+                break
+            if command != "collect":
+                continue
+
+            state_dict = payload
+            policy.load_state_dict({key: tensor.to(worker_device) for key, tensor in state_dict.items()})
+            rollout = _collect_rollout(policy, iterator, reinforcement, worker_device)
+            response_queue.put(("result", rollout.detach().to(torch.device("cpu"))))
+    except Exception as exc:  # pragma: no cover - surfaced via response queue
+        response_queue.put(("error", repr(exc)))
+
+
+class ParallelRolloutManager:
+    """Manage a pool of worker processes that collect PPO rollouts."""
+
+    def __init__(self, experiment: ExperimentConfig, reinforcement: ReinforcementConfig) -> None:
+        if reinforcement.rollout_workers < 1:
+            raise ValueError("reinforcement.rollout_workers must be at least 1")
+
+        self._ctx = mp.get_context("spawn")
+        self._processes: list[mp.Process] = []
+        self._requests: list[mp.Queue] = []
+        self._responses: list[mp.Queue] = []
+        self._closed = False
+        self._model_config = experiment.model
+        self._data_config = experiment.data
+        self._trainer_config = experiment.trainer
+        self._reinforcement = reinforcement
+        self._seed = experiment.seed
+
+        for worker_id in range(reinforcement.rollout_workers):
+            request = self._ctx.Queue()
+            response = self._ctx.Queue()
+            process = self._ctx.Process(
+                target=_rollout_worker_loop,
+                args=(
+                    worker_id,
+                    self._data_config,
+                    self._trainer_config,
+                    self._model_config,
+                    self._reinforcement,
+                    self._seed,
+                    reinforcement.worker_device,
+                    request,
+                    response,
+                ),
+            )
+            process.daemon = True
+            process.start()
+
+            kind, payload = response.get()
+            if kind == "error":
+                process.join(timeout=1.0)
+                self.close()
+                raise RuntimeError(f"Rollout worker failed to start: {payload}")
+            if kind != "ready":
+                self.close()
+                raise RuntimeError(f"Unexpected worker initialisation message: {kind}")
+
+            self._processes.append(process)
+            self._requests.append(request)
+            self._responses.append(response)
+
+    def collect(self, policy: MarketPolicyNetwork) -> RolloutBatch:
+        state_dict = {
+            key: tensor.detach().cpu()
+            for key, tensor in policy.state_dict().items()
+        }
+
+        for queue in self._requests:
+            queue.put(("collect", state_dict))
+
+        batches: list[RolloutBatch] = []
+        for response in self._responses:
+            kind, payload = response.get()
+            if kind == "result":
+                batches.append(payload)
+            elif kind == "error":
+                self.close()
+                raise RuntimeError(f"Rollout worker error: {payload}")
+            else:
+                self.close()
+                raise RuntimeError(f"Unexpected worker message: {kind}")
+
+        return _concat_rollout_batches(batches)
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+
+        for queue in self._requests:
+            with contextlib.suppress(Exception):
+                queue.put(("stop", None))
+
+        for process in self._processes:
+            process.join(timeout=5.0)
+            if process.is_alive():
+                process.terminate()
+                process.join(timeout=1.0)
+
+        for queue in self._responses:
+            with contextlib.suppress(Exception):
+                while not queue.empty():
+                    queue.get_nowait()
 
 @dataclass(slots=True)
 class ReinforcementUpdate:
@@ -476,12 +635,7 @@ def run_reinforcement_finetuning(
     if len(train_loader) == 0:
         raise RuntimeError("Training dataloader is empty; ensure the dataset yields at least one batch")
 
-    def infinite_iterator(loader: Iterable[dict[str, torch.Tensor]]):
-        while True:
-            for batch in loader:
-                yield batch
-
-    iterator = infinite_iterator(train_loader)
+    iterator = _infinite_iterator(train_loader)
     updates: List[ReinforcementUpdate] = []
 
     buffer: RolloutReplayBuffer | None = None
@@ -492,34 +646,52 @@ def run_reinforcement_finetuning(
             raise ValueError("replay_buffer.min_samples must be positive when enabled")
         buffer = RolloutReplayBuffer(reinforcement.replay_buffer)
 
-    sample_ratio = reinforcement.replay_buffer.sample_ratio if reinforcement.replay_buffer.enabled else 0.0
+    sample_ratio = (
+        reinforcement.replay_buffer.sample_ratio if reinforcement.replay_buffer.enabled else 0.0
+    )
     if sample_ratio < 0.0:
         raise ValueError("replay_buffer.sample_ratio must be non-negative")
 
-    for step in range(reinforcement.total_updates):
-        rollout = _collect_rollout(policy, iterator, reinforcement, device)
-        combined = rollout
-        if buffer is not None:
-            ratio = min(sample_ratio, 1.0)
-            replay_batch: RolloutBatch | None = None
-            if ratio > 0.0 and buffer.can_sample():
-                requested = max(1, int(round(len(rollout) * ratio)))
-                replay_batch = buffer.sample(requested)
-            buffer.add(rollout)
-            if replay_batch is not None:
-                combined = _concat_rollout_batches([rollout, replay_batch.to(device)])
+    manager: ParallelRolloutManager | None = None
+    if reinforcement.rollout_workers < 1:
+        raise ValueError("reinforcement.rollout_workers must be at least 1")
 
-        update_stats = _ppo_update(policy, optimizer, combined, reinforcement)
-        updates.append(
-            ReinforcementUpdate(
-                update=step,
-                mean_reward=update_stats.mean_reward,
-                policy_loss=update_stats.policy_loss,
-                value_loss=update_stats.value_loss,
-                entropy=update_stats.entropy,
-                samples=update_stats.samples,
+    try:
+        if reinforcement.rollout_workers > 1:
+            manager = ParallelRolloutManager(experiment_config, reinforcement)
+
+        for step in range(reinforcement.total_updates):
+            if manager is not None:
+                rollout = manager.collect(policy)
+            else:
+                rollout = _collect_rollout(policy, iterator, reinforcement, device)
+
+            rollout = rollout.to(device)
+            combined = rollout
+            if buffer is not None:
+                ratio = min(sample_ratio, 1.0)
+                replay_batch: RolloutBatch | None = None
+                if ratio > 0.0 and buffer.can_sample():
+                    requested = max(1, int(round(len(rollout) * ratio)))
+                    replay_batch = buffer.sample(requested)
+                buffer.add(rollout)
+                if replay_batch is not None:
+                    combined = _concat_rollout_batches([rollout, replay_batch.to(device)])
+
+            update_stats = _ppo_update(policy, optimizer, combined, reinforcement)
+            updates.append(
+                ReinforcementUpdate(
+                    update=step,
+                    mean_reward=update_stats.mean_reward,
+                    policy_loss=update_stats.policy_loss,
+                    value_loss=update_stats.value_loss,
+                    entropy=update_stats.entropy,
+                    samples=update_stats.samples,
+                )
             )
-        )
+    finally:
+        if manager is not None:
+            manager.close()
 
     state_dict = {key: tensor.detach().cpu() for key, tensor in policy.state_dict().items()}
     return ReinforcementRunResult(updates=updates, policy_state_dict=state_dict)
