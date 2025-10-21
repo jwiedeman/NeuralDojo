@@ -92,6 +92,9 @@ class ModelConfig:
     max_seq_len: int = 4096
     use_rotary_embeddings: bool = True
     rope_theta: float = 10000.0
+    scale_factors: tuple[int, ...] = (1, 4, 16)
+    scale_depth: int | None = None
+    fusion_heads: int = 4
     encoder_layers: Optional[int] = None
     decoder_layers: Optional[int] = None
     gradient_checkpointing: bool = False

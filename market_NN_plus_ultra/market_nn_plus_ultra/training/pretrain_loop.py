@@ -13,6 +13,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from ..models.omni_mixture import MarketOmniBackbone, OmniBackboneConfig
+from ..models.multi_scale import MultiScaleBackbone, MultiScaleBackboneConfig
 from ..models.temporal_fusion import TemporalFusionConfig, TemporalFusionTransformer
 from ..models.temporal_transformer import TemporalBackbone, TemporalBackboneConfig
 from ..models.moe_transformer import MixtureOfExpertsBackbone, MixtureOfExpertsConfig
@@ -87,6 +88,22 @@ def _build_backbone(model_config: ModelConfig) -> nn.Module:
             gradient_checkpointing=model_config.gradient_checkpointing,
         )
         return MarketOmniBackbone(omni_config)
+    if architecture in {"multi_scale", "multiscale", "hierarchical"}:
+        multi_config = MultiScaleBackboneConfig(
+            feature_dim=model_config.feature_dim,
+            model_dim=model_config.model_dim,
+            scales=tuple(model_config.scale_factors),
+            depth_per_scale=model_config.scale_depth or model_config.depth,
+            heads=model_config.heads,
+            dropout=model_config.dropout,
+            conv_kernel_size=model_config.conv_kernel_size,
+            conv_dilations=model_config.conv_dilations,
+            max_seq_len=model_config.max_seq_len,
+            fusion_heads=model_config.fusion_heads,
+            use_rotary_embeddings=model_config.use_rotary_embeddings,
+            rope_theta=model_config.rope_theta,
+        )
+        return MultiScaleBackbone(multi_config)
     raise ValueError(f"Unknown architecture '{model_config.architecture}'")
 
 

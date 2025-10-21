@@ -90,6 +90,27 @@ This variant is controlled through the experiment configuration by setting
 `model.architecture: omni_mixture` and tweaking the `ssm_state_dim`,
 `coarse_factor`, and `cross_every` knobs.
 
+### Multi-Scale Hierarchical Variant
+
+When experiments demand explicit control over intraday, daily, and weekly
+context windows, the `MultiScaleBackbone` processes multiple resolutions in
+parallel. Each scale applies a stack of hybrid `TemporalBlock` layers with its
+own positional cache before the representations are upsampled, softmax-gated,
+and fused via multi-head attention. The architecture honours irregular window
+lengths by interpolating coarse features back to the base resolution, ensuring
+output tensors always align with the original sequence length.
+
+Configure this backbone with `model.architecture: multi_scale` and adjust the
+new knobs:
+
+* `model.scale_factors` — tuple of downsampling factors (e.g., `[1, 4, 16]`).
+* `model.scale_depth` — number of hybrid blocks per scale (defaults to
+  `model.depth`).
+* `model.fusion_heads` — attention heads used during cross-scale fusion.
+
+Benchmark sweeps can now compare omni-scale, state-space, and hierarchical
+variants within the same profiling harness.
+
 ### State-Space Variant
 
 When the research focus is purely on structured sequence modelling without the
