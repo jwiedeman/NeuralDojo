@@ -15,6 +15,11 @@ from .metrics import (
     ulcer_index,
     value_at_risk,
 )
+from .operations import (
+    OperationsSummary,
+    OperationsThresholds,
+    compile_operations_summary,
+)
 from .reporting import (
     MilestoneReference,
     ReportSummary,
@@ -38,6 +43,9 @@ __all__ = [
     "guardrail_metrics",
     "hit_rate",
     "max_drawdown",
+    "OperationsSummary",
+    "OperationsThresholds",
+    "compile_operations_summary",
     "risk_metrics",
     "sharpe_ratio",
     "sortino_ratio",

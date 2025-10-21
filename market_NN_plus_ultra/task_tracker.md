@@ -144,6 +144,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-10-26): Synced reporting and monitoring schema drafts to ensure playbook embeds linked dashboards and playback logs without refactors.
   - Notes (2025-10-28): Outlined chapter structure tying each milestone to operational runbooks so continuous retraining outputs feed directly into decision-support tooling when milestones land.
   - Notes (2025-10-29): Identified content owners for each playbook section, drafted cross-references to service and reporting updates, and scheduled validation workshops once MVP dashboards are available.
+  - Notes (2025-11-12): Operations summary aggregator now produces guardrail alerts and serialisable payloads, clearing the dependency for wiring approval workflows into the playbook.
 
 ### Active Work Log — 2024-02-24
 

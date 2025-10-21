@@ -37,6 +37,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 * **2025-11-10 — Research agenda reporting alignment:** Added milestone-aware report generation (`MilestoneReference`), CLI ingestion for agenda annotations, and regression coverage so automated reports now surface roadmap context by default.
 * **2025-11-10 — Dilation sweep automation:** Extended the architecture benchmark CLI to accept multi-schedule dilation grids, persisted schedule identifiers in parquet outputs, and refreshed regression coverage so optimisation sweeps now traverse depth/horizon/dilation combinations without manual YAML edits.
 * **2025-11-11 — Replay buffer PPO upgrade:** Delivered a CPU-backed replay buffer with configurable sampling ratios, sample-count reporting in the CLI summary, and regression coverage ensuring warm-started PPO runs mix fresh and historical experiences.
+* **2025-11-12 — Operations readiness summary aggregator:** Added `compile_operations_summary` to bundle risk metrics, guardrail diagnostics, and threshold-driven alerts, unblocking the operations playbook milestones with production-ready payloads for approval workflows and dashboards.
 
 ## Phase 1 — Data & Feature Depth (Weeks 1-2)
 
