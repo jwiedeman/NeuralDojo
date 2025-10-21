@@ -125,6 +125,13 @@ The commands below take you from a fresh clone to running both training and infe
 
    > 💡 Running into GPU memory pressure on a consumer card? Swap in `configs/default_desktop.yaml` for a lighter-weight architecture (`--config configs/default_desktop.yaml`). The desktop preset trims the model depth, attention width, and batch size, and disables persistent dataloader workers so training stays responsive on Windows.
 
+   Warm start the supervised run from a pretraining checkpoint at any time with:
+
+   ```bash
+   python scripts/train.py --config configs/default.yaml \
+       --pretrain-checkpoint checkpoints/pretrain/best.ckpt
+   ```
+
 5. **Run the inference agent**
 
    ```bash
@@ -157,7 +164,18 @@ The commands below take you from a fresh clone to running both training and infe
 
    The benchmarking CLI disables Weights & Biases logging by default, runs each scenario sequentially, and emits a parquet catalogue under `benchmarks/` capturing dataset stats, runtime, and validation metrics for downstream analysis. Use `--enable-wandb` when you want each run to report into your tracking workspace.
 
-7. **Automate retraining with the orchestration CLI**
+7. **Compare pretraining warm starts against scratch runs**
+
+   ```bash
+   python scripts/benchmarks/pretraining_comparison.py \
+       --config configs/default.yaml \
+       --pretrain-checkpoint checkpoints/pretrain/best.ckpt \
+       --output benchmarks/pretraining_comparison.parquet
+   ```
+
+   The CLI runs two supervised jobs (one from scratch, one seeded by the pretraining checkpoint), aggregates metrics into a parquet catalogue, and writes checkpoints to `benchmarks/pretraining_runs/`. Use the output to quantify validation lift, ROI changes, or training-time savings before rolling the warm start into production recipes.
+
+8. **Automate retraining with the orchestration CLI**
 
    ```bash
    python scripts/automation/retrain.py \

@@ -25,56 +25,8 @@ from .config import (
     RiskObjectiveConfig,
     TrainerConfig,
 )
+from .checkpoints import load_backbone_from_checkpoint
 from .train_loop import MarketDataModule, MarketLightningModule
-
-
-def _load_backbone_from_checkpoint(
-    backbone: nn.Module,
-    checkpoint_path: str | Path,
-    *,
-    device: torch.device,
-) -> None:
-    """Load backbone weights from a Lightning checkpoint.
-
-    The helper accepts checkpoints produced by both the supervised
-    ``MarketLightningModule`` and the self-supervised pretraining modules. Only
-    the ``backbone`` parameters are extracted, ensuring PPO-specific heads are
-    always freshly initialised.
-    """
-
-    path = Path(checkpoint_path)
-    if not path.exists():
-        raise FileNotFoundError(f"Checkpoint '{path}' does not exist")
-
-    checkpoint = torch.load(path, map_location=device)
-    if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
-        state_dict = checkpoint["state_dict"]
-    elif isinstance(checkpoint, dict):
-        state_dict = checkpoint
-    else:
-        raise ValueError(f"Unrecognised checkpoint format for '{path}'")
-
-    target_keys = set(backbone.state_dict().keys())
-    if not target_keys:
-        raise ValueError("Backbone has no parameters to load")
-
-    prefixes = ("backbone.", "model.backbone.", "")
-    for prefix in prefixes:
-        matched: dict[str, torch.Tensor] = {}
-        prefix_len = len(prefix)
-        for key, tensor in state_dict.items():
-            if prefix and not key.startswith(prefix):
-                continue
-            trimmed = key[prefix_len:]
-            if trimmed in target_keys:
-                matched[trimmed] = tensor
-        if matched.keys() >= target_keys:
-            backbone.load_state_dict({key: matched[key] for key in target_keys})
-            return
-
-    raise ValueError(
-        "Checkpoint '%s' does not contain a compatible backbone state" % path
-    )
 
 
 def _build_backbone(model_config: ModelConfig) -> nn.Module:
@@ -671,9 +623,9 @@ def run_reinforcement_finetuning(
     policy = MarketPolicyNetwork(experiment_config.model).to(device)
 
     if checkpoint_path is not None:
-        _load_backbone_from_checkpoint(policy.backbone, checkpoint_path, device=device)
+        load_backbone_from_checkpoint(policy.backbone, checkpoint_path, device=device)
     elif pretrain_checkpoint_path is not None:
-        _load_backbone_from_checkpoint(
+        load_backbone_from_checkpoint(
             policy.backbone,
             pretrain_checkpoint_path,
             device=device,

@@ -14,6 +14,7 @@ from .config import (
     ReinforcementConfig,
     TrainerConfig,
 )
+from .checkpoints import load_backbone_from_checkpoint
 from .train_loop import (
     MarketDataModule,
     MarketLightningModule,
@@ -77,6 +78,7 @@ __all__ = [
     "load_experiment_from_file",
     "TrainingRunResult",
     "run_training",
+    "load_backbone_from_checkpoint",
     "BenchmarkScenario",
     "TrainerOverrides",
     "prepare_config_for_scenario",
