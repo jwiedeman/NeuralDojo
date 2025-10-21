@@ -8,12 +8,13 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Optional
 
+import pandas as pd
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
 
-from ..trading import AgentRunResult, MarketNNPlusUltraAgent
+from ..trading import AgentRunResult, GuardrailPolicy, GuardrailResult, MarketNNPlusUltraAgent
 from ..training import ExperimentConfig, load_experiment_from_file, summarise_curriculum_profile
 
 
@@ -89,6 +90,33 @@ class CurriculumResponse(BaseModel):
     stages: list[dict[str, Any]]
 
 
+class GuardrailViolationModel(BaseModel):
+    """Payload describing a guardrail violation."""
+
+    name: str
+    value: float
+    threshold: float | None = None
+    message: str
+
+
+class GuardrailRequest(BaseModel):
+    """Request body for guardrail enforcement."""
+
+    trades: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Trade log records to evaluate against guardrails.",
+    )
+
+
+class GuardrailResponse(BaseModel):
+    """Response payload summarising guardrail enforcement."""
+
+    metrics: dict[str, float]
+    violations: list[GuardrailViolationModel]
+    scaled: bool
+    trades: list[dict[str, Any]]
+
+
 def _dataclass_to_dict(obj: Any) -> Any:
     """Recursively convert dataclasses into JSON-serialisable structures."""
 
@@ -111,6 +139,7 @@ class ServiceState:
         self._lock = Lock()
         self._config: ExperimentConfig | None = None
         self._agent: MarketNNPlusUltraAgent | None = None
+        self._guardrail_policy: GuardrailPolicy | None = None
         self.reload()
 
     @property
@@ -132,6 +161,11 @@ class ServiceState:
             )
             self._config = config
             self._agent = agent
+            self._guardrail_policy = (
+                GuardrailPolicy(config.guardrails)
+                if config.guardrails.enabled
+                else None
+            )
 
     def run_agent(self, *, evaluate: bool, return_column: str) -> tuple[AgentRunResult, dict[str, Any]]:
         """Execute the agent and capture telemetry for responses."""
@@ -143,6 +177,20 @@ class ServiceState:
             telemetry = self._build_telemetry(result)
             return result, telemetry
 
+    @property
+    def guardrail_policy(self) -> GuardrailPolicy | None:
+        """Return the active guardrail policy, if any."""
+
+        return self._guardrail_policy
+
+    def enforce_guardrails(self, trades: pd.DataFrame) -> GuardrailResult:
+        """Apply guardrails to the provided trade log."""
+
+        policy = self._guardrail_policy
+        if policy is None:
+            raise RuntimeError("Guardrails are not enabled in this service configuration")
+        return policy.enforce(trades)
+
     def _build_telemetry(self, result: AgentRunResult) -> dict[str, Any]:
         agent = self._agent
         config = self._config
@@ -151,6 +199,7 @@ class ServiceState:
         window_size: int | None = None
         stride: int | None = None
         symbols: list[str] = []
+        guardrails: dict[str, Any] | None = None
         if agent is not None:
             feature_columns = agent.feature_columns
         if config is not None:
@@ -158,6 +207,8 @@ class ServiceState:
             window_size = config.data.window_size
             stride = config.data.stride
             symbols = list(config.data.symbol_universe or [])
+            if config.guardrails.enabled:
+                guardrails = config.guardrails.serialisable()
         return {
             "prediction_rows": len(result.predictions),
             "feature_columns": feature_columns,
@@ -165,6 +216,7 @@ class ServiceState:
             "window_size": window_size,
             "stride": stride,
             "symbols": symbols,
+            "guardrails": guardrails,
         }
 
 
@@ -272,6 +324,44 @@ def create_app(settings: ServiceSettings) -> FastAPI:
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return ReloadResponse(checkpoint_path=str(checkpoint) if checkpoint else str(settings.checkpoint_path) if settings.checkpoint_path else None)
+
+    @app.post("/guardrails", response_model=GuardrailResponse)
+    async def enforce_guardrails(
+        request: GuardrailRequest,
+        service_state: ServiceState = Depends(get_state),
+    ) -> GuardrailResponse:
+        policy = service_state.guardrail_policy
+        if policy is None:
+            raise HTTPException(status_code=400, detail="Guardrails not enabled in configuration")
+
+        config = service_state.config.guardrails
+        trades_df = pd.DataFrame(request.trades)
+        if trades_df.empty:
+            trades_df = pd.DataFrame({config.timestamp_col: pd.Series(dtype="datetime64[ns]")})
+        for column, dtype in (
+            (config.symbol_col, object),
+            (config.notional_col, float),
+            (config.position_col, float),
+            (config.price_col, float),
+            (config.return_col, float),
+        ):
+            if column not in trades_df.columns:
+                trades_df[column] = pd.Series(dtype=dtype)
+        if config.sector_caps and config.sector_column not in trades_df.columns:
+            trades_df[config.sector_column] = pd.Series(dtype=object)
+        if config.factor_caps and config.factor_column not in trades_df.columns:
+            trades_df[config.factor_column] = pd.Series(dtype=object)
+
+        try:
+            result = await run_in_threadpool(service_state.enforce_guardrails, trades_df)
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        payload = result.as_payload()
+        metrics = {key: float(value) for key, value in payload["metrics"].items()}
+        violations = [GuardrailViolationModel(**violation) for violation in payload["violations"]]
+        trades_payload = jsonable_encoder(payload["trades"])
+        return GuardrailResponse(metrics=metrics, violations=violations, scaled=bool(payload["scaled"]), trades=trades_payload)
 
     return app
 
