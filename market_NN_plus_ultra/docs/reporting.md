@@ -82,6 +82,43 @@ print(guardrails["gross_exposure_peak"], guardrails["tail_return_quantile"])
 Combine guardrails with the standard ROI metrics to build dashboards that catch
 over-levered policies or fat-tailed behaviour before they reach production.
 
+## Operations Readiness Summary
+
+`compile_operations_summary` brings risk metrics and guardrail diagnostics into
+one payload that operations teams can consume before approving a rollout. Feed
+it the evaluation returns plus an optional trade log and, when desired, a set of
+thresholds that codify your guardrails:
+
+```python
+from market_nn_plus_ultra.evaluation import (
+    OperationsThresholds,
+    compile_operations_summary,
+)
+
+summary = compile_operations_summary(
+    predictions_df,
+    trades_df,
+    capital_base=5_000_000,
+    thresholds=OperationsThresholds(
+        min_sharpe=1.0,
+        max_drawdown=0.05,
+        max_gross_exposure=0.75,
+        max_turnover=0.5,
+        min_tail_return=-25_000.0,
+        max_tail_frequency=0.1,
+    ),
+)
+
+if summary.triggered:
+    print("Run blocked:")
+    for alert in summary.triggered:
+        print(" -", alert)
+```
+
+`OperationsSummary.as_dict()` returns a serialisable payload that downstream
+automation (reports, dashboards, approval workflows) can persist alongside other
+telemetry.
+
 ## Python API
 
 For programmatic access import the helper from the evaluation package:
