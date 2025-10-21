@@ -10,26 +10,12 @@ This folder provides an initial scaffold, documentation, and technical roadmap f
 
 ## Quickstart
 
-The commands below take you from a fresh clone to running both training and inference. They assume you are inside the `market_NN_plus_ultra/` directory.
+All examples assume you are working from a Windows machine inside a PowerShell session that has been opened in the `market_NN_plus_ultra\` directory. The commands below walk you from a fresh clone to running both training and inference without triggering `ModuleNotFoundError: No module named 'market_nn_plus_ultra'.`
 
 1. **Create a virtual environment and install the package**
 
-   <details>
-   <summary><strong>macOS / Linux (bash, zsh)</strong></summary>
-
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate
-   python -m pip install --upgrade pip
-   pip install -e .
-   ```
-
-   </details>
-
-   <details>
-   <summary><strong>Windows (PowerShell)</strong></summary>
-
    ```powershell
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -Force
    py -3.11 -m venv .venv
    .\.venv\Scripts\Activate.ps1
    python -m pip install --upgrade pip
@@ -42,58 +28,47 @@ The commands below take you from a fresh clone to running both training and infe
    python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available())"
    ```
 
-   </details>
-
-   Installing in editable mode registers the `market_nn_plus_ultra` package and pulls in required dependencies such as PyTorch Lightning, pandas, and SQLAlchemy. This resolves the `ModuleNotFoundError` errors you would see when running the scripts without installing the project first. Confirming `torch.cuda.is_available()` returns `True` ensures Lightning keeps the GPU accelerator without falling back to CPU.
+   Installing in editable mode registers the `market_nn_plus_ultra` package and pulls in required dependencies such as PyTorch Lightning, pandas, and SQLAlchemy. Installing before you open any notebook or script removes the `ModuleNotFoundError` raised in Windows environments that run the code prior to installation. Confirming `torch.cuda.is_available()` returns `True` ensures Lightning keeps the GPU accelerator without falling back to CPU.
 
 2. **Provide market data**
 
-   The quickest path is to run the bundled bootstrap script which downloads OHLCV candles for a basket of liquid ETFs and seeds the SQLite database::
-
-   ```bash
-   python scripts/bootstrap_sqlite.py --db-path data/market.db \
-       --tickers SPY QQQ VTI IWM EFA EEM XLK XLF XLY XLP \
-       --start 2000-01-01 --end 2025-01-01
-   ```
-
-   The script is idempotent; re-run it to refresh data or pass `--overwrite` to rebuild the tables. Alternatively copy a SQLite database that matches the schema documented in [`docs/sqlite_schema.md`](./docs/sqlite_schema.md) into `data/market.db`, or update the `data.sqlite_path` entry in your config YAML to point at your file. At minimum the database should contain `assets`, `series`, and any indicator tables you reference in the config.
-
-   Need a high-variance synthetic dataset for GPU benchmarking? Generate one with
-   the new fixture builder which fuses price history, technicals, alternative
-   signals, and regime labels in a single command:
-
-   ```bash
-   python scripts/make_fixture.py data/plus_ultra_fixture.db \
-       --symbols SPY QQQ IWM BTC-USD ETH-USD \
-       --rows 32768 --freq 15min --alt-features 4
-   ```
-
-   The resulting SQLite file drops straight into `data.sqlite_path` and is fully
-   validated by Pandera before it is written to disk.
-
-   Regenerate regime labels or run integrity checks against an existing SQLite
-   bundle at any time with the dataset-build CLI:
-
-   ```bash
-   python -m market_nn_plus_ultra.cli.dataset_build data/market.db \
-       --regime-labels --strict-validation
-   ```
-
-   To sanity check connectivity, drop into a Python shell and load the first few rows:
-
-   ```bash
-   # macOS / Linux
-   python - <<'PY'
-   from market_nn_plus_ultra.data.sqlite_loader import SQLiteMarketDataset, SQLiteMarketSource
-
-   dataset = SQLiteMarketDataset(SQLiteMarketSource(path="data/market.db"), validate=False)
-   frame = dataset.load()
-   print(frame.head())
-   PY
-   ```
+   The quickest path is to run the bundled bootstrap script which downloads OHLCV candles for a basket of liquid ETFs and seeds the SQLite database:
 
    ```powershell
-   # Windows PowerShell
+   python scripts/bootstrap_sqlite.py `
+       --db-path data/market.db `
+       --tickers SPY QQQ VTI IWM EFA EEM XLK XLF XLY XLP `
+       --start 2000-01-01 `
+       --end 2025-01-01
+   ```
+
+   The script is idempotent; re-run it to refresh data or pass `--overwrite` to rebuild the tables. Alternatively copy a SQLite database that matches the schema documented in [`docs/sqlite_schema.md`](./docs/sqlite_schema.md) into `data\market.db`, or update the `data.sqlite_path` entry in your config YAML to point at your file. At minimum the database should contain `assets`, `series`, and any indicator tables you reference in the config.
+
+   Need a high-variance synthetic dataset for GPU benchmarking? Generate one with the fixture builder which fuses price history, technicals, alternative signals, and regime labels in a single command:
+
+   ```powershell
+   python scripts/make_fixture.py `
+       data/plus_ultra_fixture.db `
+       --symbols SPY QQQ IWM BTC-USD ETH-USD `
+       --rows 32768 `
+       --freq 15min `
+       --alt-features 4
+   ```
+
+   The resulting SQLite file drops straight into `data.sqlite_path` and is validated by Pandera before it is written to disk.
+
+   Regenerate regime labels or run integrity checks against an existing SQLite bundle at any time with the dataset-build CLI:
+
+   ```powershell
+   python -m market_nn_plus_ultra.cli.dataset_build `
+       data/market.db `
+       --regime-labels `
+       --strict-validation
+   ```
+
+   To sanity check connectivity, drop into a Python shell and load the first few rows directly from PowerShell:
+
+   ```powershell
    python -c "from market_nn_plus_ultra.data.sqlite_loader import SQLiteMarketDataset, SQLiteMarketSource; "^
    "dataset = SQLiteMarketDataset(SQLiteMarketSource(path='data/market.db'), validate=False); "^
    "frame = dataset.load(); print(frame.head())"
@@ -101,132 +76,87 @@ The commands below take you from a fresh clone to running both training and infe
 
 3. **(Optional) Warm start with self-supervised pretraining**
 
-   ```bash
-   python scripts/pretrain.py --config configs/pretrain.yaml --accelerator cpu --devices 1 --max-epochs 1
-   ```
-
    ```powershell
-   python scripts/pretrain.py --config configs/pretrain.yaml --accelerator gpu --devices 1 --max-epochs 1
+   python scripts/pretrain.py `
+       --config configs/pretrain.yaml `
+       --accelerator gpu `
+       --devices 1 `
+       --max-epochs 1
    ```
 
-   Adjust the overrides (e.g. `--accelerator gpu`, `--devices 1`) to match your hardware. The command saves checkpoints under `checkpoints/pretrain/` by default and now auto-launches a Weights & Biases run with sensible defaults so you can watch loss curves evolve in real time. Add `--wandb-offline` for air-gapped environments or `--no-wandb` if you need to suppress tracking entirely.
+   Adjust the overrides (e.g. `--accelerator gpu`, `--devices 1`) to match your hardware. The command saves checkpoints under `checkpoints\pretrain\` by default and auto-launches a Weights & Biases run with sensible defaults so you can watch loss curves evolve in real time. Add `--wandb-offline` for air-gapped environments or `--no-wandb` if you need to suppress tracking entirely.
 
 4. **Train the supervised model**
 
-   ```bash
-   python scripts/train.py --config configs/default.yaml --accelerator cpu --devices 1 --max-epochs 1
-   ```
-
    ```powershell
-   python scripts/train.py --config configs/default.yaml --accelerator gpu --devices 1 --max-epochs 1
+   python scripts/train.py `
+       --config configs/default.yaml `
+       --accelerator gpu `
+       --devices 1 `
+       --max-epochs 1
    ```
 
-   Remove or change the CLI overrides once you are ready to run a full GPU-backed training session. Checkpoints land in `checkpoints/default/`. As with pretraining, Weights & Biases logging starts automatically (project name defaults to `plus-ultra` and run names include the config + timestamp). Opt out with `--no-wandb` if you prefer local-only console logging.
+   Remove or change the CLI overrides once you are ready to run a full GPU-backed training session. Checkpoints land in `checkpoints\default\`. As with pretraining, Weights & Biases logging starts automatically (project name defaults to `plus-ultra` and run names include the config + timestamp). Opt out with `--no-wandb` if you prefer local-only console logging.
 
    > 💡 Running into GPU memory pressure on a consumer card? Swap in `configs/default_desktop.yaml` for a lighter-weight architecture (`--config configs/default_desktop.yaml`). The desktop preset trims the model depth, attention width, and batch size, and disables persistent dataloader workers so training stays responsive on Windows.
 
    Warm start the supervised run from a pretraining checkpoint at any time with:
 
-   ```bash
-   python scripts/train.py --config configs/default.yaml \
+   ```powershell
+   python scripts/train.py `
+       --config configs/default.yaml `
        --pretrain-checkpoint checkpoints/pretrain/best.ckpt
    ```
 
 5. **Run the inference agent**
 
-   ```bash
-   python scripts/run_agent.py --config configs/default.yaml \
-     --checkpoint checkpoints/default/last.ckpt \
-     --device cpu \
-     --output outputs/predictions.parquet
-   ```
-
    ```powershell
-   python scripts/run_agent.py --config configs/default.yaml `
-     --checkpoint checkpoints/default/last.ckpt `
-     --device cuda:0 `
-     --output outputs\predictions.parquet
+   python scripts/run_agent.py `
+       --config configs/default.yaml `
+       --checkpoint checkpoints/default/last.ckpt `
+       --device cuda:0 `
+       --output outputs\predictions.parquet
    ```
 
    Swap in the path to the checkpoint you want to evaluate (`last.ckpt`, `best.ckpt`, etc.) and, if desired, request GPU execution with `--device cuda:0`. The script writes predictions to the requested parquet (or CSV) file and prints evaluation metrics when realised returns are available.
 
 6. **Benchmark architecture variants**
 
-   ```bash
-   python scripts/benchmarks/architecture_sweep.py \
-       --config configs/default.yaml \
-       --architectures hybrid_transformer,omni \
-       --model-dims 512,768 \
-       --depths 8,12 \
-       --limit-train-batches 0.1 \
+   ```powershell
+   python scripts/benchmarks/architecture_sweep.py `
+       --config configs/default.yaml `
+       --architectures hybrid_transformer,omni `
+       --model-dims 512,768 `
+       --depths 8,12 `
+       --limit-train-batches 0.1 `
        --max-epochs 1
    ```
 
-   The benchmarking CLI disables Weights & Biases logging by default, runs each scenario sequentially, and emits a parquet catalogue under `benchmarks/` capturing dataset stats, runtime, and validation metrics for downstream analysis. Use `--enable-wandb` when you want each run to report into your tracking workspace.
+   The benchmarking CLI disables Weights & Biases logging by default, runs each scenario sequentially, and emits a parquet catalogue under `benchmarks\` capturing dataset stats, runtime, and validation metrics for downstream analysis. Use `--enable-wandb` when you want each run to report into your tracking workspace.
 
 7. **Compare pretraining warm starts against scratch runs**
 
-   ```bash
-   python scripts/benchmarks/pretraining_comparison.py \
-       --config configs/default.yaml \
-       --pretrain-checkpoint checkpoints/pretrain/best.ckpt \
+   ```powershell
+   python scripts/benchmarks/pretraining_comparison.py `
+       --config configs/default.yaml `
+       --pretrain-checkpoint checkpoints/pretrain/best.ckpt `
        --output benchmarks/pretraining_comparison.parquet
    ```
 
-   The CLI runs two supervised jobs (one from scratch, one seeded by the pretraining checkpoint), aggregates metrics into a parquet catalogue, and writes checkpoints to `benchmarks/pretraining_runs/`. A third row records warm-start minus scratch deltas for every numeric metric, and the command prints a concise summary of the most useful deltas (validation loss, ROI, Sharpe, runtime) so you can gauge warm-start lift at a glance. Use the output to quantify validation lift, ROI changes, or training-time savings before rolling the warm start into production recipes.
+   The CLI runs two supervised jobs (one from scratch, one seeded by the pretraining checkpoint), aggregates metrics into a parquet catalogue, and writes checkpoints to `benchmarks\pretraining_runs\`. A third row records warm-start minus scratch deltas for every numeric metric, and the command prints a concise summary of the most useful deltas (validation loss, ROI, Sharpe, runtime) so you can gauge warm-start lift at a glance. Use the output to quantify validation lift, ROI changes, or training-time savings before rolling the warm start into production recipes.
 
 8. **Evaluate stability with walk-forward splits**
 
-   Once you have predictions with realised returns, run the walk-forward
-   evaluation CLI to generate per-split metrics and an aggregated summary:
-
-   ```bash
-   python scripts/walkforward_eval.py \
-       --predictions outputs/predictions.parquet \
-       --train-window 252 \
-       --test-window 63 \
-       --metrics-output benchmarks/walkforward_metrics.parquet \
-       --summary-output benchmarks/walkforward_summary.json
-   ```
+   Once you have predictions with realised returns, run the walk-forward evaluation CLI to generate per-split metrics and an aggregated summary:
 
    ```powershell
    python scripts/walkforward_eval.py `
-       --predictions outputs\predictions.parquet `
+       --predictions outputs/predictions.parquet `
        --train-window 252 `
        --test-window 63 `
-       --metrics-output benchmarks\walkforward_metrics.parquet `
-       --summary-output benchmarks\walkforward_summary.json
+       --metrics-output benchmarks/walkforward_metrics.parquet `
+       --summary-output benchmarks/walkforward_summary.json
    ```
-
-   The command emits a per-split metrics table and records aggregate Sharpe,
-   drawdown, and hit-rate statistics, helping you track deployment readiness as
-   you iterate on training runs.
-
-9. **Automate retraining with the orchestration CLI**
-
-   ```bash
-   python scripts/automation/retrain.py \
-       --dataset data/market.db \
-       --train-config configs/default.yaml \
-       --pretrain-config configs/pretrain.yaml \
-       --run-reinforcement \
-       --warm-start training
-   ```
-
-   The command above validates the SQLite dataset, optionally regenerates regime labels, runs pretraining, launches supervised training, and finishes with PPO fine-tuning. Artifacts land under `automation_runs/<timestamp>/`, including checkpoints, profitability summaries, and policy state dicts. Add flags such as `--regenerate-regimes`, `--skip-pretraining`, or `--skip-training` to tailor individual stages.
-
-   Looking for a complete walkthrough that chains fixture creation, pretraining,
-   training, evaluation, and monitoring? Follow the
-   [end-to-end MVP quickstart](./docs/quickstart_mvp.md) to run the full loop
-   and capture Prometheus-ready telemetry after each pass.
-
-10. **Serve the inference API**
-
-   ```bash
-   python scripts/service.py --config configs/default.yaml --host 0.0.0.0 --port 8000
-   ```
-
-   The FastAPI service loads the same experiment configuration as the CLI agent and exposes `/health`, `/config`, `/curriculum`, `/predict`, and `/reload` endpoints. Override defaults with flags such as `--checkpoint`, `--device`, or `--max-prediction-rows` when deploying. Responses include telemetry snapshots (feature columns, horizon, window size) so monitoring dashboards can ingest predictions without extra glue code.
 
 ## Containerised workflow
 
