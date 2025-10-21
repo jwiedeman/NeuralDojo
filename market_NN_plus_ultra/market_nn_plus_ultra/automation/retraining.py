@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 import logging
+import json
 from pathlib import Path
 import sqlite3
 from typing import Any, Iterable, MutableMapping
@@ -312,12 +313,37 @@ def _run_reinforcement_stage(
     torch.save(result.policy_state_dict, policy_path)
 
     updates = result.updates
+    updates_payload = [asdict(update) for update in updates]
+    if updates_payload:
+        updates_path = output_dir / "ppo_updates.json"
+        updates_path.write_text(
+            json.dumps(updates_payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    else:
+        updates_path = None
+
+    metrics_payload = dict(result.evaluation_metrics)
+    metrics_path: Path | None = None
+    if metrics_payload:
+        metrics_path = output_dir / "evaluation_metrics.json"
+        metrics_path.write_text(
+            json.dumps(metrics_payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
     artifacts: dict[str, Any] = {
         "policy_state_dict": str(policy_path),
-        "updates": [update.__dict__ for update in updates],
+        "updates": updates_payload,
     }
-    if updates:
-        artifacts["last_update"] = updates[-1].__dict__
+    if updates_payload:
+        artifacts["last_update"] = updates_payload[-1]
+    if updates_path is not None:
+        artifacts["updates_path"] = str(updates_path)
+    if metrics_payload:
+        artifacts["evaluation_metrics"] = metrics_payload
+    if metrics_path is not None:
+        artifacts["evaluation_metrics_path"] = str(metrics_path)
 
     completed = datetime.now(timezone.utc)
     return RetrainingStageResult(
