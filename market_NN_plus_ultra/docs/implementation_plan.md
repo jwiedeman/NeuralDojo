@@ -4,6 +4,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 
 ## Optimization Execution Log
 
+* **2025-12-01 — End-to-end evaluation automation:** Added an evaluation stage to `run_retraining_plan` that restores the latest checkpoint, runs the inference agent, persists predictions, and compiles an operations summary with profitability guardrails. The automation CLI now exposes `--run-evaluation` flags so orchestration runs can surface ROI/drawdown telemetry immediately after training.
 * **2025-11-28 — Benchmark-aware reporting:** Enabled optional benchmark inputs across the agent, reporting CLI, and operations summary. Risk metrics now surface excess return, tracking error, information ratio, beta, and benchmark correlation when a benchmark column is supplied, and the new metrics propagate through the FastAPI service and automation tooling.
 * **2024-02-25 — Plan resync:** Reconfirmed Phase 1 as the primary optimisation bottleneck. The focus is to finish schema enforcement and unlock richer market-regime labels before scaling benchmarking sweeps.
 * **2024-02-25 — Traceability update:** Added implementation notes directly to each milestone below so in-flight work, blockers, and measurement hooks are visible without cross-referencing other docs.

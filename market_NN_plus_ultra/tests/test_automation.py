@@ -13,12 +13,14 @@ import yaml
 
 from market_nn_plus_ultra.automation import (
     DatasetStageConfig,
+    EvaluationStageConfig,
     RetrainingPlan,
     WarmStartStrategy,
     run_retraining_plan,
 )
 from market_nn_plus_ultra.training import TrainingRunResult
 from market_nn_plus_ultra.training.reinforcement import ReinforcementRunResult
+from market_nn_plus_ultra.trading.agent import AgentRunResult
 
 
 def _build_sqlite_fixture(path: Path, *, rows: int = 32) -> None:
@@ -209,6 +211,82 @@ def test_run_retraining_plan_executes_all_stages(monkeypatch, tmp_path: Path) ->
     assert checkpoint == str(tmp_path / "train.ckpt")
     policy_path = summary.stage_artifacts("reinforcement")["policy_state_dict"]
     assert Path(policy_path).exists()
+
+
+def test_run_retraining_plan_with_evaluation_stage(monkeypatch, tmp_path: Path) -> None:
+    db_path = tmp_path / "fixture.db"
+    _build_sqlite_fixture(db_path)
+    train_config = _write_experiment_config(tmp_path / "train.yaml", db_path)
+
+    def fake_training(config):
+        return TrainingRunResult(
+            best_model_path=str(tmp_path / "train.ckpt"),
+            logged_metrics={"val/loss": 0.5},
+            dataset_summary={
+                "train_windows": 8,
+                "val_windows": 4,
+                "train_batches": 2,
+                "val_batches": 1,
+                "feature_dim": 5,
+                "market_state_features": 0,
+            },
+        )
+
+    class FakeAgent:
+        def __init__(self, experiment_config, checkpoint_path=None, device="cpu", batch_size=None):
+            self.experiment_config = experiment_config
+            self.checkpoint_path = checkpoint_path
+            self.device = device
+
+        def run(self, *, evaluate=True, return_column="realised_return", benchmark_column=None):
+            frame = pd.DataFrame(
+                {
+                    "symbol": ["TEST", "TEST"],
+                    "window_end": pd.date_range("2024-01-01", periods=2, freq="1D"),
+                    return_column: [0.01, -0.005],
+                }
+            )
+            metrics = {"roi": 0.0025, "sharpe": 0.5}
+            return AgentRunResult(predictions=frame, metrics=metrics)
+
+    monkeypatch.setattr(
+        "market_nn_plus_ultra.automation.retraining.run_training",
+        fake_training,
+    )
+    monkeypatch.setattr(
+        "market_nn_plus_ultra.automation.retraining.MarketNNPlusUltraAgent",
+        FakeAgent,
+    )
+
+    plan = RetrainingPlan(
+        dataset_path=db_path,
+        training_config=train_config,
+        output_dir=tmp_path / "orchestration",
+        dataset_stage=DatasetStageConfig(strict_validation=False),
+        run_pretraining=False,
+        run_training=True,
+        run_reinforcement=False,
+        warm_start=WarmStartStrategy.TRAINING,
+        run_evaluation=True,
+        evaluation_stage=EvaluationStageConfig(
+            output_dir=tmp_path / "orchestration" / "evaluation",
+            predictions_path=Path("predictions.csv"),
+            metrics_path=Path("metrics.json"),
+            operations_path=Path("ops.json"),
+        ),
+    )
+
+    summary = run_retraining_plan(plan)
+    stage_names = [stage.name for stage in summary.stages]
+    assert stage_names == ["dataset", "training", "evaluation"]
+
+    evaluation_stage = summary.stage_artifacts("evaluation")
+    predictions_path = Path(evaluation_stage["predictions_path"])
+    operations_path = Path(evaluation_stage["operations_summary_path"])
+    assert predictions_path.exists()
+    assert operations_path.exists()
+    assert "operations_summary" in evaluation_stage
+    assert evaluation_stage["operations_summary"]["triggered"] == []
 
 
 def test_pretraining_warm_start(monkeypatch, tmp_path: Path) -> None:

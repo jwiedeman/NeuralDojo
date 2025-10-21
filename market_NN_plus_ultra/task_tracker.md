@@ -124,6 +124,7 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
    - Notes (2025-10-26): Captured integration tasks for incorporating simulator-derived execution costs into summary tables and queued fixtures for validating drawdown aggregation under new telemetry fields.
    - Notes (2025-10-28): Added experiment-tracker upload cadence for interim profitability snapshots and documented schema extensions for calibration-derived confidence intervals.
    - Notes (2025-11-07): Coordinated telemetry schema updates with simulator and PPO teams, outlined Markdown/HTML template deltas for risk-aware metrics, and scheduled Sprint 5 doc automation spikes to keep reporting aligned with new objectives.
+   - Notes (2025-12-01): Orchestration pipeline now emits post-training predictions and operations summaries via the evaluation stage in `run_retraining_plan`, giving automation runs immediate profitability and guardrail snapshots.
 
 ## 4. Automation & Deployment
 - [x] Containerise training + inference pipelines with GPU support. — Notes: Docker image (`docker/Dockerfile.gpu`) + multi-command entrypoint ship CUDA-ready runtime; docs in `docs/containerization.md` cover volumes + usage (2025-11-20).
