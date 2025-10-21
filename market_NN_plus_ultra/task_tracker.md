@@ -152,18 +152,20 @@ This tracker organises the roadmap toward a production-ready "ultimate trader". 
   - Notes (2025-10-29): Drafted alert playbooks with escalation timing, synchronised metric namespaces with service planning, and catalogued synthetic drift scenarios for end-to-end monitoring tests.
   - Notes (2025-11-04): Locked profitability reporting payload schema IDs with the service planning thread, reserved telemetry pagination retry semantics, and ensured monitoring dashboards can ingest the new diagnostics aggregates without schema churn.
   - Notes (2025-11-30): Landed `market_nn_plus_ultra.monitoring` with drift/risk snapshots, Prometheus exporters, and CLI tooling (`scripts/monitoring/live_monitor.py`) so live runs can stream alerts and dashboard metrics.
-- [ ] Build playbook for human-in-the-loop overrides and risk manager approvals. — Notes: Drafting outline alongside analyst feedback tooling requirements.
+- [x] Build playbook for human-in-the-loop overrides and risk manager approvals. — Notes: Drafting outline alongside analyst feedback tooling requirements.
   - Notes (2025-10-26): Added placeholders for calibration-confidence dashboards and simulator what-if analyses to inform override decisions.
   - Notes (2025-10-28): Defined escalation tree integrating monitoring alerts with analyst annotations, added rollback SOP referencing checkpoint lineage, and documented review cadence expectations.
   - Notes (2025-10-29): Outlined approval runbooks tied to guardrail violations, mapped decision logging to analyst feedback tooling, and scheduled doc reviews alongside monitoring/service milestones.
   - Notes (2025-11-04): Captured telemetry ownership assignments (diagnostics parquet, simulator traces) so override workflows can surface provenance and profitability context during reviews.
   - Notes (2025-11-30): Monitoring documentation (`docs/monitoring.md`) now anchors override guidance with live alert semantics, paving the way for the consolidated playbook.
-- [ ] Integrate live monitoring, automated reporting, and risk guardrails into a single operations playbook for extend/branch decisions. — Notes: Will consolidate once reporting, monitoring, and guardrail milestones reach MVP.
+  - Notes (2025-12-03): Added the override/approval checklist, decision tree, and escalation matrix to `docs/operations.md`, wiring automation, reporting, annotations, and monitoring into a single review flow.
+- [x] Integrate live monitoring, automated reporting, and risk guardrails into a single operations playbook for extend/branch decisions. — Notes: Will consolidate once reporting, monitoring, and guardrail milestones reach MVP.
   - Notes (2024-02-25): Operations playbook will surface optimisation KPIs (latency, calibration, guardrail triggers) defined in the implementation plan so deployment readiness decisions remain data-driven.
   - Notes (2025-10-26): Synced reporting and monitoring schema drafts to ensure playbook embeds linked dashboards and playback logs without refactors.
   - Notes (2025-10-28): Outlined chapter structure tying each milestone to operational runbooks so continuous retraining outputs feed directly into decision-support tooling when milestones land.
   - Notes (2025-10-29): Identified content owners for each playbook section, drafted cross-references to service and reporting updates, and scheduled validation workshops once MVP dashboards are available.
   - Notes (2025-11-12): Operations summary aggregator now produces guardrail alerts and serialisable payloads, clearing the dependency for wiring approval workflows into the playbook.
+  - Notes (2025-12-03): Documented the integrated monitoring→reporting→guardrail workflow in `docs/operations.md`, linking automation outputs, Prometheus telemetry, and approval notes into the MVP operations loop.
 
 ### Active Work Log — 2024-02-24
 

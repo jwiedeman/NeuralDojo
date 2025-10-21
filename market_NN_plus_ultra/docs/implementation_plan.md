@@ -4,6 +4,7 @@ This living plan translates the Market NN Plus Ultra roadmap into concrete engin
 
 ## Optimization Execution Log
 
+* **2025-12-03 — Operations playbook MVP:** Consolidated monitoring, reporting, and guardrail approval workflows inside `docs/operations.md`. Added human-in-the-loop checklists, escalation matrices, and the integrated retraining→evaluation→deployment loop so risk leads can approve profitability before rollouts.
 * **2025-12-02 — Monitoring severity gauges:** Normalised Prometheus exporter risk gauges to emit absolute magnitudes for negative metrics, keeping dashboards non-negative while preserving profitability alerting semantics for the MVP monitoring stack. Documented the behaviour in `docs/monitoring.md` to align operations playbooks with the live metrics surface.
 * **2025-12-01 — End-to-end evaluation automation:** Added an evaluation stage to `run_retraining_plan` that restores the latest checkpoint, runs the inference agent, persists predictions, and compiles an operations summary with profitability guardrails. The automation CLI now exposes `--run-evaluation` flags so orchestration runs can surface ROI/drawdown telemetry immediately after training.
 * **2025-11-28 — Benchmark-aware reporting:** Enabled optional benchmark inputs across the agent, reporting CLI, and operations summary. Risk metrics now surface excess return, tracking error, information ratio, beta, and benchmark correlation when a benchmark column is supplied, and the new metrics propagate through the FastAPI service and automation tooling.
