@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
+from types import SimpleNamespace
 
 from market_nn_plus_ultra.training import (
     DataConfig,
@@ -19,6 +20,8 @@ from market_nn_plus_ultra.training import (
     TrainerConfig,
     run_reinforcement_finetuning,
 )
+from market_nn_plus_ultra.trading import TradingCosts
+from market_nn_plus_ultra.cli.reinforcement import apply_reinforcement_overrides
 
 
 def _build_sqlite_fixture(path: Path, *, rows: int = 64) -> None:
@@ -315,3 +318,87 @@ def test_reinforcement_warm_start_from_pretraining_checkpoint(tmp_path: Path) ->
     assert pretrain_backbone
     for key, tensor in pretrain_backbone.items():
         torch.testing.assert_close(policy_backbone[key], tensor)
+
+
+def _cli_namespace(**overrides: object) -> SimpleNamespace:
+    defaults = {
+        "updates": None,
+        "steps_per_rollout": None,
+        "policy_epochs": None,
+        "minibatch_size": None,
+        "gamma": None,
+        "gae_lambda": None,
+        "clip_ratio": None,
+        "value_coef": None,
+        "entropy_coef": None,
+        "learning_rate": None,
+        "max_grad_norm": None,
+        "rollout_workers": None,
+        "worker_device": None,
+        "activation": None,
+        "targets_are_returns": False,
+        "cost_transaction": None,
+        "cost_slippage": None,
+        "cost_holding": None,
+        "risk_enabled": None,
+        "risk_sharpe_weight": None,
+        "risk_sortino_weight": None,
+        "risk_drawdown_weight": None,
+        "risk_cvar_weight": None,
+        "risk_reward_scale": None,
+        "risk_cvar_alpha": None,
+    }
+    defaults.update(overrides)
+    return SimpleNamespace(**defaults)
+
+
+def test_apply_overrides_updates_nested_configs() -> None:
+    base = ReinforcementConfig()
+    args = _cli_namespace(
+        cost_transaction=0.002,
+        cost_slippage=0.003,
+        cost_holding=0.004,
+        risk_enabled=True,
+        risk_sharpe_weight=1.5,
+        risk_sortino_weight=0.75,
+        risk_drawdown_weight=0.25,
+        risk_cvar_weight=0.1,
+        risk_reward_scale=2.0,
+        risk_cvar_alpha=0.2,
+    )
+
+    updated = apply_reinforcement_overrides(base, args)
+
+    assert updated.costs is not None
+    assert updated.costs.transaction == 0.002
+    assert updated.costs.slippage == 0.003
+    assert updated.costs.holding == 0.004
+
+    assert updated.risk_objective.enabled is True
+    assert updated.risk_objective.sharpe_weight == 1.5
+    assert updated.risk_objective.sortino_weight == 0.75
+    assert updated.risk_objective.drawdown_weight == 0.25
+    assert updated.risk_objective.cvar_weight == 0.1
+    assert updated.risk_objective.reward_scale == 2.0
+    assert updated.risk_objective.cvar_alpha == 0.2
+
+
+def test_apply_overrides_preserves_existing_values() -> None:
+    base = ReinforcementConfig(
+        gamma=0.91,
+        costs=TradingCosts(transaction=0.01, slippage=0.02, holding=0.03),
+    )
+    base.risk_objective.enabled = True
+    base.risk_objective.sharpe_weight = 0.5
+
+    args = _cli_namespace()
+
+    updated = apply_reinforcement_overrides(base, args)
+
+    assert updated.gamma == base.gamma
+    assert updated.costs is not None
+    assert updated.costs.transaction == 0.01
+    assert updated.costs.slippage == 0.02
+    assert updated.costs.holding == 0.03
+    assert updated.risk_objective.enabled is True
+    assert updated.risk_objective.sharpe_weight == 0.5

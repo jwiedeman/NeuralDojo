@@ -6,6 +6,10 @@ import argparse
 from dataclasses import replace
 from pathlib import Path
 
+from market_nn_plus_ultra.cli.reinforcement import (
+    apply_reinforcement_overrides,
+    register_reinforcement_arguments,
+)
 from market_nn_plus_ultra.training import (
     ReinforcementConfig,
     load_experiment_from_file,
@@ -47,11 +51,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-grad-norm", type=float, help="Gradient clipping norm")
     parser.add_argument("--rollout-workers", type=int, help="Number of parallel rollout workers")
     parser.add_argument("--worker-device", type=str, help="Device identifier for rollout workers")
-    parser.add_argument(
-        "--targets-are-returns",
-        action="store_true",
-        help="Treat dataset targets as pre-computed returns instead of prices",
-    )
+    register_reinforcement_arguments(parser)
     return parser.parse_args()
 
 
@@ -83,9 +83,7 @@ def apply_overrides(config: ReinforcementConfig, args: argparse.Namespace) -> Re
         updated.rollout_workers = args.rollout_workers
     if args.worker_device is not None:
         updated.worker_device = args.worker_device
-    if args.targets_are_returns:
-        updated.targets_are_returns = True
-    return updated
+    return apply_reinforcement_overrides(updated, args)
 
 
 def main() -> None:
