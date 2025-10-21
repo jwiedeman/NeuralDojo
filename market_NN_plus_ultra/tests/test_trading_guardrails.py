@@ -58,7 +58,7 @@ def test_guardrail_policy_respects_sector_caps() -> None:
 
     result = policy.enforce(trades)
 
-    tech_exposure = result.metrics["max_symbol_exposure"]
+    tech_exposure = result.exposures["sector"]["tech"]
     assert tech_exposure == pytest.approx(0.3, rel=1e-6)
     finance_rows = result.trades[result.trades["sector"] == "finance"]
     assert finance_rows["notional"].iloc[0] == pytest.approx(trades.loc[1, "notional"])
@@ -91,3 +91,21 @@ def test_guardrail_policy_records_tail_violation_when_warn_only() -> None:
     violation_names = {violation.name for violation in result.violations}
     assert "tail_return_quantile" in violation_names
     assert result.metrics["tail_return_quantile"] < -0.02
+
+
+def test_guardrail_policy_exposes_symbol_and_sector_summaries() -> None:
+    trades = _base_trades()
+    policy = GuardrailPolicy(
+        GuardrailConfig(
+            enabled=False,
+            capital_base=200.0,
+        )
+    )
+
+    result = policy.enforce(trades)
+
+    exposures = result.exposures
+    assert "symbol" in exposures
+    assert exposures["symbol"]["AAA"] == pytest.approx(1.0)
+    assert exposures["symbol"]["BBB"] == pytest.approx(0.2)
+    assert exposures.get("sector", {})["tech"] == pytest.approx(1.0)

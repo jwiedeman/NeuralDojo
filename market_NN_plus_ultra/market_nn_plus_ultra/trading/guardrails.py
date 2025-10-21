@@ -60,15 +60,21 @@ class GuardrailResult:
     metrics: Dict[str, float]
     violations: list[GuardrailViolation]
     scaled: bool = False
+    exposures: Dict[str, Dict[str, float]] = field(default_factory=dict)
 
     def as_payload(self) -> Dict[str, Any]:
         """Serialise the result for JSON responses."""
 
+        exposures_payload = {
+            group: {name: float(value) for name, value in values.items()}
+            for group, values in self.exposures.items()
+        }
         return {
             "metrics": dict(self.metrics),
             "violations": [asdict(v) for v in self.violations],
             "scaled": self.scaled,
             "trades": self.trades.to_dict(orient="records"),
+            "exposures": exposures_payload,
         }
 
 
@@ -115,13 +121,46 @@ class GuardrailPolicy:
             tail_percentile=cfg.tail_percentile,
         )
 
-        if not cfg.enabled:
-            return GuardrailResult(trades=df, metrics=metrics, violations=[], scaled=False)
-
-        scaled = False
-
         def _capital() -> float:
             return cfg.capital_base if cfg.capital_base not in (None, 0) else 1.0
+
+        def _compute_exposures() -> Dict[str, Dict[str, float]]:
+            capital = _capital()
+            exposures: Dict[str, Dict[str, float]] = {}
+
+            def _summarise(label: str, column: str | None) -> None:
+                if not column or column not in df.columns:
+                    return
+                series = (
+                    df.groupby(column)[cfg.notional_col]
+                    .apply(lambda values: values.abs().max())
+                    .dropna()
+                )
+                if series.empty:
+                    exposures[label] = {}
+                    return
+                normalised = (series / capital).sort_values(ascending=False)
+                exposures[label] = {
+                    str(key): float(value)
+                    for key, value in normalised.items()
+                }
+
+            _summarise("symbol", cfg.symbol_col)
+            _summarise("sector", cfg.sector_column)
+            _summarise("factor", cfg.factor_column)
+            return {label: values for label, values in exposures.items() if values or label == "symbol"}
+
+        if not cfg.enabled:
+            exposures = _compute_exposures()
+            return GuardrailResult(
+                trades=df,
+                metrics=metrics,
+                violations=[],
+                scaled=False,
+                exposures=exposures,
+            )
+
+        scaled = False
 
         def _scale_all(scale: float) -> None:
             nonlocal df, metrics, scaled
@@ -274,6 +313,7 @@ class GuardrailPolicy:
             capital_base=cfg.capital_base,
             tail_percentile=cfg.tail_percentile,
         )
+        exposures = _compute_exposures()
 
         violations: list[GuardrailViolation] = []
 
@@ -334,21 +374,17 @@ class GuardrailPolicy:
             )
 
         if cfg.max_symbol_exposure is not None and cfg.max_symbol_exposure > 0:
-            capital = _capital()
-            symbol_notional = df[cfg.notional_col].abs().groupby(df[cfg.symbol_col]).max()
-            if not symbol_notional.empty:
-                exposures = symbol_notional / capital
-                for symbol, exposure in exposures.items():
-                    if exposure > cfg.max_symbol_exposure:
-                        _record_violation(
-                            f"symbol_exposure:{symbol}",
-                            float(exposure),
-                            cfg.max_symbol_exposure,
-                            f"Symbol {symbol} exposure {float(exposure):.3f} exceeded limit {cfg.max_symbol_exposure:.3f}",
-                        )
+            symbol_exposures = exposures.get("symbol", {})
+            for symbol, exposure in symbol_exposures.items():
+                if exposure > cfg.max_symbol_exposure:
+                    _record_violation(
+                        f"symbol_exposure:{symbol}",
+                        float(exposure),
+                        cfg.max_symbol_exposure,
+                        f"Symbol {symbol} exposure {float(exposure):.3f} exceeded limit {cfg.max_symbol_exposure:.3f}",
+                    )
 
         if cfg.sector_caps:
-            capital = _capital()
             if cfg.sector_column not in df.columns:
                 _record_violation(
                     "sector_caps",
@@ -357,13 +393,7 @@ class GuardrailPolicy:
                     f"Sector column '{cfg.sector_column}' missing for configured caps",
                 )
             else:
-                sector_exposure = (
-                    df[cfg.notional_col]
-                    .abs()
-                    .groupby(df[cfg.sector_column])
-                    .max()
-                    / capital
-                )
+                sector_exposure = exposures.get("sector", {})
                 for sector, limit in cfg.sector_caps.items():
                     exposure = float(sector_exposure.get(sector, 0.0))
                     if exposure > limit:
@@ -375,7 +405,6 @@ class GuardrailPolicy:
                         )
 
         if cfg.factor_caps:
-            capital = _capital()
             if cfg.factor_column not in df.columns:
                 _record_violation(
                     "factor_caps",
@@ -384,13 +413,7 @@ class GuardrailPolicy:
                     f"Factor column '{cfg.factor_column}' missing for configured caps",
                 )
             else:
-                factor_exposure = (
-                    df[cfg.notional_col]
-                        .abs()
-                        .groupby(df[cfg.factor_column])
-                        .max()
-                        / capital
-                )
+                factor_exposure = exposures.get("factor", {})
                 for factor, limit in cfg.factor_caps.items():
                     exposure = float(factor_exposure.get(factor, 0.0))
                     if exposure > limit:
@@ -401,7 +424,13 @@ class GuardrailPolicy:
                             f"Factor {factor} exposure {exposure:.3f} exceeded limit {float(limit):.3f}",
                         )
 
-        return GuardrailResult(trades=df, metrics=metrics, violations=violations, scaled=scaled)
+        return GuardrailResult(
+            trades=df,
+            metrics=metrics,
+            violations=violations,
+            scaled=scaled,
+            exposures=exposures,
+        )
 
 
 __all__ = [

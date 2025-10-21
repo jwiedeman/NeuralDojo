@@ -115,6 +115,7 @@ class GuardrailResponse(BaseModel):
     violations: list[GuardrailViolationModel]
     scaled: bool
     trades: list[dict[str, Any]]
+    exposures: dict[str, dict[str, float]] = Field(default_factory=dict)
 
 
 def _dataclass_to_dict(obj: Any) -> Any:
@@ -359,9 +360,19 @@ def create_app(settings: ServiceSettings) -> FastAPI:
 
         payload = result.as_payload()
         metrics = {key: float(value) for key, value in payload["metrics"].items()}
+        exposures_payload = {
+            group: {name: float(value) for name, value in values.items()}
+            for group, values in payload.get("exposures", {}).items()
+        }
         violations = [GuardrailViolationModel(**violation) for violation in payload["violations"]]
         trades_payload = jsonable_encoder(payload["trades"])
-        return GuardrailResponse(metrics=metrics, violations=violations, scaled=bool(payload["scaled"]), trades=trades_payload)
+        return GuardrailResponse(
+            metrics=metrics,
+            violations=violations,
+            scaled=bool(payload["scaled"]),
+            trades=trades_payload,
+            exposures=exposures_payload,
+        )
 
     return app
 

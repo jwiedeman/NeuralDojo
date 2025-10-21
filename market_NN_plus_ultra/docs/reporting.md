@@ -109,7 +109,22 @@ over-levered policies or fat-tailed behaviour before they reach production.
 Guardrail enforcement is now packaged in `market_nn_plus_ultra.trading.guardrails`.
 Load `GuardrailPolicy` with your YAML-configured thresholds to clip or audit
 trade logs locally, or call the new `/guardrails` FastAPI endpoint to receive
-scaled trades, metrics, and violation summaries directly from the service.
+scaled trades, metrics, exposure summaries, and violation details directly from
+the service. The response now includes symbol/sector/factor exposure snapshots
+so operations teams can inspect the largest positions alongside guardrail
+breaches:
+
+```python
+from market_nn_plus_ultra.trading.guardrails import GuardrailPolicy, GuardrailConfig
+
+policy = GuardrailPolicy(GuardrailConfig(enabled=False, capital_base=5_000_000))
+result = policy.enforce(trade_log_df)
+print(result.exposures["symbol"])
+```
+
+Each exposure map reports the peak absolute notional per group normalised by
+capital, enabling dashboards to highlight concentration risks without
+recomputing statistics downstream.
 
 ## Operations Readiness Summary
 
