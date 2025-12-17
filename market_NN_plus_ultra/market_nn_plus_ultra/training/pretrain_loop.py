@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 import logging
+from pathlib import Path
 from typing import Any
 import warnings
 
@@ -445,7 +446,7 @@ def run_pretraining(config: ExperimentConfig) -> dict[str, Any]:
         trainable_params / 1e6,
         total_params / 1e6,
     )
-    checkpoint_dir = config.trainer.checkpoint_dir
+    checkpoint_dir = Path(config.trainer.checkpoint_dir)
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     monitor_metric = config.pretraining.monitor_metric
     sanitized_monitor = monitor_metric.replace("/", "_")

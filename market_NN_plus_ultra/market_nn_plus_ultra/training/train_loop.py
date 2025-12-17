@@ -969,7 +969,7 @@ def run_training(
         trainable_params / 1e6,
         total_params / 1e6,
     )
-    checkpoint_dir = config.trainer.checkpoint_dir
+    checkpoint_dir = Path(config.trainer.checkpoint_dir)
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     monitor_metric = config.trainer.monitor_metric
     sanitized_monitor = monitor_metric.replace("/", "_")

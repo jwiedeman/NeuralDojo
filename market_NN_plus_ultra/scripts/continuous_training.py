@@ -89,8 +89,16 @@ class GracefulKiller:
         self.kill_now = True
 
 
-def fetch_latest_data(config: DaemonConfig) -> bool:
-    """Fetch latest market data."""
+def fetch_latest_data(config: DaemonConfig, force_full: bool = False) -> bool:
+    """Fetch latest market data using incremental updates when possible.
+
+    Args:
+        config: Daemon configuration
+        force_full: If True, do a full refetch instead of incremental
+
+    Returns:
+        True if data was fetched successfully
+    """
     logger.info("Fetching latest market data...")
 
     try:
@@ -102,6 +110,8 @@ def fetch_latest_data(config: DaemonConfig) -> bool:
 
         from fetch_market_data import (
             fetch_all_tickers,
+            fetch_incremental_data,
+            get_existing_data_info,
             compute_features,
             generate_regime_labels,
             write_to_sqlite,
@@ -118,13 +128,34 @@ def fetch_latest_data(config: DaemonConfig) -> bool:
         else:
             tickers = DEFAULT_TICKERS
 
-        # Fetch data (period auto-detected based on interval)
-        df = fetch_all_tickers(
-            tickers,
-            interval=config.data_interval,
-            period="auto",  # Auto-detect max period for interval
-            rate_limit_delay=0.1,
-        )
+        # Use incremental fetch if database exists
+        if config.db_path.exists() and not force_full:
+            logger.info("Using incremental data fetch (only new data)...")
+            existing_info = get_existing_data_info(config.db_path)
+            logger.info(f"Found existing data for {len(existing_info)} tickers")
+
+            df, fetched_tickers = fetch_incremental_data(
+                tickers,
+                config.db_path,
+                interval=config.data_interval,
+                rate_limit_delay=0.1,
+            )
+
+            if df.empty:
+                logger.info("Database is up to date - no new data needed")
+                return True  # Success - just no new data
+
+            append_mode = True
+        else:
+            # Full fetch for new database or forced refresh
+            logger.info("Running full data fetch...")
+            df = fetch_all_tickers(
+                tickers,
+                interval=config.data_interval,
+                period="auto",  # Auto-detect max period for interval
+                rate_limit_delay=0.1,
+            )
+            append_mode = False
 
         if df.empty:
             logger.error("No data fetched")
@@ -139,7 +170,7 @@ def fetch_latest_data(config: DaemonConfig) -> bool:
         regimes_df = generate_regime_labels(df)
 
         # Write to SQLite
-        write_to_sqlite(df, config.db_path, regimes_df)
+        write_to_sqlite(df, config.db_path, regimes_df, append=append_mode)
 
         logger.info(f"Data fetch complete: {len(df)} rows, {df['symbol'].nunique()} symbols")
         return True
