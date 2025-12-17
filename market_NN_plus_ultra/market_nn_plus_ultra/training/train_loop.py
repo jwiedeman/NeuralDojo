@@ -426,6 +426,7 @@ class MarketDataModule(pl.LightningDataModule):
         self._target_columns: list[str] = []
         self._persistent_workers: bool | None = None
         self._state_token_columns: list[str] = []
+        self._regime_source_columns: list[str] = []
         self._market_state_metadata: MarketStateMetadata | None = None
 
     def setup(self, stage: str | None = None) -> None:
@@ -442,13 +443,16 @@ class MarketDataModule(pl.LightningDataModule):
         pipeline = self.registry.build_pipeline(self.data_config.feature_set)
         enriched = pipeline.transform_panel(panel)
         enriched = self._prepare_market_state(enriched)
+        # Columns to exclude from features: token columns and original regime columns
+        # (regime columns are represented via embeddings, so including them as features is redundant)
+        excluded_columns = set(self._state_token_columns) | set(self._regime_source_columns)
         if self.data_config.feature_set:
             requested = [f for f in self.data_config.feature_set if f in enriched.columns]
             numeric_cols = enriched[requested].select_dtypes(include=[np.number]).columns.tolist()
-            available = [col for col in numeric_cols if col not in self._state_token_columns]
+            available = [col for col in numeric_cols if col not in excluded_columns]
         else:
             numeric_panel = enriched.select_dtypes(include=[np.number])
-            available = [c for c in numeric_panel.columns if c not in self._state_token_columns]
+            available = [c for c in numeric_panel.columns if c not in excluded_columns]
         self._enriched_panel = enriched
         self._feature_columns = available
         self._target_columns = list(self.data_config.target_columns)
@@ -519,8 +523,9 @@ class MarketDataModule(pl.LightningDataModule):
 
     def _prepare_market_state(self, panel: pd.DataFrame) -> pd.DataFrame:
         self._state_token_columns = []
+        self._regime_source_columns = []  # Track original regime columns to exclude from features
         self._market_state_metadata = None
-        regime_columns = [col for col in panel.columns if col.startswith("regime__")]
+        regime_columns = [col for col in panel.columns if col.startswith("regime__") and not col.endswith("__token")]
         if not regime_columns:
             return panel
 
@@ -533,6 +538,7 @@ class MarketDataModule(pl.LightningDataModule):
             categorical = pd.Categorical(filled)
             enriched[token_column] = categorical.codes.astype(np.int64)
             self._state_token_columns.append(token_column)
+            self._regime_source_columns.append(column)  # Track original column
             metadata_columns.append((base_name, token_column, categorical.categories.astype(str).tolist()))
 
         if metadata_columns:
