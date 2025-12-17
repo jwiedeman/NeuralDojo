@@ -106,10 +106,34 @@ INTERVALS = {
 }
 
 
+def get_max_period_for_interval(interval: str) -> str:
+    """Return the maximum period allowed for a given interval by Yahoo Finance."""
+    # Yahoo Finance data availability limits:
+    # 1m: 7 days
+    # 2m, 5m, 15m, 30m: 60 days
+    # 1h: 730 days (~2 years)
+    # 1d, 5d, 1wk, 1mo, 3mo: unlimited
+    limits = {
+        "1m": "7d",
+        "2m": "60d",
+        "5m": "60d",
+        "15m": "60d",
+        "30m": "60d",
+        "60m": "2y",
+        "1h": "2y",
+        "1d": "max",
+        "5d": "max",
+        "1wk": "max",
+        "1mo": "max",
+        "3mo": "max",
+    }
+    return limits.get(interval, "max")
+
+
 def fetch_ticker_data(
     ticker: str,
     interval: str = "1h",
-    period: str = "max",
+    period: str = "auto",
     start: Optional[str] = None,
     end: Optional[str] = None,
     retries: int = 3,
@@ -117,6 +141,10 @@ def fetch_ticker_data(
 ) -> Optional[pd.DataFrame]:
     """Fetch OHLCV data for a single ticker with retry logic."""
     import yfinance as yf
+
+    # Auto-detect max period for interval
+    if period == "auto" or period == "max":
+        period = get_max_period_for_interval(interval)
 
     for attempt in range(retries):
         try:
@@ -172,7 +200,7 @@ def fetch_ticker_data(
 def fetch_all_tickers(
     tickers: list[str],
     interval: str = "1h",
-    period: str = "max",
+    period: str = "auto",
     start: Optional[str] = None,
     end: Optional[str] = None,
     rate_limit_delay: float = 0.1,
@@ -180,6 +208,10 @@ def fetch_all_tickers(
     """Fetch data for all tickers and combine into a single DataFrame."""
     all_data = []
     failed_tickers = []
+
+    # Show actual period being used
+    actual_period = period if period not in ("auto", "max") else get_max_period_for_interval(interval)
+    logger.info(f"Using period '{actual_period}' for interval '{interval}'")
 
     for i, ticker in enumerate(tickers):
         logger.info(f"Fetching {ticker} ({i + 1}/{len(tickers)})")
