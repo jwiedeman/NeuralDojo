@@ -10,6 +10,12 @@ from .risk import (
     sharpe_ratio,
     sortino_ratio,
 )
+from .shadow_trader import (
+    Position,
+    Trade,
+    ShadowPortfolio,
+    ShadowTradingSession,
+)
 
 __all__ = [
     "MarketNNPlusUltraAgent",
@@ -27,6 +33,10 @@ __all__ = [
     "GuardrailPolicy",
     "GuardrailResult",
     "GuardrailViolation",
+    "Position",
+    "Trade",
+    "ShadowPortfolio",
+    "ShadowTradingSession",
 ]
 
 

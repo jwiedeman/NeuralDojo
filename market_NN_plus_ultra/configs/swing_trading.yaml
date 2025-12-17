@@ -1,0 +1,131 @@
+seed: 42
+notes: "Swing trading configuration - multi-day holds, 1h candles"
+
+data:
+  sqlite_path: data/market.db
+  symbol_universe: []  # Empty = use all symbols in database
+  indicators: {}
+  alternative_data: []
+  resample_rule: null
+  tz_convert: null
+  feature_set: null
+  target_columns: [close]
+  window_size: 256  # ~10 days of 1h data
+  horizon: 24  # 24 hour forward prediction
+  stride: 4
+  normalise: true
+  val_fraction: 0.2
+  curriculum:
+    repeat_final: true
+    stages:
+      - start_epoch: 0
+        window_size: 128
+        horizon: 12
+        stride: 2
+        normalise: true
+      - start_epoch: 20
+        window_size: 192
+        horizon: 18
+        stride: 3
+      - start_epoch: 40
+        window_size: 256
+        horizon: 24
+        stride: 4
+
+model:
+  feature_dim: 64
+  model_dim: 512
+  depth: 12
+  heads: 8
+  dropout: 0.1
+  conv_kernel_size: 7
+  conv_dilations: [1, 2, 4, 8, 16, 32]
+  horizon: 24
+  output_dim: 1
+  architecture: omni_mixture
+  ff_mult: 4
+  ssm_state_dim: 192
+  ssm_kernel_size: 16
+  coarse_factor: 4
+  cross_every: 2
+  max_seq_len: 2048
+  calibration:
+    enabled: true
+    quantiles: [0.1, 0.25, 0.5, 0.75, 0.9]
+    temperature: 1.0
+    min_concentration: 0.01
+  scale_factors: [1, 4, 16]
+  scale_depth: null
+  fusion_heads: 4
+  market_state:
+    enabled: true
+    embedding_dim: 16
+    dropout: 0.05
+    include: []
+
+optimizer:
+  lr: 0.0003
+  weight_decay: 0.01
+  betas: [0.9, 0.95]
+
+trainer:
+  batch_size: 64
+  num_workers: 4
+  max_epochs: 100
+  gradient_clip_val: 1.0
+  accumulate_grad_batches: 2
+  accelerator: auto
+  devices: auto
+  precision: bf16-mixed
+  log_every_n_steps: 25
+  checkpoint_dir: checkpoints/swing_trading
+  monitor_metric: val/loss
+  monitor_mode: min
+  save_top_k: 3
+
+diagnostics:
+  enabled: true
+  log_interval: 25
+  profile: false
+  gradient_noise_threshold: 4.0
+  calibration_bias_threshold: 0.05
+  calibration_error_threshold: 0.15
+
+reinforcement:
+  total_updates: 500
+  steps_per_rollout: 1024
+  policy_epochs: 4
+  minibatch_size: 128
+  gamma: 0.995
+  gae_lambda: 0.97
+  clip_ratio: 0.2
+  value_coef: 0.5
+  entropy_coef: 0.01
+  learning_rate: 0.0001
+  max_grad_norm: 1.0
+  rollout_workers: 2
+  worker_device: cpu
+  targets_are_returns: false
+  activation: tanh
+  costs:
+    transaction: 0.001
+    slippage: 0.0005
+    holding: 0.0
+  risk_objective:
+    sharpe_weight: 0.15
+    sortino_weight: 0.1
+    drawdown_weight: 0.25
+    cvar_weight: 0.1
+    cvar_alpha: 0.05
+    reward_scale: 1.0
+  replay_buffer:
+    enabled: true
+    capacity: 10000
+    min_samples: 512
+    sample_ratio: 0.25
+
+wandb_project: market-nn-swing
+wandb_entity: null
+wandb_run_name: null
+wandb_tags: [swing_trading, rl]
+wandb_offline: false
