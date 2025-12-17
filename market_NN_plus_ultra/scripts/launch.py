@@ -130,7 +130,7 @@ def fetch_data(interval: str = "1h", categories: list[str] | None = None):
         str(Path(__file__).parent / "fetch_market_data.py"),
         "data/market.db",
         "--interval", interval,
-        "--period", "2y",
+        "--period", "auto",
         "--compute-features",
     ]
 
