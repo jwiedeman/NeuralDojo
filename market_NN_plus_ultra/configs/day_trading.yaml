@@ -1,0 +1,131 @@
+seed: 42
+notes: "Day trading configuration - intraday positions, 15min candles"
+
+data:
+  sqlite_path: data/market.db
+  symbol_universe: []  # Empty = use all symbols in database
+  indicators: {}
+  alternative_data: []
+  resample_rule: null
+  tz_convert: null
+  feature_set: null
+  target_columns: [close]
+  window_size: 128  # ~32 hours of 15min data
+  horizon: 8  # 2 hour forward prediction
+  stride: 2
+  normalise: true
+  val_fraction: 0.2
+  curriculum:
+    repeat_final: true
+    stages:
+      - start_epoch: 0
+        window_size: 64
+        horizon: 4
+        stride: 1
+        normalise: true
+      - start_epoch: 15
+        window_size: 96
+        horizon: 6
+        stride: 2
+      - start_epoch: 30
+        window_size: 128
+        horizon: 8
+        stride: 2
+
+model:
+  feature_dim: 64
+  model_dim: 384
+  depth: 10
+  heads: 8
+  dropout: 0.15
+  conv_kernel_size: 5
+  conv_dilations: [1, 2, 4, 8, 16]
+  horizon: 8
+  output_dim: 1
+  architecture: omni_mixture
+  ff_mult: 4
+  ssm_state_dim: 128
+  ssm_kernel_size: 8
+  coarse_factor: 4
+  cross_every: 2
+  max_seq_len: 1024
+  calibration:
+    enabled: true
+    quantiles: [0.1, 0.25, 0.5, 0.75, 0.9]
+    temperature: 1.0
+    min_concentration: 0.01
+  scale_factors: [1, 4]
+  scale_depth: null
+  fusion_heads: 4
+  market_state:
+    enabled: true
+    embedding_dim: 16
+    dropout: 0.05
+    include: []
+
+optimizer:
+  lr: 0.0005
+  weight_decay: 0.01
+  betas: [0.9, 0.95]
+
+trainer:
+  batch_size: 96
+  num_workers: 4
+  max_epochs: 80
+  gradient_clip_val: 1.0
+  accumulate_grad_batches: 1
+  accelerator: auto
+  devices: auto
+  precision: bf16-mixed
+  log_every_n_steps: 20
+  checkpoint_dir: checkpoints/day_trading
+  monitor_metric: val/loss
+  monitor_mode: min
+  save_top_k: 3
+
+diagnostics:
+  enabled: true
+  log_interval: 20
+  profile: false
+  gradient_noise_threshold: 4.0
+  calibration_bias_threshold: 0.05
+  calibration_error_threshold: 0.15
+
+reinforcement:
+  total_updates: 300
+  steps_per_rollout: 2048
+  policy_epochs: 3
+  minibatch_size: 256
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_ratio: 0.2
+  value_coef: 0.5
+  entropy_coef: 0.02
+  learning_rate: 0.0002
+  max_grad_norm: 1.0
+  rollout_workers: 2
+  worker_device: cpu
+  targets_are_returns: false
+  activation: tanh
+  costs:
+    transaction: 0.0015
+    slippage: 0.001
+    holding: 0.0001
+  risk_objective:
+    sharpe_weight: 0.2
+    sortino_weight: 0.15
+    drawdown_weight: 0.3
+    cvar_weight: 0.15
+    cvar_alpha: 0.05
+    reward_scale: 1.0
+  replay_buffer:
+    enabled: true
+    capacity: 8000
+    min_samples: 512
+    sample_ratio: 0.2
+
+wandb_project: market-nn-day
+wandb_entity: null
+wandb_run_name: null
+wandb_tags: [day_trading, rl]
+wandb_offline: false

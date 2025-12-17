@@ -19,6 +19,13 @@ from .state_space import (
 from .losses import composite_trading_loss, sharpe_ratio_loss
 from .calibration import CalibratedPolicyHead, CalibrationHeadOutput
 from .market_state import MarketStateEmbedding, MarketStateMetadata, MarketStateFeature
+from .ensemble import (
+    EnsembleConfig,
+    EnsembleMemberConfig,
+    EnsembleModel,
+    EnsembleTrainer,
+    create_default_ensemble,
+)
 
 __all__ = [
     "TemporalBackbone",
@@ -49,4 +56,9 @@ __all__ = [
     "MarketStateEmbedding",
     "MarketStateMetadata",
     "MarketStateFeature",
+    "EnsembleConfig",
+    "EnsembleMemberConfig",
+    "EnsembleModel",
+    "EnsembleTrainer",
+    "create_default_ensemble",
 ]
