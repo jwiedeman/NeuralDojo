@@ -14,22 +14,22 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .temporal_transformer import HybridTemporalTransformer
+from .temporal_transformer import TemporalBackbone
 from .temporal_fusion import TemporalFusionTransformer
-from .omni_mixture import OmniMixtureBackbone
-from .moe_transformer import MoETransformerBackbone
+from .omni_mixture import MarketOmniBackbone
+from .moe_transformer import MixtureOfExpertsBackbone
 from .multi_scale import MultiScaleBackbone
 
 
 ARCHITECTURE_MAP = {
-    "hybrid": HybridTemporalTransformer,
-    "temporal_transformer": HybridTemporalTransformer,
+    "hybrid": TemporalBackbone,
+    "temporal_transformer": TemporalBackbone,
     "tft": TemporalFusionTransformer,
     "temporal_fusion": TemporalFusionTransformer,
-    "omni": OmniMixtureBackbone,
-    "omni_mixture": OmniMixtureBackbone,
-    "moe": MoETransformerBackbone,
-    "moe_transformer": MoETransformerBackbone,
+    "omni": MarketOmniBackbone,
+    "omni_mixture": MarketOmniBackbone,
+    "moe": MixtureOfExpertsBackbone,
+    "moe_transformer": MixtureOfExpertsBackbone,
     "multi_scale": MultiScaleBackbone,
 }
 

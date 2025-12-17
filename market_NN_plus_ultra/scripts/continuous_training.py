@@ -94,7 +94,13 @@ def fetch_latest_data(config: DaemonConfig) -> bool:
     logger.info("Fetching latest market data...")
 
     try:
-        from scripts.fetch_market_data import (
+        # Add scripts directory to path for imports
+        import sys
+        scripts_dir = Path(__file__).parent
+        if str(scripts_dir) not in sys.path:
+            sys.path.insert(0, str(scripts_dir))
+
+        from fetch_market_data import (
             fetch_all_tickers,
             compute_features,
             generate_regime_labels,
