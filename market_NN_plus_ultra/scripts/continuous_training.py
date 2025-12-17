@@ -112,11 +112,11 @@ def fetch_latest_data(config: DaemonConfig) -> bool:
         else:
             tickers = DEFAULT_TICKERS
 
-        # Fetch data
+        # Fetch data (period auto-detected based on interval)
         df = fetch_all_tickers(
             tickers,
             interval=config.data_interval,
-            period="2y",  # Get 2 years of data
+            period="auto",  # Auto-detect max period for interval
             rate_limit_delay=0.1,
         )
 
