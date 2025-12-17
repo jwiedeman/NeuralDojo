@@ -366,17 +366,158 @@ def generate_regime_labels(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(regimes)
 
 
+def get_existing_data_info(db_path: Path) -> dict[str, datetime]:
+    """Get the latest timestamp for each ticker in existing database.
+
+    Returns:
+        Dictionary mapping symbol -> latest timestamp
+    """
+    if not db_path.exists():
+        return {}
+
+    try:
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.execute(
+            "SELECT symbol, MAX(timestamp) FROM series GROUP BY symbol"
+        )
+        result = {}
+        for symbol, max_ts in cursor.fetchall():
+            if max_ts:
+                # Parse timestamp string to datetime
+                try:
+                    result[symbol] = pd.to_datetime(max_ts)
+                except Exception:
+                    pass
+        conn.close()
+        return result
+    except Exception as e:
+        logger.warning(f"Could not read existing database: {e}")
+        return {}
+
+
+def fetch_incremental_data(
+    tickers: list[str],
+    db_path: Path,
+    interval: str = "1h",
+    rate_limit_delay: float = 0.1,
+) -> tuple[pd.DataFrame, list[str]]:
+    """Fetch only new data that doesn't exist in the database.
+
+    Returns:
+        Tuple of (new_data_dataframe, list_of_tickers_fetched)
+    """
+    existing_info = get_existing_data_info(db_path)
+
+    all_data = []
+    fetched_tickers = []
+    failed_tickers = []
+
+    for i, ticker in enumerate(tickers):
+        logger.info(f"Checking {ticker} ({i + 1}/{len(tickers)})")
+
+        if ticker in existing_info:
+            # Ticker exists - only fetch new data
+            last_ts = existing_info[ticker]
+            # Add a small buffer to avoid duplicates (1 interval)
+            interval_delta = _interval_to_timedelta(interval)
+            start_date = (last_ts + interval_delta).strftime('%Y-%m-%d')
+            end_date = datetime.now().strftime('%Y-%m-%d')
+
+            # Check if we actually need new data
+            if last_ts >= datetime.now() - interval_delta * 2:
+                logger.info(f"  {ticker}: Already up to date (last: {last_ts})")
+                continue
+
+            logger.info(f"  {ticker}: Fetching from {start_date} (had data up to {last_ts})")
+            df = fetch_ticker_data(
+                ticker,
+                interval=interval,
+                start=start_date,
+                end=end_date,
+            )
+        else:
+            # New ticker - fetch full history
+            logger.info(f"  {ticker}: New ticker, fetching full history")
+            df = fetch_ticker_data(ticker, interval=interval, period="auto")
+
+        if df is not None and not df.empty:
+            all_data.append(df)
+            fetched_tickers.append(ticker)
+        elif ticker not in existing_info:
+            # Only count as failed if it's a new ticker with no data
+            failed_tickers.append(ticker)
+
+        # Rate limiting
+        if i < len(tickers) - 1:
+            time.sleep(rate_limit_delay)
+
+    if failed_tickers:
+        logger.warning(f"Failed to fetch {len(failed_tickers)} new tickers: {failed_tickers}")
+
+    if not all_data:
+        logger.info("No new data to fetch - database is up to date")
+        return pd.DataFrame(), []
+
+    combined = pd.concat(all_data, ignore_index=True)
+    combined = combined.sort_values(['timestamp', 'symbol']).reset_index(drop=True)
+
+    logger.info(f"Fetched {len(combined)} new rows for {len(fetched_tickers)} tickers")
+    return combined, fetched_tickers
+
+
+def _interval_to_timedelta(interval: str) -> timedelta:
+    """Convert interval string to timedelta."""
+    mappings = {
+        "1m": timedelta(minutes=1),
+        "5m": timedelta(minutes=5),
+        "15m": timedelta(minutes=15),
+        "30m": timedelta(minutes=30),
+        "1h": timedelta(hours=1),
+        "1d": timedelta(days=1),
+        "5d": timedelta(days=5),
+        "1wk": timedelta(weeks=1),
+    }
+    return mappings.get(interval, timedelta(hours=1))
+
+
 def write_to_sqlite(
     df: pd.DataFrame,
     db_path: Path,
     regimes_df: Optional[pd.DataFrame] = None,
+    append: bool = False,
 ) -> None:
-    """Write data to SQLite database with proper schema."""
+    """Write data to SQLite database with proper schema.
+
+    Args:
+        df: DataFrame with OHLCV data
+        db_path: Path to SQLite database
+        regimes_df: Optional regime labels DataFrame
+        append: If True, append to existing data instead of replacing
+    """
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     conn = sqlite3.connect(str(db_path))
 
     try:
+        if append and db_path.exists():
+            # Append mode: add new data and deduplicate
+            # First, read existing data
+            try:
+                existing_df = pd.read_sql("SELECT * FROM series", conn)
+                existing_df['timestamp'] = pd.to_datetime(existing_df['timestamp'])
+
+                # Combine and remove duplicates (keep newest)
+                combined = pd.concat([existing_df, df], ignore_index=True)
+                combined = combined.drop_duplicates(
+                    subset=['timestamp', 'symbol'],
+                    keep='last'
+                )
+                combined = combined.sort_values(['timestamp', 'symbol']).reset_index(drop=True)
+                df = combined
+                logger.info(f"Combined with existing data: {len(df)} total rows")
+            except Exception as e:
+                logger.warning(f"Could not read existing data for append: {e}")
+
         # Create assets table
         symbols = df['symbol'].unique()
         assets_df = pd.DataFrame({
@@ -391,6 +532,17 @@ def write_to_sqlite(
 
         # Create regimes table
         if regimes_df is not None and not regimes_df.empty:
+            if append:
+                try:
+                    existing_regimes = pd.read_sql("SELECT * FROM regimes", conn)
+                    existing_regimes['timestamp'] = pd.to_datetime(existing_regimes['timestamp'])
+                    regimes_df = pd.concat([existing_regimes, regimes_df], ignore_index=True)
+                    regimes_df = regimes_df.drop_duplicates(
+                        subset=['timestamp', 'symbol', 'name'],
+                        keep='last'
+                    )
+                except Exception:
+                    pass
             regimes_df.to_sql('regimes', conn, if_exists='replace', index=False)
 
         # Create indices for faster queries
@@ -476,6 +628,16 @@ def parse_args() -> argparse.Namespace:
         default=0.1,
         help="Delay between ticker fetches in seconds",
     )
+    parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Only fetch new data not already in database (efficient updates)",
+    )
+    parser.add_argument(
+        "--force-full",
+        action="store_true",
+        help="Force full refetch even if data exists",
+    )
     return parser.parse_args()
 
 
@@ -496,15 +658,38 @@ def main() -> int:
     logger.info(f"Fetching data for {len(tickers)} tickers")
     logger.info(f"Interval: {args.interval}, Period: {args.period}")
 
-    # Fetch data
-    df = fetch_all_tickers(
-        tickers,
-        interval=args.interval,
-        period=args.period,
-        start=args.start,
-        end=args.end,
-        rate_limit_delay=args.rate_limit,
-    )
+    # Decide between incremental and full fetch
+    use_incremental = args.incremental and not args.force_full and args.output.exists()
+
+    if use_incremental:
+        logger.info("Running incremental fetch (only new data)...")
+        existing_info = get_existing_data_info(args.output)
+        logger.info(f"Found existing data for {len(existing_info)} tickers")
+
+        df, fetched_tickers = fetch_incremental_data(
+            tickers,
+            args.output,
+            interval=args.interval,
+            rate_limit_delay=args.rate_limit,
+        )
+
+        if df.empty:
+            logger.info("Database is up to date - no new data needed")
+            return 0
+
+        append_mode = True
+    else:
+        # Full fetch
+        logger.info("Running full data fetch...")
+        df = fetch_all_tickers(
+            tickers,
+            interval=args.interval,
+            period=args.period,
+            start=args.start,
+            end=args.end,
+            rate_limit_delay=args.rate_limit,
+        )
+        append_mode = False
 
     # Compute features
     if args.compute_features and not args.no_features:
@@ -516,7 +701,7 @@ def main() -> int:
     regimes_df = generate_regime_labels(df)
 
     # Write to SQLite
-    write_to_sqlite(df, args.output, regimes_df)
+    write_to_sqlite(df, args.output, regimes_df, append=append_mode)
 
     logger.info("Data fetch complete!")
     return 0

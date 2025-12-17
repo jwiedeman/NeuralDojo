@@ -121,9 +121,18 @@ def install_package():
     return True
 
 
-def fetch_data(interval: str = "1h", categories: list[str] | None = None):
-    """Fetch market data."""
-    print("\n📊 Fetching market data...")
+def fetch_data(interval: str = "1h", categories: list[str] | None = None, incremental: bool = False):
+    """Fetch market data.
+
+    Args:
+        interval: Data interval (e.g., '1h', '15m')
+        categories: Ticker categories to fetch
+        incremental: If True, only fetch new data not already in database
+    """
+    if incremental:
+        print("\n📊 Updating market data (incremental)...")
+    else:
+        print("\n📊 Fetching market data (full)...")
 
     cmd = [
         sys.executable,
@@ -136,6 +145,9 @@ def fetch_data(interval: str = "1h", categories: list[str] | None = None):
 
     if categories:
         cmd.extend(["--categories"] + categories)
+
+    if incremental:
+        cmd.append("--incremental")
 
     result = subprocess.run(cmd, cwd=Path(__file__).parent.parent)
 
@@ -262,7 +274,9 @@ Trading Modes:
     # Fetch data if needed
     data_path = project_root / "data" / "market.db"
     if args.setup or args.fetch_only or not data_path.exists():
-        if not fetch_data(interval, args.categories):
+        # Use full fetch for setup or new database, incremental for updates
+        use_incremental = data_path.exists() and not args.setup
+        if not fetch_data(interval, args.categories, incremental=use_incremental):
             return 1
 
     if args.fetch_only:
