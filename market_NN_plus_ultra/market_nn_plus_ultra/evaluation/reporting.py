@@ -693,7 +693,7 @@ def _build_markdown(
         f"- **Symbols:** {summary.symbols}",
     ]
     if summary.start_timestamp:
-        lines.append(f"- **Window:** {summary.start_timestamp} → {summary.end_timestamp}")
+        lines.append(f"- **Window:** {summary.start_timestamp} -> {summary.end_timestamp}")
     lines.append("")
 
     lines += ["## Risk Metrics", "", "| Metric | Value |", "| --- | --- |"]
@@ -810,7 +810,7 @@ def _build_html(
     ]
     if summary.start_timestamp:
         overview_items.append(
-            f"<li><strong>Window:</strong> {summary.start_timestamp} → {summary.end_timestamp}</li>"
+            f"<li><strong>Window:</strong> {summary.start_timestamp} -> {summary.end_timestamp}</li>"
         )
 
     metrics_rows = "\n".join(
