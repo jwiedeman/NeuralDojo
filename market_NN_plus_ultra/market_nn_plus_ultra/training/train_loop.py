@@ -457,6 +457,12 @@ class MarketDataModule(pl.LightningDataModule):
         panel = dataset.as_panel()
         pipeline = self.registry.build_pipeline(self.data_config.feature_set)
         enriched = pipeline.transform_panel(panel)
+        # Remove duplicate columns (keep first occurrence) - SQLite data may already have
+        # computed features that the FeatureRegistry also computes
+        if enriched.columns.duplicated().any():
+            dup_cols = enriched.columns[enriched.columns.duplicated()].tolist()
+            logger.info("Removing %d duplicate columns: %s", len(dup_cols), dup_cols[:10])
+            enriched = enriched.loc[:, ~enriched.columns.duplicated()]
         enriched = self._prepare_market_state(enriched)
         # Columns to exclude from features: token columns and original regime columns
         # (regime columns are represented via embeddings, so including them as features is redundant)
