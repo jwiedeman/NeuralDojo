@@ -428,6 +428,33 @@ def run_pretraining(config: ExperimentConfig) -> dict[str, Any]:
                 RuntimeWarning,
                 stacklevel=2,
             )
+
+    # Suppress expected warnings that are either handled or unavoidable
+    warnings.filterwarnings(
+        "ignore",
+        message=r".*persistent_workers=True.*",
+        category=UserWarning,
+        module=r"pytorch_lightning\.trainer\.connectors\.data_connector",
+    )
+    warnings.filterwarnings(
+        "ignore",
+        message=r".*Checkpoint directory.*exists and is not empty.*",
+        category=UserWarning,
+        module=r"pytorch_lightning\.callbacks\.model_checkpoint",
+    )
+    warnings.filterwarnings(
+        "ignore",
+        message=r".*Precision bf16-mixed is not supported by the model summary.*",
+        category=UserWarning,
+        module=r"pytorch_lightning\.utilities\.model_summary",
+    )
+    # Suppress pydantic warnings from wandb internals (Python 3.13 compatibility)
+    warnings.filterwarnings(
+        "ignore",
+        category=UserWarning,
+        module=r"pydantic\._internal\._generate_schema",
+    )
+
     module, data_module = instantiate_pretraining_module(config)
     if data_module.train_dataset is None or data_module.val_dataset is None:
         data_module.setup(stage="fit")
