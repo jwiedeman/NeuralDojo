@@ -70,7 +70,11 @@ class SlidingWindowDataset(Dataset):
             raise ValueError("Panel must be indexed by ('timestamp', 'symbol')")
 
         self.panel = panel
-        self.feature_columns = list(feature_columns or [c for c in panel.columns if c not in ("symbol",)])
+        # Use provided feature_columns or fall back to all numeric columns
+        if feature_columns is not None and len(feature_columns) > 0:
+            self.feature_columns = list(feature_columns)
+        else:
+            self.feature_columns = [c for c in panel.columns if c not in ("symbol",)]
         self.target_columns = list(target_columns or ["close"])
         self.window_size = window_size
         self.horizon = horizon
@@ -83,9 +87,16 @@ class SlidingWindowDataset(Dataset):
 
     def _precompute_symbol_data(self) -> dict[str, _SymbolData]:
         symbol_data: dict[str, _SymbolData] = {}
+        expected_feature_dim = len(self.feature_columns)
         for symbol in self.panel.index.get_level_values("symbol").unique():
             sym_df = self.panel.xs(symbol, level="symbol")
             feature_array = sym_df[self.feature_columns].to_numpy(dtype=np.float32, copy=True)
+            # Verify feature dimensions match expectations
+            if feature_array.shape[1] != expected_feature_dim:
+                raise ValueError(
+                    f"Feature dimension mismatch for {symbol}: expected {expected_feature_dim} "
+                    f"columns but got {feature_array.shape[1]}. Feature columns: {self.feature_columns[:5]}..."
+                )
             target_array = sym_df[self.target_columns].to_numpy(dtype=np.float32, copy=True)
             state_array: np.ndarray | None = None
             if self.state_columns:

@@ -499,9 +499,11 @@ class MarketDataModule(pl.LightningDataModule):
     def _build_dataset(self, params: CurriculumParameters) -> SlidingWindowDataset:
         if self._enriched_panel is None:
             raise RuntimeError("DataModule.setup must be called before building datasets")
-        logger.debug("Building dataset with %d feature columns and %d state columns",
-                    len(self._feature_columns), len(self._state_token_columns))
-        return SlidingWindowDataset(
+        logger.info("Building dataset: %d feature columns, %d state columns, panel has %d total columns",
+                    len(self._feature_columns), len(self._state_token_columns), len(self._enriched_panel.columns))
+        if len(self._feature_columns) == 0:
+            logger.error("Feature columns list is EMPTY! This will cause all panel columns to be used.")
+        dataset = SlidingWindowDataset(
             panel=self._enriched_panel,
             feature_columns=self._feature_columns,
             target_columns=self._target_columns,
@@ -511,6 +513,9 @@ class MarketDataModule(pl.LightningDataModule):
             normalise=params.normalise,
             state_columns=self._state_token_columns,
         )
+        # Verify the dataset feature dimension matches what we passed
+        logger.info("Dataset created with %d feature columns", len(dataset.feature_columns))
+        return dataset
 
     def _assign_splits(self, dataset: SlidingWindowDataset) -> None:
         dataset_length = len(dataset)
