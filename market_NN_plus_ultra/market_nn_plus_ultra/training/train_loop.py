@@ -1001,7 +1001,7 @@ def run_training(
         data_module.setup(stage="fit")
     summary = data_module.dataset_summary()
     logger.info(
-        "Prepared %s training windows and %s validation windows (batch size %s → %s steps/epoch)",
+        "Prepared %s training windows and %s validation windows (batch size %s -> %s steps/epoch)",
         summary["train_windows"],
         summary["val_windows"],
         config.trainer.batch_size,

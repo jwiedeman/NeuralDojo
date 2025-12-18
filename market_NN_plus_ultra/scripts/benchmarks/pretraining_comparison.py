@@ -107,7 +107,7 @@ def _format_delta_summary(delta_row: dict[str, object]) -> str | None:
             continue
     if not parts:
         return None
-    return "Warm-start vs scratch deltas → " + ", ".join(parts)
+    return "Warm-start vs scratch deltas -> " + ", ".join(parts)
 
 
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
