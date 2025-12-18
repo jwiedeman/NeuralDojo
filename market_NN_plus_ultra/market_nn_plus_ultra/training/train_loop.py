@@ -249,6 +249,14 @@ class MarketLightningModule(pl.LightningModule):
                     base_feat_dim, state_embed.shape[-1], features.shape[-1], self.model_config.feature_dim
                 )
                 self._logged_dims = True
+        # Safety check for dimension mismatch
+        if features.shape[-1] != self.model_config.feature_dim:
+            raise RuntimeError(
+                f"Feature dimension mismatch: got {features.shape[-1]} features but model expects "
+                f"{self.model_config.feature_dim}. Base features: {base_feat_dim}. "
+                f"This usually means the database has extra columns. Try deleting data/market.db "
+                f"and re-fetching data with: python scripts/launch.py --setup --mode day"
+            )
         hidden = self.backbone(features)
         head_output = self.head(hidden)
         if isinstance(head_output, CalibrationHeadOutput):
