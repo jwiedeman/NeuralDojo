@@ -239,9 +239,24 @@ class MarketLightningModule(pl.LightningModule):
         *,
         state_tokens: torch.Tensor | None = None,
     ) -> torch.Tensor:
+        base_feat_dim = features.shape[-1]
         if self.market_state_embedding is not None:
             state_embed = self._compute_state_embedding(features, state_tokens)
             features = torch.cat([features, state_embed], dim=-1)
+            if not hasattr(self, '_logged_dims'):
+                logger.info(
+                    "Forward pass dims: base_features=%d, state_embed=%d, total=%d, model_expects=%d",
+                    base_feat_dim, state_embed.shape[-1], features.shape[-1], self.model_config.feature_dim
+                )
+                self._logged_dims = True
+        # Safety check for dimension mismatch
+        if features.shape[-1] != self.model_config.feature_dim:
+            raise RuntimeError(
+                f"Feature dimension mismatch: got {features.shape[-1]} features but model expects "
+                f"{self.model_config.feature_dim}. Base features: {base_feat_dim}. "
+                f"This usually means the database has extra columns. Try deleting data/market.db "
+                f"and re-fetching data with: python scripts/launch.py --setup --mode day"
+            )
         hidden = self.backbone(features)
         head_output = self.head(hidden)
         if isinstance(head_output, CalibrationHeadOutput):
@@ -446,16 +461,27 @@ class MarketDataModule(pl.LightningDataModule):
         # Columns to exclude from features: token columns and original regime columns
         # (regime columns are represented via embeddings, so including them as features is redundant)
         excluded_columns = set(self._state_token_columns) | set(self._regime_source_columns)
+        logger.debug("State token columns to exclude: %s", self._state_token_columns)
+        logger.debug("Regime source columns to exclude: %s", self._regime_source_columns)
         if self.data_config.feature_set:
             requested = [f for f in self.data_config.feature_set if f in enriched.columns]
             numeric_cols = enriched[requested].select_dtypes(include=[np.number]).columns.tolist()
-            available = [col for col in numeric_cols if col not in excluded_columns]
+            # Exclude any column containing 'regime' (handles edge cases)
+            available = [col for col in numeric_cols if col not in excluded_columns and 'regime' not in col.lower()]
         else:
             numeric_panel = enriched.select_dtypes(include=[np.number])
-            available = [c for c in numeric_panel.columns if c not in excluded_columns]
+            all_numeric = list(numeric_panel.columns)
+            # Exclude any column containing 'regime' (handles edge cases)
+            available = [c for c in all_numeric if c not in excluded_columns and 'regime' not in c.lower()]
+            logger.info("Total numeric columns: %d, excluded: %d, available: %d",
+                       len(all_numeric), len(excluded_columns), len(available))
         self._enriched_panel = enriched
         self._feature_columns = available
         self._target_columns = list(self.data_config.target_columns)
+        # Log regime-related columns for debugging
+        regime_in_features = [c for c in available if 'regime' in c.lower()]
+        if regime_in_features:
+            logger.warning("Regime columns still in features (should be excluded): %s", regime_in_features)
 
         if self.data_config.curriculum is not None:
             self.curriculum_scheduler = CurriculumScheduler(self.data_config, self.data_config.curriculum)
@@ -473,6 +499,8 @@ class MarketDataModule(pl.LightningDataModule):
     def _build_dataset(self, params: CurriculumParameters) -> SlidingWindowDataset:
         if self._enriched_panel is None:
             raise RuntimeError("DataModule.setup must be called before building datasets")
+        logger.debug("Building dataset with %d feature columns and %d state columns",
+                    len(self._feature_columns), len(self._state_token_columns))
         return SlidingWindowDataset(
             panel=self._enriched_panel,
             feature_columns=self._feature_columns,
