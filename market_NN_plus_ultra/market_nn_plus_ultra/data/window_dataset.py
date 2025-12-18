@@ -69,6 +69,9 @@ class SlidingWindowDataset(Dataset):
         if not isinstance(panel.index, pd.MultiIndex) or panel.index.names != ["timestamp", "symbol"]:
             raise ValueError("Panel must be indexed by ('timestamp', 'symbol')")
 
+        # Remove duplicate columns if present (keep first occurrence)
+        if panel.columns.duplicated().any():
+            panel = panel.loc[:, ~panel.columns.duplicated()]
         self.panel = panel
         # Use provided feature_columns or fall back to all numeric columns
         if feature_columns is not None and len(feature_columns) > 0:
