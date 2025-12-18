@@ -31,3 +31,9 @@ Thumbs.db
 .cache/
 .coverage
 htmlcov/
+
+# Market NN Plus Ultra runtime artifacts
+market_NN_plus_ultra/data/
+market_NN_plus_ultra/wandb/
+market_NN_plus_ultra/checkpoints/
+*.db
