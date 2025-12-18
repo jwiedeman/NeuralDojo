@@ -128,4 +128,4 @@ wandb_project: market-nn-day
 wandb_entity: null
 wandb_run_name: null
 wandb_tags: [day_trading, rl]
-wandb_offline: false
+wandb_offline: true
