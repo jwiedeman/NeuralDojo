@@ -458,11 +458,13 @@ class MarketDataModule(pl.LightningDataModule):
         if self.data_config.feature_set:
             requested = [f for f in self.data_config.feature_set if f in enriched.columns]
             numeric_cols = enriched[requested].select_dtypes(include=[np.number]).columns.tolist()
-            available = [col for col in numeric_cols if col not in excluded_columns]
+            # Exclude any column containing 'regime' (handles edge cases)
+            available = [col for col in numeric_cols if col not in excluded_columns and 'regime' not in col.lower()]
         else:
             numeric_panel = enriched.select_dtypes(include=[np.number])
             all_numeric = list(numeric_panel.columns)
-            available = [c for c in all_numeric if c not in excluded_columns]
+            # Exclude any column containing 'regime' (handles edge cases)
+            available = [c for c in all_numeric if c not in excluded_columns and 'regime' not in c.lower()]
             logger.info("Total numeric columns: %d, excluded: %d, available: %d",
                        len(all_numeric), len(excluded_columns), len(available))
         self._enriched_panel = enriched
